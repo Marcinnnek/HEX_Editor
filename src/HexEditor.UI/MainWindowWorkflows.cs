@@ -6,28 +6,32 @@ using HexEditor.Tools;
 namespace HexEditor.UI;
 
 /// <summary>Coordinates image edit use cases while leaving prompts and control state to the WPF view.</summary>
-internal sealed class ImageEditWorkflow(ImageEditingSession editing)
+internal sealed class ImageEditWorkflow(MainViewModel viewModel)
 {
     public void Insert(uint address, IReadOnlyList<byte> bytes, Func<int, string, OverlapDecision> chooseOverlap)
     {
-        var preview = editing.PreviewInsert(address, bytes);
+        var preview = viewModel.Editing.PreviewInsert(address, bytes);
         var decision = preview.OverlapCount == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(preview.OverlapCount, "insert/replace");
-        editing.InsertBytes(address, bytes, decision);
+        viewModel.Editing.InsertBytes(address, bytes, decision);
     }
 
     public void Paste(uint address, Func<int, string, OverlapDecision> chooseOverlap)
     {
-        var collisions = editing.GetPasteOverlapCount(address);
-        editing.PasteAt(address, collisions == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(collisions, "paste"));
+        var collisions = viewModel.Editing.GetPasteOverlapCount(address);
+        viewModel.Editing.PasteAt(address, collisions == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(collisions, "paste"));
     }
 
     public bool Relocate(int segmentIndex, uint destination, Func<MemoryRelocationPreview, RelocationOverlapDecision> chooseOverlap)
     {
-        var preview = editing.PrepareRelocation(segmentIndex, destination);
-        return editing.ApplyRelocation(preview, preview.Overlaps.Count == 0
+        var preview = viewModel.Editing.PrepareRelocation(segmentIndex, destination);
+        return viewModel.Editing.ApplyRelocation(preview, preview.Overlaps.Count == 0
             ? RelocationOverlapDecision.Overwrite
             : chooseOverlap(preview));
     }
+
+    public void Copy(uint startAddress, uint endAddress) => viewModel.CopyRange(startAddress, endAddress);
+    public void Cut(uint startAddress, uint endAddress) => viewModel.CutRange(startAddress, endAddress);
+    public void Delete(uint startAddress, uint endAddress) => viewModel.DeleteRange(startAddress, endAddress);
 }
 
 /// <summary>Runs checksum operations and writes a previously calculated result.</summary>

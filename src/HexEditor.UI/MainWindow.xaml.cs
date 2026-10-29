@@ -30,7 +30,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
-        _imageEdits = new ImageEditWorkflow(ViewModel.Editing);
+        _imageEdits = new ImageEditWorkflow(ViewModel);
         _checksums = new ChecksumWorkflow(ViewModel);
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
@@ -56,7 +56,8 @@ public partial class MainWindow : Window
             var imageB = _comparisonImageLoader.Load(pathB);
             var nameA = System.IO.Path.GetFileName(pathA);
             var nameB = System.IO.Path.GetFileName(pathB);
-            var view = new CompareView(new CompareWorkspaceTabViewModel(imageA.Image, imageB.Image, nameA, nameB));
+            var view = new CompareView(new CompareWorkspaceTabViewModel(
+                imageA.Image, imageB.Image, nameA, nameB, imageA.Path, imageB.Path));
             _comparisonViews.Add(view);
             var tab = new TabItem { Header = $"Compare: {nameA} ↔ {nameB}", Content = view };
             WorkspaceTabs.Items.Add(tab);
@@ -99,7 +100,7 @@ public partial class MainWindow : Window
     private void ViewModel_ImageChanged(HexEditor.Core.MemoryImage previousImage, HexEditor.Core.MemoryImage updatedImage)
     {
         foreach (var comparison in _comparisonViews.ToArray())
-            comparison.RefreshImage(previousImage, updatedImage);
+            comparison.Workspace.RefreshDocument(ViewModel.SourcePath, updatedImage);
     }
 
     private void OpenImage_Click(object sender, RoutedEventArgs e)
@@ -295,9 +296,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CopyRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.Editing.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.Editing.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Copy(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Cut(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Delete(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
