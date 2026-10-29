@@ -79,7 +79,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         // by the newly associated source file, so keep them marked unsaved until the user saves explicitly.
         _savedImage = hadExistingImage ? MemoryImage.Empty : imported.Image;
         _sourcePath = imported.SourcePath;
-        _sourceFormat = imported.InputFormat == "Intel HEX" ? MemoryImageExportFormat.IntelHex : MemoryImageExportFormat.SRecord;
+        _sourceFormat = imported.DetectedFormat;
         _sourceFormatMetadata = imported.FormatMetadata;
         RefreshImage();
         RefreshEditorStatus();

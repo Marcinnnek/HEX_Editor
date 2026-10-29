@@ -38,12 +38,12 @@ internal sealed class ChecksumWorkflow(MainViewModel viewModel)
 
     public void Write(uint address, Func<int, string, OverlapDecision> chooseOverlap)
     {
-        var result = viewModel.Checksum.Result ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
+        var result = viewModel.Checksum.GetWritableResult();
         var collisions = Enumerable.Range(0, result.WidthBits / 8)
             .Count(offset => viewModel.CurrentImage.TryGetByte(checked(address + (uint)offset), out _));
         var decision = collisions == 0 ? (OverlapDecision?)null : chooseOverlap(collisions, "checksum write");
         if (decision == OverlapDecision.Cancel) return;
-        viewModel.Editing.InsertBytes(address, result.ToBytes(), decision);
+        viewModel.WriteChecksumResult(address, decision);
     }
 
     public static ChecksumRequest CreateRequest(
@@ -89,8 +89,7 @@ internal sealed class ComparisonImageLoader(MainViewModel viewModel)
         var preview = service.PrepareImport(stream, MemoryImage.Empty, path);
         var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
             ?? throw new InvalidOperationException("The selected image could not be imported.");
-        var format = imported.InputFormat == "Intel HEX" ? MemoryImageExportFormat.IntelHex : MemoryImageExportFormat.SRecord;
-        return new LoadedMemoryImage(imported.Image, path, format);
+        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat);
     }
 }
 
