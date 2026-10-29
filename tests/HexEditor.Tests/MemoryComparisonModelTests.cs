@@ -7,6 +7,24 @@ namespace HexEditor.Tests;
 public sealed class MemoryComparisonModelTests
 {
     [TestMethod]
+    public void ComparisonPanels_UseSharedHexAsciiAndMissingByteText()
+    {
+        var left = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x41, 0x00, 0x7F])]);
+        var right = MemoryImage.Empty;
+        var comparison = new MemoryComparisonModel(left, right, bytesPerRow: 8);
+
+        var row = comparison.Rows[0];
+
+        Assert.AreEqual("41 00 7F" + new string(' ', 15), row.FileA.HexData);
+        Assert.AreEqual("A..     ", row.FileA.Ascii);
+        Assert.AreEqual(new string(' ', 23), row.FileB.HexData);
+        Assert.AreEqual("        ", row.FileB.Ascii);
+        Assert.AreEqual(CompareByteState.OnlyA, row.FileA.Cells[0].State);
+        Assert.AreEqual("", row.FileB.Cells[0].Hex);
+        Assert.AreEqual(" ", row.FileB.Cells[0].Ascii);
+    }
+
+    [TestMethod]
     public void ComparisonModel_AlignsSparseBytesAndFindsOnlyPresentDifferences()
     {
         var left = MemoryImage.FromSegments([

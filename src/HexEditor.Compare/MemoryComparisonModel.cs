@@ -142,12 +142,11 @@ public sealed class MemoryComparisonModel
             byte value = 0;
             var hasValue = inSelectedRange && rawAddress <= uint.MaxValue && image.TryGetByte((uint)rawAddress, out value);
             var state = inSelectedRange && rawAddress <= uint.MaxValue ? GetState((uint)rawAddress) : CompareByteState.Equal;
-            var text = hasValue ? value.ToString("X2") : string.Empty;
-            var character = hasValue ? (value is >= 0x20 and <= 0x7E ? (char)value : '.') : ' ';
-            cells[offset] = new CompareByteCell(text, character.ToString(), state,
+            var text = ByteText.FromByte(hasValue ? value : null);
+            cells[offset] = new CompareByteCell(text.Hex, text.Ascii.ToString(), state,
                 inSelectedRange && rawAddress <= uint.MaxValue ? (uint)rawAddress : null);
-            hex.Append(hasValue ? text : "  ");
-            ascii?.Append(character);
+            hex.Append(text.HexColumn);
+            ascii?.Append(text.Ascii);
         }
         return new ComparePanelRow(cells, hex.ToString(), ascii?.ToString());
     }

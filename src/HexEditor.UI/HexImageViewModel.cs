@@ -88,19 +88,11 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         {
             if (offset > 0) hex.Append(' ');
             var address = (ulong)rowAddress + (uint)offset;
-            if (address <= uint.MaxValue && image.TryGetByte((uint)address, out var value))
-            {
-                var character = value is >= 0x20 and <= 0x7E ? ((char)value).ToString() : ".";
-                hex.Append(value.ToString("X2"));
-                ascii?.Append(character);
-                cells[offset] = new HexByteCell(value.ToString("X2"), character, (uint)address, string.Empty);
-            }
-            else
-            {
-                hex.Append("  ");
-                ascii?.Append(' ');
-                cells[offset] = new HexByteCell(string.Empty, " ", address <= uint.MaxValue ? (uint)address : null, string.Empty);
-            }
+            byte? value = address <= uint.MaxValue && image.TryGetByte((uint)address, out var present) ? present : null;
+            var text = ByteText.FromByte(value);
+            hex.Append(text.HexColumn);
+            ascii?.Append(text.Ascii);
+            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), address <= uint.MaxValue ? (uint)address : null, string.Empty);
         }
         return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null) { Cells = cells };
     }
