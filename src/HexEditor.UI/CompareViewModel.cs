@@ -103,7 +103,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
             foreach (var current in streams)
             {
                 if (current < address) continue;
-                if (GetState(current) != CompareByteState.Equal) { difference = current; return true; }
+                if (IsInSelectedAddressRange(current) && GetState(current) != CompareByteState.Equal) { difference = current; return true; }
             }
         }
         else
@@ -113,7 +113,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
             foreach (var current in streams)
             {
                 if (current > address) break;
-                if (GetState(current) != CompareByteState.Equal) { difference = current; found = true; }
+                if (IsInSelectedAddressRange(current) && GetState(current) != CompareByteState.Equal) { difference = current; found = true; }
             }
             if (found) return true;
         }

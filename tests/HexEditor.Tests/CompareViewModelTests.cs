@@ -98,6 +98,38 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void DifferenceNavigation_InAddressRangeDoesNotReturnOutsideDifferences()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x0FFF, [0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17])]),
+            MemoryImage.FromSegments([new MemorySegment(0x0FFF, [0x20, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x27])]),
+            bytesPerRow: 8);
+
+        comparison.SetAddressRange(0x1000, 0x1005);
+        comparison.ViewMode = CompareViewMode.AddressRange;
+
+        Assert.IsFalse(comparison.TryFindNextDifference(0x1000, out _), "The next difference at 0x1006 is outside the inclusive range.");
+        Assert.IsFalse(comparison.TryFindPreviousDifference(0x1005, out _), "The previous difference at 0x0FFF is outside the inclusive range.");
+    }
+
+    [TestMethod]
+    public void DifferenceNavigation_InAddressRangeIncludesBothRangeBoundaries()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x11, 0x12, 0x13, 0x14, 0x15])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20, 0x21, 0x22, 0x23, 0x24, 0x25])]),
+            bytesPerRow: 8);
+
+        comparison.SetAddressRange(0x1000, 0x1005);
+        comparison.ViewMode = CompareViewMode.AddressRange;
+
+        Assert.IsTrue(comparison.TryFindNextDifference(0x1000, out var next));
+        Assert.AreEqual(0x1000u, next);
+        Assert.IsTrue(comparison.TryFindPreviousDifference(0x1005, out var previous));
+        Assert.AreEqual(0x1005u, previous);
+    }
+
+    [TestMethod]
     public void ComparisonStatus_ReportsEqualityAndDifferenceCountsAndRefreshes()
     {
         var comparison = new CompareViewModel(
