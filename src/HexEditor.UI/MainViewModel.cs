@@ -23,6 +23,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private object? _sourceFormatMetadata;
     private EditClipboard? _clipboard;
     private ChecksumCalculationResult? _checksumResult;
+    private uint? _currentAddress;
+    private long _selectionLength;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -48,6 +50,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string? SourcePath => _sourcePath;
     public MemoryImageExportFormat? SourceFormat => _sourceFormat;
     public object? SourceFormatMetadata => _sourceFormatMetadata;
+    public uint? CurrentAddress => _currentAddress;
+    public string CurrentAddressText => _currentAddress?.ToString("X8") ?? "—";
+    public long SelectionLength => _selectionLength;
+    public string ImageFormatText => SourceFormat switch
+    {
+        MemoryImageExportFormat.IntelHex => "Intel HEX",
+        MemoryImageExportFormat.SRecord => "Motorola S-Record",
+        _ => "Unknown format"
+    };
+    public string ModifiedStateText => IsModified ? "Modified" : "Saved";
 
     public HexImageViewModel ImageView
     {
@@ -99,7 +111,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshImage();
         RefreshTitle();
         StatusMessage = DescribeImage(imported.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(ImageFormatText), nameof(ModifiedStateText));
         NotifyImageChanged(previousImage);
     }
 
@@ -116,7 +128,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshImage();
         RefreshTitle();
         StatusMessage = DescribeImage(format?.ToString());
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(ImageFormatText), nameof(ModifiedStateText));
     }
 
     public void CloseImage() => LoadImage(MemoryImage.Empty, null, null);
@@ -271,7 +283,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _currentImage = previous;
         RefreshImage();
         RefreshModifiedTitle();
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ModifiedStateText));
         NotifyImageChanged(changedImage);
         return true;
     }
@@ -285,7 +297,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _currentImage = next;
         RefreshImage();
         RefreshModifiedTitle();
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ModifiedStateText));
         NotifyImageChanged(changedImage);
         return true;
     }
@@ -307,11 +319,26 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _savedImage = _currentImage;
         RefreshTitle();
         StatusMessage = $"Saved {_currentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {format}.";
-        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified));
+        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified), nameof(ImageFormatText), nameof(ModifiedStateText));
     }
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
+
+    public void SetSelection(uint startAddress, uint endAddress)
+    {
+        if (startAddress > endAddress) throw new ArgumentOutOfRangeException(nameof(startAddress), "Selection start must not exceed its end.");
+        _currentAddress = startAddress;
+        _selectionLength = (long)endAddress - startAddress + 1;
+        Raise(nameof(CurrentAddress), nameof(CurrentAddressText), nameof(SelectionLength));
+    }
+
+    public void ClearSelection()
+    {
+        _currentAddress = null;
+        _selectionLength = 0;
+        Raise(nameof(CurrentAddress), nameof(CurrentAddressText), nameof(SelectionLength));
+    }
 
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
         _fileService.ExportSegments(_currentImage, segmentIndexes, format, maxDataBytesPerRecord, output);
@@ -352,7 +379,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshImage();
         RefreshModifiedTitle();
         StatusMessage = "Image modified. Save to write changes to disk.";
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ModifiedStateText));
         NotifyImageChanged(previousImage);
     }
 
@@ -396,6 +423,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void RefreshImage()
     {
+        ClearSelection();
         ImageView = new HexImageViewModel(_currentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
         Segments.Clear();
         foreach (var segment in _currentImage.Segments)
@@ -511,61 +539,9 @@ internal static class MemoryImageEdits
     public static MemoryImage Overlay(MemoryImage existing, MemoryImage incoming, OverlapDecision decision)
     {
         if (decision == OverlapDecision.Cancel) return existing;
-        if (existing.Segments.Count == 0) return incoming;
-        if (incoming.Segments.Count == 0) return existing;
-        var result = new List<MemorySegment>();
-        var left = 0;
-        var right = 0;
-        ulong cursor = Math.Min(existing.Segments[0].StartAddress, incoming.Segments[0].StartAddress);
-        var maximum = Math.Max(existing.Segments[^1].EndAddress, incoming.Segments[^1].EndAddress);
-        ulong runStart = 0;
-        ulong previousAddress = 0;
-        var run = new List<byte>();
-        while (cursor <= maximum)
-        {
-            Advance(existing.Segments, ref left, cursor);
-            Advance(incoming.Segments, ref right, cursor);
-            var hasLeft = TryValue(existing.Segments, left, cursor, out var leftValue);
-            var hasRight = TryValue(incoming.Segments, right, cursor, out var rightValue);
-            if (!hasLeft && !hasRight)
-            {
-                Flush();
-                cursor = Math.Min(NextStart(existing.Segments, left), NextStart(incoming.Segments, right));
-                if (cursor == ulong.MaxValue) break;
-                continue;
-            }
-            if (run.Count == 0) runStart = cursor;
-            else if (previousAddress + 1 != cursor) { Flush(); runStart = cursor; }
-            run.Add(hasRight && (!hasLeft || decision == OverlapDecision.OverwriteIncoming) ? rightValue : leftValue);
-            previousAddress = cursor;
-            if (cursor == maximum) break;
-            cursor++;
-        }
-        Flush();
-        return MemoryImage.FromSegments(result);
-
-        void Flush()
-        {
-            if (run.Count == 0) return;
-            result.Add(new MemorySegment((uint)runStart, run.ToArray()));
-            run.Clear();
-        }
-    }
-
-    private static ulong NextStart(IReadOnlyList<MemorySegment> segments, int index) => index < segments.Count ? segments[index].StartAddress : ulong.MaxValue;
-    private static void Advance(IReadOnlyList<MemorySegment> segments, ref int index, ulong address)
-    {
-        while (index < segments.Count && segments[index].EndAddress < address) index++;
-    }
-    private static bool TryValue(IReadOnlyList<MemorySegment> segments, int index, ulong address, out byte value)
-    {
-        if (index < segments.Count && address >= segments[index].StartAddress && address <= segments[index].EndAddress)
-        {
-            value = segments[index].Data.Span[(int)(address - segments[index].StartAddress)];
-            return true;
-        }
-        value = default;
-        return false;
+        return MemoryImageSparseOverlay.Combine(existing, incoming,
+            (_, hasExisting, existingValue, hasIncoming, incomingValue) =>
+                hasIncoming && (!hasExisting || decision == OverlapDecision.OverwriteIncoming) ? incomingValue : existingValue);
     }
 }
 

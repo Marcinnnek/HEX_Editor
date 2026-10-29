@@ -19,6 +19,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private uint _rangeStart;
     private uint _rangeEnd = uint.MaxValue;
     private CompareRows _rows;
+    private string _comparisonStatus = "No differences";
 
     public CompareViewModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true)
     {
@@ -28,6 +29,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
         _bytesPerRow = bytesPerRow;
         _showAscii = showAscii;
         _rows = new CompareRows(this);
+        UpdateComparisonStatus();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -37,6 +39,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     public int BytesPerRow { get => _bytesPerRow; set { ValidateRowWidth(value); if (SetField(ref _bytesPerRow, value)) RebuildRows(); } }
     public bool ShowAscii { get => _showAscii; set { if (SetField(ref _showAscii, value)) RebuildRows(); } }
     public CompareViewMode ViewMode { get => _viewMode; set { if (SetField(ref _viewMode, value)) RebuildRows(); } }
+    public string ComparisonStatus => _comparisonStatus;
 
     public void SetAddressRange(uint start, uint end)
     {
@@ -52,6 +55,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
         _fileB = fileB ?? throw new ArgumentNullException(nameof(fileB));
         OnPropertyChanged(nameof(FileA));
         OnPropertyChanged(nameof(FileB));
+        UpdateComparisonStatus();
         RebuildRows();
     }
 
@@ -138,6 +142,28 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     {
         _rows = new CompareRows(this);
         OnPropertyChanged(nameof(Rows));
+    }
+
+    private void UpdateComparisonStatus()
+    {
+        long different = 0;
+        long onlyA = 0;
+        long onlyB = 0;
+        foreach (var address in GetOccupiedAddresses())
+        {
+            switch (GetState(address))
+            {
+                case CompareByteState.Different: different++; break;
+                case CompareByteState.OnlyA: onlyA++; break;
+                case CompareByteState.OnlyB: onlyB++; break;
+            }
+        }
+
+        var total = different + onlyA + onlyB;
+        _comparisonStatus = total == 0
+            ? "No differences"
+            : $"{total:N0} differences ({different:N0} different, {onlyA:N0} only in File A, {onlyB:N0} only in File B)";
+        OnPropertyChanged(nameof(ComparisonStatus));
     }
 
     private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)

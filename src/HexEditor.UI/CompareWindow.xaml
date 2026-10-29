@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Compare memory images" Height="720" Width="1400" MinHeight="460" MinWidth="900">
     <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,10,0,0" Text="{Binding ViewModel.ComparisonStatus}" FontWeight="SemiBold" />
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
             <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
             <ComboBox x:Name="RowWidthBox" Width="70" ItemsSource="{Binding RowWidths}" SelectedItem="{Binding ViewModel.BytesPerRow}" />

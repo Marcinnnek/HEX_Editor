@@ -400,13 +400,7 @@ public partial class MainWindow : Window
     }
 
     private static uint ParseAddress(string text)
-    {
-        text = text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
-        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var address))
-            throw new ArgumentException("Enter a 32-bit hexadecimal address.");
-        return address;
-    }
+        => HexAddressParser.Parse(text);
 
     private static ulong ParseHexValue(string text)
     {
@@ -606,6 +600,19 @@ public partial class MainWindow : Window
         {
             SelectRow(rowIndex);
         }
+    }
+
+    private void HexRowsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (HexRowsGrid.SelectedItem is not HexViewRow { IsGapMarker: false } row ||
+            !HexAddressParser.TryParse(row.Address, out var start))
+        {
+            ViewModel.ClearSelection();
+            return;
+        }
+
+        var end = (uint)Math.Min(uint.MaxValue, (ulong)start + (uint)ViewModel.ImageView.BytesPerRow - 1);
+        ViewModel.SetSelection(start, end);
     }
 
     private void AsciiToggle_Changed(object sender, RoutedEventArgs e)

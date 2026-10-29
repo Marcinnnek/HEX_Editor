@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -49,7 +48,7 @@ public partial class CompareWindow : Window
 
     private void ApplyRange_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryParseAddress(RangeStartBox.Text, out var start) || !TryParseAddress(RangeEndBox.Text, out var end) || start > end)
+        if (!HexAddressParser.TryParse(RangeStartBox.Text, out var start) || !HexAddressParser.TryParse(RangeEndBox.Text, out var end) || start > end)
         {
             MessageBox.Show(this, "Enter a valid hexadecimal address range where Start is not greater than End.", "Invalid range", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -60,7 +59,7 @@ public partial class CompareWindow : Window
 
     private void Go_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryParseAddress(AddressBox.Text, out var address) || !ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        if (!HexAddressParser.TryParse(AddressBox.Text, out var address) || !ViewModel.TryNavigateToAddress(address, out var rowIndex))
         {
             MessageBox.Show(this, "Enter an address in the displayed comparison range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
@@ -84,7 +83,7 @@ public partial class CompareWindow : Window
 
     private uint SelectedAddress()
     {
-        if (FileAGrid.SelectedItem is CompareViewRow row && uint.TryParse(row.Address, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var address)) return address;
+        if (FileAGrid.SelectedItem is CompareViewRow row && HexAddressParser.TryParse(row.Address, out var address)) return address;
         return 0;
     }
 
@@ -146,12 +145,4 @@ public partial class CompareWindow : Window
             if (nested is not null) return nested;
         }
         return null;
-    }
-
-    private static bool TryParseAddress(string text, out uint address)
-    {
-        text = text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
-        return uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
-    }
 }

@@ -12,6 +12,7 @@
 - [x] Virtualize rows so layout work is limited to visible rows and a small buffer.
 - [x] Collapse gaps spanning more than one displayed row to a marker showing the skipped address range; keep shorter gaps aligned as blank positions.
 - [x] Navigate directly to an absolute address and use the occupied-segment list to jump to a segment start.
+- [x] Show the selected row's starting address and inclusive address-range length, along with image format and saved/modified state.
 - [x] Keep rendering and navigation practical for typical images up to 10 MB and widely separated address ranges without dense allocation.
 
 ## Comments
@@ -19,3 +20,4 @@
 - Implemented a lazy indexed row list over occupied segment ranges. WPF row virtualization creates only visible row containers, while long address gaps use a single marker.
 - Added public view-model behavior tests for row formatting, gap behavior, address and segment navigation, and lazy indexing of a 10 MB image.
 - Verification: all 16 tests passed; full solution build passed.
+- Review follow-up: the editor status bar now reports selection address and length, source format, and modified state; selection clears when no address row is selected.

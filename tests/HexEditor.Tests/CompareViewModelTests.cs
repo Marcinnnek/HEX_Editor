@@ -25,6 +25,20 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void ComparisonStatus_ReportsEqualityAndDifferenceCountsAndRefreshes()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20]), new MemorySegment(0x1010, [0x30])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x21]), new MemorySegment(0x1020, [0x40])]));
+
+        Assert.AreEqual("3 differences (1 different, 1 only in File A, 1 only in File B)", comparison.ComparisonStatus);
+
+        comparison.Refresh(comparison.FileA, MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20]), new MemorySegment(0x1010, [0x30])]));
+
+        Assert.AreEqual("No differences", comparison.ComparisonStatus);
+    }
+
+    [TestMethod]
     public void Comparison_SharesNavigationAndSettingsAndCanShowOnlyDifferencesOrRange()
     {
         var fileA = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20, 0x30]), new MemorySegment(0x90000000, [0x40])]);

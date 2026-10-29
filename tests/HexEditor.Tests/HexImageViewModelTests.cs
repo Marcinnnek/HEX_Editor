@@ -10,6 +10,38 @@ namespace HexEditor.Tests;
 public sealed class HexImageViewModelTests
 {
     [TestMethod]
+    public void SelectionStatus_TracksInclusiveAddressRangeAndClearsToZeroSelection()
+    {
+        var model = new MainViewModel();
+        Assert.IsNull(model.CurrentAddress);
+        Assert.AreEqual(0, model.SelectionLength);
+
+        model.SetSelection(0x1234, 0x123F);
+        Assert.AreEqual(0x1234u, model.CurrentAddress);
+        Assert.AreEqual(12L, model.SelectionLength);
+        Assert.AreEqual("00001234", model.CurrentAddressText);
+
+        model.ClearSelection();
+        Assert.IsNull(model.CurrentAddress);
+        Assert.AreEqual(0, model.SelectionLength);
+        Assert.AreEqual("—", model.CurrentAddressText);
+    }
+
+    [TestMethod]
+    public void EditorStatus_ReportsSourceFormatAndModifiedState()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xAA])]), "input.hex", MemoryImageExportFormat.IntelHex);
+
+        Assert.AreEqual("Intel HEX", model.ImageFormatText);
+        Assert.AreEqual("Saved", model.ModifiedStateText);
+        model.EditByte(0x10, 0xBB, OverlapDecision.OverwriteIncoming);
+        Assert.AreEqual("Modified", model.ModifiedStateText);
+        Assert.IsTrue(model.Undo());
+        Assert.AreEqual("Saved", model.ModifiedStateText);
+    }
+
+    [TestMethod]
     public void Edits_PreserveSparseOffsetsAndSupportUndoRedo()
     {
         var model = new MainViewModel();

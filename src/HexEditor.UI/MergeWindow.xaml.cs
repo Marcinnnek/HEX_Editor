@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using System.Windows;
 using HexEditor.Core;
 
@@ -150,13 +149,7 @@ public partial class MergeWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) => DialogResult = false;
 
     private static uint ParseAddress(string text)
-    {
-        text = text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
-        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var address))
-            throw new ArgumentException("Enter a 32-bit hexadecimal address.");
-        return address;
-    }
+        => HexAddressParser.Parse(text);
 }
 
 public sealed record MergeDirectionOption(string Label, bool Reverse)

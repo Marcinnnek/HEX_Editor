@@ -16,7 +16,10 @@
 - [x] Navigate to an arbitrary address and the next or previous difference; clicking either panel identifies the same address in the other panel, including absent bytes.
 - [x] Offer All Regions, Differences Only, and selected-address-range views; collapse identical regions and large gaps without generating empty rows.
 - [x] Refresh comparison results after either image is edited.
+- [x] Show a live summary of total differences, unequal bytes, and bytes present on only one side.
 
 ## Comments
 
 Implemented synchronized compare panels with absolute-address byte states, sparse gap markers, navigation, row-width and ASCII settings, three view modes, and refreshable image inputs. Added comparison behavior tests. dotnet test tests\HexEditor.Tests\HexEditor.Tests.csproj --no-restore -m:1 -nodeReuse:false passed (21 tests); dotnet build HexEditor.sln --no-restore -m:1 -nodeReuse:false passed with no warnings or errors.
+
+Review follow-up: the compare window displays a byte-level difference summary and updates it whenever either image refreshes.

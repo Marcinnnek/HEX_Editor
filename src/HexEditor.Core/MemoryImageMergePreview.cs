@@ -52,60 +52,14 @@ public sealed class MemoryImageMergePreview
             .ToArray();
         ValidateOverrides(overrides);
 
-        if (Destination.Segments.Count == 0) return Source;
-        if (Source.Segments.Count == 0) return Destination;
-
-        var result = new List<MemorySegment>();
-        var destinationIndex = 0;
-        var sourceIndex = 0;
         var overrideIndex = 0;
-        ulong cursor = Math.Min(Destination.Segments[0].StartAddress, Source.Segments[0].StartAddress);
-        var maximum = Math.Max(Destination.Segments[^1].EndAddress, Source.Segments[^1].EndAddress);
-        uint runStart = 0;
-        uint previousAddress = 0;
-        var run = new List<byte>();
-
-        while (cursor <= maximum)
+        return MemoryImageSparseOverlay.Combine(Destination, Source, (address, hasDestination, destinationValue, hasSource, sourceValue) =>
         {
-            Advance(Destination.Segments, ref destinationIndex, cursor);
-            Advance(Source.Segments, ref sourceIndex, cursor);
-            var hasDestination = TryValue(Destination.Segments, destinationIndex, cursor, out var destinationValue);
-            var hasSource = TryValue(Source.Segments, sourceIndex, cursor, out var sourceValue);
-            if (!hasDestination && !hasSource)
-            {
-                Flush();
-                cursor = Math.Min(NextStart(Destination.Segments, destinationIndex), NextStart(Source.Segments, sourceIndex));
-                if (cursor == ulong.MaxValue) break;
-                continue;
-            }
-
-            var address = (uint)cursor;
-            if (run.Count == 0) runStart = address;
-            else if ((ulong)previousAddress + 1 != cursor)
-            {
-                Flush();
-                runStart = address;
-            }
-
             var choice = GetChoice(address, overrides, ref overrideIndex, defaultChoice.Value);
-            run.Add(hasSource && (!hasDestination || choice == MemoryImageMergeChoice.KeepSource)
+            return hasSource && (!hasDestination || choice == MemoryImageMergeChoice.KeepSource)
                 ? sourceValue
-                : destinationValue);
-            previousAddress = address;
-
-            if (cursor == maximum) break;
-            cursor++;
-        }
-
-        Flush();
-        return MemoryImage.FromSegments(result);
-
-        void Flush()
-        {
-            if (run.Count == 0) return;
-            result.Add(new MemorySegment(runStart, run.ToArray()));
-            run.Clear();
-        }
+                : destinationValue;
+        });
     }
 
     private static MemoryImageOverlapRange[] SummarizeOverlaps(MemoryImage destination, MemoryImage source)
@@ -184,23 +138,4 @@ public sealed class MemoryImageMergePreview
         return defaultChoice;
     }
 
-    private static ulong NextStart(IReadOnlyList<MemorySegment> segments, int index) =>
-        index < segments.Count ? segments[index].StartAddress : ulong.MaxValue;
-
-    private static void Advance(IReadOnlyList<MemorySegment> segments, ref int index, ulong address)
-    {
-        while (index < segments.Count && segments[index].EndAddress < address) index++;
-    }
-
-    private static bool TryValue(IReadOnlyList<MemorySegment> segments, int index, ulong address, out byte value)
-    {
-        if (index < segments.Count && address >= segments[index].StartAddress && address <= segments[index].EndAddress)
-        {
-            value = segments[index].Data.Span[(int)(address - segments[index].StartAddress)];
-            return true;
-        }
-
-        value = default;
-        return false;
-    }
 }
