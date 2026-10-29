@@ -2,6 +2,46 @@ namespace HexEditor.Formats;
 
 public sealed class MemoryImageFileService
 {
+    public void SaveAtomically(
+        HexEditor.Core.MemoryImage image,
+        string path,
+        MemoryImageExportFormat format,
+        int maxDataBytesPerRecord,
+        bool overwriteExisting)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var targetPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(targetPath)!;
+        Directory.CreateDirectory(directory);
+        if (File.Exists(targetPath) && !overwriteExisting)
+            throw new IOException($"The target file already exists: {targetPath}");
+
+        var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(targetPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.WriteThrough))
+            {
+                Export(image, format, maxDataBytesPerRecord, output);
+                output.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(targetPath))
+            {
+                if (!overwriteExisting) throw new IOException($"The target file already exists: {targetPath}");
+                File.Move(temporaryPath, targetPath, overwrite: true);
+            }
+            else
+            {
+                File.Move(temporaryPath, targetPath);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
+    }
+
     public void Export(
         HexEditor.Core.MemoryImage image,
         MemoryImageExportFormat format,
