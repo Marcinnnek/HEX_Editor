@@ -51,22 +51,28 @@ internal sealed class ChecksumWorkflow(MainViewModel viewModel)
 }
 
 /// <summary>Loads images used by compare and merge workflows without changing the active image.</summary>
-internal sealed class ComparisonImageLoader(MainViewModel viewModel)
+public sealed class ComparisonImageLoader(MainViewModel viewModel)
 {
-    public LoadedMemoryImage Load(string path)
+    public async Task<LoadedMemoryImage> LoadAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!string.IsNullOrWhiteSpace(viewModel.SourcePath) &&
             string.Equals(Path.GetFullPath(viewModel.SourcePath), Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase))
         {
             return new LoadedMemoryImage(viewModel.CurrentImage, viewModel.SourcePath!, viewModel.SourceFormat);
         }
 
-        var service = new MemoryImageFileService();
-        using var stream = File.OpenRead(path);
-        var preview = service.PrepareImport(stream, MemoryImage.Empty, path);
-        var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
-            ?? throw new InvalidOperationException("The selected image could not be imported.");
-        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat);
+        return await Task.Run(() =>
+        {
+            using var stream = File.OpenRead(path);
+            var preview = new MemoryImageFileService().PrepareImport(stream, MemoryImage.Empty, path,
+                cancellationToken, progress);
+            cancellationToken.ThrowIfCancellationRequested();
+            var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
+                ?? throw new InvalidOperationException("The selected image could not be imported.");
+            return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat);
+        }, cancellationToken);
     }
 }
 
@@ -127,4 +133,4 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
     }
 }
 
-internal sealed record LoadedMemoryImage(MemoryImage Image, string? Path, MemoryImageExportFormat? Format);
+public sealed record LoadedMemoryImage(MemoryImage Image, string? Path, MemoryImageExportFormat? Format);
