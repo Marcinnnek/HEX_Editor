@@ -9,7 +9,9 @@ public sealed class MemoryImageFileService
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
         Stream output,
-        object? formatMetadata = null)
+        MemoryImageFormatMetadata? formatMetadata = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (startAddress > endAddress)
@@ -26,7 +28,7 @@ public sealed class MemoryImageFileService
             selectedSegments.Add(new HexEditor.Core.MemorySegment((uint)start, segment.Data.Span.Slice(offset, count)));
         }
 
-        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output, formatMetadata);
+        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output, formatMetadata, cancellationToken, progress);
     }
 
     public void ExportSegments(
@@ -35,7 +37,9 @@ public sealed class MemoryImageFileService
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
         Stream output,
-        object? formatMetadata = null)
+        MemoryImageFormatMetadata? formatMetadata = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(segmentIndexes);
@@ -52,7 +56,7 @@ public sealed class MemoryImageFileService
             selectedSegments.Add(image.Segments[index]);
         }
 
-        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output, formatMetadata);
+        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output, formatMetadata, cancellationToken, progress);
     }
 
     public void SaveAtomically(
@@ -61,9 +65,28 @@ public sealed class MemoryImageFileService
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
         bool overwriteExisting,
-        object? formatMetadata = null)
+        MemoryImageFormatMetadata? formatMetadata = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(image);
+        WriteAtomically(path, overwriteExisting,
+            (output, token, operationProgress) => Export(image, format, maxDataBytesPerRecord, output,
+                formatMetadata, token, operationProgress), cancellationToken, progress);
+    }
+
+    public void ExportAtomically(string path, bool overwriteExisting,
+        Action<Stream, CancellationToken, IProgress<MemoryImageFileProgress>?> export,
+        CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(export);
+        WriteAtomically(path, overwriteExisting, export, cancellationToken, progress);
+    }
+
+    private static void WriteAtomically(string path, bool overwriteExisting,
+        Action<Stream, CancellationToken, IProgress<MemoryImageFileProgress>?> write,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         var targetPath = Path.GetFullPath(path);
         var directory = Path.GetDirectoryName(targetPath)!;
@@ -76,9 +99,12 @@ public sealed class MemoryImageFileService
         {
             using (var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.WriteThrough))
             {
-                Export(image, format, maxDataBytesPerRecord, output, formatMetadata);
+                write(output, cancellationToken, progress);
+                cancellationToken.ThrowIfCancellationRequested();
                 output.Flush(flushToDisk: true);
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             if (File.Exists(targetPath))
             {
@@ -101,7 +127,9 @@ public sealed class MemoryImageFileService
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
         Stream output,
-        object? formatMetadata = null)
+        MemoryImageFormatMetadata? formatMetadata = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(output);
@@ -126,65 +154,66 @@ public sealed class MemoryImageFileService
         switch (format)
         {
             case MemoryImageExportFormat.IntelHex:
-                IntelHexWriter.Write(image, maxDataBytesPerRecord, output, GetIntelMetadata(formatMetadata));
+                IntelHexWriter.Write(image, maxDataBytesPerRecord, output, GetIntelMetadata(formatMetadata), cancellationToken, progress);
                 break;
             case MemoryImageExportFormat.SRecord:
-                SRecordWriter.Write(image, maxDataBytesPerRecord, output, GetSRecordMetadata(formatMetadata));
+                SRecordWriter.Write(image, maxDataBytesPerRecord, output, GetSRecordMetadata(formatMetadata), cancellationToken, progress);
                 break;
         }
     }
 
-    public static object? ConvertMetadata(object? metadata, MemoryImageExportFormat format, int dataRecordCount = 0)
+    public static MemoryImageFormatMetadata ConvertMetadata(MemoryImageFormatMetadata? metadata, MemoryImageExportFormat format, int dataRecordCount = 0)
     {
         var startAddress = GetExecutionStartAddress(metadata);
         return format switch
         {
-            MemoryImageExportFormat.IntelHex when metadata is IntelHexMetadata intel => intel,
-            MemoryImageExportFormat.IntelHex => startAddress is { } start ? new IntelHexMetadata(start, null, null) : new IntelHexMetadata(null, null, null),
-            MemoryImageExportFormat.SRecord => metadata is SRecordMetadata sRecord
-                ? new SRecordMetadata(startAddress, dataRecordCount, sRecord.HeaderAddress, sRecord.HeaderData?.ToArray())
-                : new SRecordMetadata(startAddress, dataRecordCount),
+            MemoryImageExportFormat.IntelHex => MemoryImageFormatMetadata.FromIntelHex(
+                metadata?.IntelHex ?? new IntelHexMetadata(startAddress, null, null)),
+            MemoryImageExportFormat.SRecord => MemoryImageFormatMetadata.FromSRecord(new SRecordMetadata(
+                startAddress, dataRecordCount, metadata?.SRecord?.HeaderAddress, metadata?.SRecord?.HeaderData?.ToArray())),
             _ => throw new ArgumentOutOfRangeException(nameof(format))
         };
     }
 
-    private static IntelHexMetadata? GetIntelMetadata(object? metadata) => metadata switch
+    private static uint? GetExecutionStartAddress(MemoryImageFormatMetadata? metadata)
     {
-        IntelHexMetadata intel => intel,
-        SRecordMetadata { StartAddress: { } start } => new IntelHexMetadata(start, null, null),
-        _ => null
-    };
+        if (metadata?.IntelHex is { } intel)
+        {
+            if (intel.StartLinearAddress is { } linear) return linear;
+            if (intel.StartSegmentCodeSegment is { } code && intel.StartSegmentInstructionPointer is { } pointer)
+                return checked(((uint)code << 4) + pointer);
+        }
+        return metadata?.SRecord?.StartAddress;
+    }
 
-    private static uint? GetExecutionStartAddress(object? metadata) => metadata switch
-    {
-        IntelHexMetadata { StartLinearAddress: { } start } => start,
-        IntelHexMetadata { StartSegmentCodeSegment: { } code, StartSegmentInstructionPointer: { } pointer } => checked(((uint)code << 4) + pointer),
-        SRecordMetadata { StartAddress: { } start } => start,
-        _ => null
-    };
+    private static IntelHexMetadata? GetIntelMetadata(MemoryImageFormatMetadata? metadata) =>
+        metadata?.IntelHex ?? (metadata?.SRecord?.StartAddress is { } start
+            ? new IntelHexMetadata(start, null, null)
+            : null);
 
-    private static SRecordMetadata GetSRecordMetadata(object? metadata) => metadata switch
-    {
-        SRecordMetadata sRecord => sRecord,
-        _ => new SRecordMetadata(GetExecutionStartAddress(metadata), 0)
-    };
+    private static SRecordMetadata GetSRecordMetadata(MemoryImageFormatMetadata? metadata) =>
+        metadata?.SRecord ?? new SRecordMetadata(GetExecutionStartAddress(metadata), 0);
 
     private void ExportSelectedImage(
         IReadOnlyList<HexEditor.Core.MemorySegment> selectedSegments,
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
         Stream output,
-        object? formatMetadata = null)
+        MemoryImageFormatMetadata? formatMetadata = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MemoryImageFileProgress>? progress = null)
     {
         if (selectedSegments.Count == 0)
             throw new InvalidOperationException("The selected address range contains no occupied bytes.");
-        Export(HexEditor.Core.MemoryImage.FromSegments(selectedSegments), format, maxDataBytesPerRecord, output, formatMetadata);
+        Export(HexEditor.Core.MemoryImage.FromSegments(selectedSegments), format, maxDataBytesPerRecord, output, formatMetadata, cancellationToken, progress);
     }
 
     public MemoryImageImportPreview PrepareImport(
         Stream input,
         HexEditor.Core.MemoryImage? existingImage = null,
-        string? sourcePath = null)
+        string? sourcePath = null,
+        CancellationToken cancellationToken = default,
+        IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (!input.CanRead)
@@ -193,7 +222,18 @@ public sealed class MemoryImageFileService
         }
 
         var content = new MemoryStream();
-        input.CopyTo(content);
+        var buffer = new byte[64 * 1024];
+        var total = input.CanSeek ? input.Length - input.Position : (long?)null;
+        long copied = 0;
+        int bytesRead;
+        while ((bytesRead = input.Read(buffer, 0, buffer.Length)) != 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            content.Write(buffer, 0, bytesRead);
+            copied += bytesRead;
+            progress?.Report(new MemoryImageFileProgress("Reading file", copied, total));
+        }
+        cancellationToken.ThrowIfCancellationRequested();
         content.Position = 0;
 
         using var probe = new StreamReader(content, System.Text.Encoding.ASCII, true, 1024, leaveOpen: true);
@@ -216,8 +256,8 @@ public sealed class MemoryImageFileService
         var formatMarker = firstRecord[0];
         var (records, format, metadata) = formatMarker switch
         {
-            ':' => ReadIntelHex(content),
-            'S' => ReadSRecord(content),
+            ':' => ReadIntelHex(content, cancellationToken, progress),
+            'S' => ReadSRecord(content, cancellationToken, progress),
             _ => throw new MemoryImageImportException(1, "Unable to detect format. Expected Intel HEX ':' or Motorola S-record 'S' content.")
         };
 
@@ -229,15 +269,15 @@ public sealed class MemoryImageFileService
             metadata);
     }
 
-    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, MemoryImageExportFormat Format, object Metadata) ReadIntelHex(Stream input)
+    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, MemoryImageExportFormat Format, MemoryImageFormatMetadata Metadata) ReadIntelHex(Stream input, CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        var (records, metadata) = IntelHexReader.Read(input);
-        return (records, MemoryImageExportFormat.IntelHex, metadata);
+        var (records, metadata) = IntelHexReader.Read(input, cancellationToken, progress);
+        return (records, MemoryImageExportFormat.IntelHex, MemoryImageFormatMetadata.FromIntelHex(metadata));
     }
 
-    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, MemoryImageExportFormat Format, object Metadata) ReadSRecord(Stream input)
+    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, MemoryImageExportFormat Format, MemoryImageFormatMetadata Metadata) ReadSRecord(Stream input, CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        var (records, metadata) = SRecordReader.Read(input);
-        return (records, MemoryImageExportFormat.SRecord, metadata);
+        var (records, metadata) = SRecordReader.Read(input, cancellationToken, progress);
+        return (records, MemoryImageExportFormat.SRecord, MemoryImageFormatMetadata.FromSRecord(metadata));
     }
 }

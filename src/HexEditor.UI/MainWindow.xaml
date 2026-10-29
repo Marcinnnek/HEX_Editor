@@ -7,7 +7,63 @@
         mc:Ignorable="d"
         Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640">
     <DockPanel Margin="12">
+        <Menu DockPanel.Dock="Top" Margin="0,0,0,8">
+            <MenuItem Header="_File">
+                <MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" />
+                <Separator />
+                <MenuItem Header="Save" Click="Save_Click" />
+                <MenuItem Header="Save As..." Click="SaveAs_Click" />
+                <MenuItem Header="Close Image" Click="CloseImage_Click" />
+                <Separator />
+                <MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
+                <MenuItem Header="Export address range..." Click="ExportRange_Click" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.CanUndo}" />
+                <MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.CanRedo}" />
+                <Separator />
+                <MenuItem Header="Edit / Insert" Click="EditInsert_Click" />
+                <MenuItem Header="Fill range" Click="Fill_Click" />
+                <MenuItem Header="Copy range" Click="Copy_Click" />
+                <MenuItem Header="Cut range" Click="Cut_Click" />
+                <MenuItem Header="Paste at start" Click="Paste_Click" />
+                <MenuItem Header="Delete range" Click="Delete_Click" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="8 bytes per row" Click="RowWidth8_Click" />
+                <MenuItem Header="16 bytes per row" Click="RowWidth16_Click" />
+                <MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
+                <Separator />
+                <MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ImageView.ShowAscii, Mode=TwoWay}" />
+                <MenuItem Header="Go to address" Click="GoToAddress_Click" />
+                <MenuItem Header="Select range" Click="SelectRange_Click" />
+            </MenuItem>
+            <MenuItem Header="_Compare">
+                <MenuItem Header="Compare images..." Click="CompareImages_Click" />
+            </MenuItem>
+            <MenuItem Header="_Merge">
+                <MenuItem Header="Merge images..." Click="MergeImages_Click" />
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="Calculate checksum / CRC" Click="CalculateChecksum_Click" />
+                <MenuItem Header="Write checksum result" Click="WriteChecksum_Click" />
+                <MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" />
+            </MenuItem>
+            <MenuItem Header="E_xport">
+                <MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
+                <MenuItem Header="Export address range..." Click="ExportRange_Click" />
+            </MenuItem>
+        </Menu>
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <Border x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="#FF8A8A8A" BorderThickness="1" Padding="6" Margin="0,0,0,6">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
+                    <StackPanel>
+                        <TextBlock x:Name="FileOperationText" Text="Working..." Margin="0,0,0,3" />
+                        <ProgressBar x:Name="FileOperationProgress" Height="8" IsIndeterminate="True" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
             <WrapPanel Margin="0,0,0,6" VerticalAlignment="Center">
                 <Button Content="Open HEX / S-Record" Padding="10,5" Click="OpenImage_Click" Margin="0,0,6,0" />
                 <Button Content="Compare images" Padding="10,5" Click="CompareImages_Click" Margin="0,0,6,0" />

@@ -6,7 +6,7 @@ public sealed record MemoryImageImportResult(
     MemoryImage Image,
     MemoryImageExportFormat DetectedFormat,
     string? SourcePath,
-    object? FormatMetadata)
+    MemoryImageFormatMetadata? FormatMetadata)
 {
     public string InputFormat => DetectedFormat.GetDisplayName();
 }

@@ -9,6 +9,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
 using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.Tools;
@@ -25,6 +27,7 @@ public partial class MainWindow : Window
     private readonly ChecksumWorkflow _checksums;
     private readonly ComparisonImageLoader _comparisonImageLoader;
     private readonly MemoryImageFileWorkflow _files;
+    private CancellationTokenSource? _fileOperationCancellation;
 
     public MainWindow()
     {
@@ -40,6 +43,56 @@ public partial class MainWindow : Window
     }
 
     public MainViewModel ViewModel { get; }
+
+    private async Task<T> RunFileOperationAsync<T>(Func<CancellationToken, IProgress<MemoryImageFileProgress>, Task<T>> operation)
+    {
+        if (_fileOperationCancellation is not null) throw new InvalidOperationException("A file operation is already running.");
+        using var cancellation = new CancellationTokenSource();
+        _fileOperationCancellation = cancellation;
+        FileOperationPanel.Visibility = Visibility.Visible;
+        FileOperationProgress.IsIndeterminate = true;
+        FileOperationText.Text = "Working...";
+        var progress = new Progress<MemoryImageFileProgress>(update =>
+        {
+            FileOperationText.Text = update.Total is { } total
+                ? $"{update.Stage}: {update.Completed:N0} / {total:N0} bytes"
+                : $"{update.Stage}: {update.Completed:N0}";
+            FileOperationProgress.IsIndeterminate = update.Total is null or 0;
+            if (update.Total is > 0)
+            {
+                FileOperationProgress.Minimum = 0;
+                FileOperationProgress.Maximum = update.Total.Value;
+                FileOperationProgress.Value = Math.Min(update.Completed, update.Total.Value);
+            }
+        });
+        try
+        {
+            return await operation(cancellation.Token, progress);
+        }
+        finally
+        {
+            _fileOperationCancellation = null;
+            FileOperationPanel.Visibility = Visibility.Collapsed;
+            FileOperationProgress.IsIndeterminate = true;
+        }
+    }
+
+    private async Task RunFileOperationAsync(Func<CancellationToken, IProgress<MemoryImageFileProgress>, Task> operation) =>
+        await RunFileOperationAsync(async (token, progress) =>
+        {
+            await operation(token, progress);
+            return true;
+        });
+
+    private void CancelFileOperation_Click(object sender, RoutedEventArgs e)
+    {
+        FileOperationText.Text = "Cancelling...";
+        _fileOperationCancellation?.Cancel();
+    }
+
+    private void RowWidth8_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 8;
+    private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 16;
+    private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 32;
 
     private void CompareImages_Click(object sender, RoutedEventArgs e)
     {
@@ -103,7 +156,7 @@ public partial class MainWindow : Window
             comparison.Workspace.RefreshDocument(ViewModel.SourcePath, updatedImage);
     }
 
-    private void OpenImage_Click(object sender, RoutedEventArgs e)
+    private async void OpenImage_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
@@ -119,32 +172,68 @@ public partial class MainWindow : Window
 
         try
         {
-            _files.Open(dialog.FileName, ChooseImportOverlap);
+            var preview = await RunFileOperationAsync((token, progress) => _files.PrepareOpenAsync(dialog.FileName, token, progress));
+            ViewModel.ApplyImport(preview, ChooseImportOverlap(preview));
             Title = ViewModel.WindowTitle;
         }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Open"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
         {
             MessageBox.Show(this, exception.Message, "Unable to open file", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private void Save_Click(object sender, RoutedEventArgs e)
+    private async void Save_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            if (ViewModel.SourcePath is null || ViewModel.SourceFormat is null) { SaveAs_Click(sender, e); return; }
-            _files.Save();
+            if (ViewModel.SourcePath is null || ViewModel.SourceFormat is null) { await TrySaveAsAsync(); return; }
+            await RunFileOperationAsync((token, progress) => _files.SaveAsync(token, progress));
             Title = ViewModel.WindowTitle;
         }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private void SaveAs_Click(object sender, RoutedEventArgs e)
+    private async void SaveAs_Click(object sender, RoutedEventArgs e)
     {
-        TrySaveAs();
+        await TrySaveAsAsync();
+    }
+
+    private async Task<bool> TrySaveAsAsync()
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Save memory image as",
+            Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
+            FilterIndex = ViewModel.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
+            AddExtension = true,
+            OverwritePrompt = false
+        };
+        if (dialog.ShowDialog(this) != true) return false;
+        var format = dialog.FilterIndex == 2 ? MemoryImageExportFormat.SRecord : MemoryImageExportFormat.IntelHex;
+        var overwrite = false;
+        if (File.Exists(dialog.FileName))
+        {
+            var answer = MessageBox.Show(this, $"Replace the existing file?\n\n{dialog.FileName}", "Confirm overwrite", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes) return false;
+            overwrite = true;
+        }
+        try
+        {
+            await RunFileOperationAsync((token, progress) => _files.SaveAsAsync(dialog.FileName, format, overwrite, token, progress));
+            Title = ViewModel.WindowTitle;
+            return true;
+        }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); return false; }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
     }
 
     private bool TrySaveAs()
@@ -431,16 +520,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ExportSegments_Click(object sender, RoutedEventArgs e)
+    private async void ExportSegments_Click(object sender, RoutedEventArgs e)
     {
         var segmentIndexes = SegmentsGrid.SelectedItems
             .Cast<MemorySegmentRow>()
             .Select(ViewModel.Segments.IndexOf)
             .ToArray();
-        ExportToFile((format, payloadSize, output) => _files.ExportSegments(segmentIndexes, format, payloadSize, output));
+        await ExportToFileAsync((format, payloadSize, output, token, progress) =>
+            _files.ExportSegments(segmentIndexes, format, payloadSize, output, token, progress));
     }
 
-    private void ExportRange_Click(object sender, RoutedEventArgs e)
+    private async void ExportRange_Click(object sender, RoutedEventArgs e)
     {
         if (!HexAddressParser.TryParse(ExportRangeStartInput.Text, out var startAddress) ||
             !HexAddressParser.TryParse(ExportRangeEndInput.Text, out var endAddress))
@@ -450,11 +540,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        ExportToFile((format, payloadSize, output) =>
-            _files.ExportAddressRange(startAddress, endAddress, format, payloadSize, output));
+        await ExportToFileAsync((format, payloadSize, output, token, progress) =>
+            _files.ExportAddressRange(startAddress, endAddress, format, payloadSize, output, token, progress));
     }
 
-    private void ExportToFile(Action<MemoryImageExportFormat, int, Stream> export)
+    private async Task ExportToFileAsync(Action<MemoryImageExportFormat, int, Stream, CancellationToken, IProgress<MemoryImageFileProgress>?> export)
     {
         if (ExportFormatInput.SelectedItem is not MemoryImageExportFormat format ||
             ExportPayloadInput.SelectedItem is not int payloadSize)
@@ -483,8 +573,12 @@ public partial class MainWindow : Window
 
         try
         {
-            _files.Export(dialog.FileName, output => export(format, payloadSize, output));
+            await RunFileOperationAsync((token, progress) => Task.Run(() =>
+                _files.Export(dialog.FileName, (output, operationToken, operationProgress) =>
+                    export(format, payloadSize, output, operationToken, operationProgress), token, progress), token));
+            ViewModel.ReportExported(System.IO.Path.GetFileName(dialog.FileName));
         }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Export"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
             MessageBox.Show(this, exception.Message, "Unable to export selected data", MessageBoxButton.OK, MessageBoxImage.Error);

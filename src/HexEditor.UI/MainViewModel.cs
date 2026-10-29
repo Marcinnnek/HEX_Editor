@@ -17,7 +17,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _windowTitle = "HEX Editor";
     private string? _sourcePath;
     private MemoryImageExportFormat? _sourceFormat;
-    private object? _sourceFormatMetadata;
+    private MemoryImageFormatMetadata? _sourceFormatMetadata;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -48,7 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool CanRedo => Editing.CanRedo;
     public string? SourcePath => _sourcePath;
     public MemoryImageExportFormat? SourceFormat => _sourceFormat;
-    public object? SourceFormatMetadata => _sourceFormatMetadata;
+    public MemoryImageFormatMetadata? SourceFormatMetadata => _sourceFormatMetadata;
 
     public HexImageViewModel ImageView
     {
@@ -63,6 +63,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         using var stream = File.OpenRead(path);
         return _fileService.PrepareImport(stream, CurrentImage, path);
+    }
+
+    public Task<MemoryImageImportPreview> PrepareOpenAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return Task.Run(() =>
+        {
+            using var stream = File.OpenRead(path);
+            return _fileService.PrepareImport(stream, CurrentImage, path, cancellationToken, progress);
+        }, cancellationToken);
     }
 
     public void ApplyImport(MemoryImageImportPreview preview, OverlapDecision decision)
@@ -156,16 +167,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SaveAs(_sourcePath, _sourceFormat.Value, overwriteExisting: true);
     }
 
-    public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting)
+    public async Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
+    {
+        if (string.IsNullOrWhiteSpace(_sourcePath) || _sourceFormat is null)
+            throw new InvalidOperationException("Choose Save As and select a file format first.");
+        await SaveAsAsync(_sourcePath, _sourceFormat.Value, overwriteExisting: true, cancellationToken, progress);
+    }
+
+    public async Task SaveAsAsync(string path, MemoryImageExportFormat format, bool overwriteExisting,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var image = CurrentImage;
+        var metadata = _sourceFormatMetadata;
+        await Task.Run(() => _fileService.SaveAtomically(image, path, format, 16, overwriteExisting,
+            metadata, cancellationToken, progress), cancellationToken);
+        CompleteSave(path, format, image);
+    }
+
+    public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting)
+    {
         _fileService.SaveAtomically(CurrentImage, path, format, 16, overwriteExisting, _sourceFormatMetadata);
+        CompleteSave(path, format, CurrentImage);
+    }
+
+    private void CompleteSave(string path, MemoryImageExportFormat format, MemoryImage image)
+    {
         _sourcePath = Path.GetFullPath(path);
         _sourceFormat = format;
         _sourceFormatMetadata = MemoryImageFileService.ConvertMetadata(_sourceFormatMetadata, format);
-        _savedImage = CurrentImage;
+        _savedImage = image;
         RefreshTitle();
-        StatusMessage = $"Saved {CurrentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {format}.";
+        StatusMessage = $"Saved {image.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {format}.";
         RefreshEditorStatus();
         Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified));
     }
@@ -184,6 +217,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         StatusMessage = $"Exported selected occupied bytes to {fileName}.";
     }
+
+    public void ReportFileOperationCancelled(string operation) => StatusMessage = $"{operation} operation cancelled.";
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) => Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
     public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) => Editing.ApplyRelocation(preview, decision);

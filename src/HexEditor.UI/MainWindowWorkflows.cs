@@ -81,16 +81,30 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
         viewModel.ApplyImport(preview, chooseOverlap(preview));
     }
 
+    public Task<MemoryImageImportPreview> PrepareOpenAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress) => viewModel.PrepareOpenAsync(path, cancellationToken, progress);
+
     public void Save() => viewModel.Save();
+
+    public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
+        viewModel.SaveAsync(cancellationToken, progress);
 
     public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting) =>
         viewModel.SaveAs(path, format, overwriteExisting);
 
-    public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int payloadSize, Stream output) =>
-        _fileService.ExportSegments(viewModel.CurrentImage, segmentIndexes, format, payloadSize, output, viewModel.SourceFormatMetadata);
+    public Task SaveAsAsync(string path, MemoryImageExportFormat format, bool overwriteExisting,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
+        viewModel.SaveAsAsync(path, format, overwriteExisting, cancellationToken, progress);
 
-    public void ExportAddressRange(uint start, uint end, MemoryImageExportFormat format, int payloadSize, Stream output) =>
-        _fileService.ExportAddressRange(viewModel.CurrentImage, start, end, format, payloadSize, output, viewModel.SourceFormatMetadata);
+    public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int payloadSize, Stream output,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
+        _fileService.ExportSegments(viewModel.CurrentImage, segmentIndexes, format, payloadSize, output,
+            viewModel.SourceFormatMetadata, cancellationToken, progress);
+
+    public void ExportAddressRange(uint start, uint end, MemoryImageExportFormat format, int payloadSize, Stream output,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
+        _fileService.ExportAddressRange(viewModel.CurrentImage, start, end, format, payloadSize, output,
+            viewModel.SourceFormatMetadata, cancellationToken, progress);
 
     public bool ApplyMerge(LoadedMemoryImage destination, MemoryImageMergePreview preview,
         MemoryImageMergeChoice? defaultChoice, IEnumerable<MemoryImageMergeRangeOverride> rangeOverrides,
@@ -106,11 +120,10 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
         return true;
     }
 
-    public void Export(string path, Action<Stream> export)
+    public void Export(string path, Action<Stream, CancellationToken, IProgress<MemoryImageFileProgress>?> export,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        using var output = File.Create(path);
-        export(output);
-        viewModel.ReportExported(Path.GetFileName(path));
+        _fileService.ExportAtomically(path, overwriteExisting: true, export, cancellationToken, progress);
     }
 }
 
