@@ -6,15 +6,28 @@ namespace HexEditor.Formats;
 
 internal static class SRecordWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output, uint? startAddress)
+    public static void Write(MemoryImage image, int maxPayload, Stream output, SRecordMetadata metadata)
     {
+        ArgumentNullException.ThrowIfNull(metadata);
+        var headerData = metadata.HeaderData ?? [];
+        if (metadata.HeaderAddress is not null && headerData.Length > byte.MaxValue - 3)
+        {
+            throw new ArgumentException("An S0 header can contain at most 252 data bytes.", nameof(metadata));
+        }
+
         var highestAddress = image.Segments.Count == 0 ? 0 : image.Segments[^1].EndAddress;
-        if (startAddress is { } entryAddress) highestAddress = Math.Max(highestAddress, entryAddress);
+        if (metadata.StartAddress is { } entryAddress) highestAddress = Math.Max(highestAddress, entryAddress);
         var addressBytes = highestAddress <= 0xFFFF ? 2 : highestAddress <= 0xFFFFFF ? 3 : 4;
         var dataType = addressBytes switch { 2 => '1', 3 => '2', _ => '3' };
         var terminationType = addressBytes switch { 2 => '9', 3 => '8', _ => '7' };
 
         using var writer = new StreamWriter(output, Encoding.ASCII, 1024, leaveOpen: true);
+        if (metadata.HeaderAddress is { } headerAddress)
+        {
+            WriteRecord(writer, '0', headerAddress, 2, headerData);
+        }
+
+        var dataRecordCount = 0;
         foreach (var segment in image.Segments)
         {
             for (var offset = 0; offset < segment.ByteCount;)
@@ -26,11 +39,19 @@ internal static class SRecordWriter
                     (uint)((ulong)segment.StartAddress + (uint)offset),
                     addressBytes,
                     segment.Data.Span.Slice(offset, count));
+                dataRecordCount++;
                 offset += count;
             }
         }
 
-        WriteRecord(writer, terminationType, startAddress ?? 0, addressBytes, ReadOnlySpan<byte>.Empty);
+        if (dataRecordCount <= 0xFFFFFF)
+        {
+            var countAddressBytes = dataRecordCount <= ushort.MaxValue ? 2 : 3;
+            var countType = countAddressBytes == 2 ? '5' : '6';
+            WriteRecord(writer, countType, (uint)dataRecordCount, countAddressBytes, ReadOnlySpan<byte>.Empty);
+        }
+
+        WriteRecord(writer, terminationType, metadata.StartAddress ?? 0, addressBytes, ReadOnlySpan<byte>.Empty);
     }
 
     private static void WriteRecord(

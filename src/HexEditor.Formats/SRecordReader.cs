@@ -24,6 +24,7 @@ internal static class SRecordReader
         int? declaredDataRecordCount = null;
         uint? startAddress = null;
         char? lastDataType = null;
+        ParsedRecord? headerRecord = null;
 
         while (reader.ReadLine() is { } line)
         {
@@ -43,6 +44,7 @@ internal static class SRecordReader
                     }
 
                     sawHeader = true;
+                    headerRecord = record;
                     break;
                 case '1':
                 case '2':
@@ -115,7 +117,11 @@ internal static class SRecordReader
             }
         }
 
-        return (segments, new SRecordMetadata(startAddress, dataRecords.Count));
+        return (segments, new SRecordMetadata(
+            startAddress,
+            dataRecords.Count,
+            headerRecord is null ? null : checked((ushort)headerRecord.Address),
+            headerRecord?.Data.ToArray()));
     }
 
     private static ParsedRecord ParseRecord(string line, int lineNumber)
