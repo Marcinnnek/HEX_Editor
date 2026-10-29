@@ -19,6 +19,8 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private uint _rangeStart;
     private uint _rangeEnd = uint.MaxValue;
     private CompareRows _rows;
+    private ComparePanelRows _fileARows;
+    private ComparePanelRows _fileBRows;
     private string _comparisonStatus = "No differences";
 
     public CompareViewModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true)
@@ -29,11 +31,15 @@ public sealed class CompareViewModel : INotifyPropertyChanged
         _bytesPerRow = bytesPerRow;
         _showAscii = showAscii;
         _rows = new CompareRows(this);
+        _fileARows = new ComparePanelRows(this, fileA: true);
+        _fileBRows = new ComparePanelRows(this, fileA: false);
         UpdateComparisonStatus();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public IList<CompareViewRow> Rows => _rows;
+    public IList<HexViewRow> FileARows => _fileARows;
+    public IList<HexViewRow> FileBRows => _fileBRows;
     public MemoryImage FileA => _fileA;
     public MemoryImage FileB => _fileB;
     public int BytesPerRow { get => _bytesPerRow; set { ValidateRowWidth(value); if (SetField(ref _bytesPerRow, value)) RebuildRows(); } }
@@ -141,7 +147,11 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private void RebuildRows()
     {
         _rows = new CompareRows(this);
+        _fileARows = new ComparePanelRows(this, fileA: true);
+        _fileBRows = new ComparePanelRows(this, fileA: false);
         OnPropertyChanged(nameof(Rows));
+        OnPropertyChanged(nameof(FileARows));
+        OnPropertyChanged(nameof(FileBRows));
     }
 
     private void UpdateComparisonStatus()
@@ -246,6 +256,57 @@ public sealed class CompareViewModel : INotifyPropertyChanged
 
     internal uint RangeStart => _rangeStart;
     internal uint RangeEnd => _rangeEnd;
+}
+
+internal sealed class ComparePanelRows : IList<HexViewRow>
+{
+    private readonly CompareViewModel _view;
+    private readonly bool _fileA;
+
+    public ComparePanelRows(CompareViewModel view, bool fileA)
+    {
+        _view = view;
+        _fileA = fileA;
+    }
+
+    public int Count => _view.Rows.Count;
+    public bool IsReadOnly => true;
+    public HexViewRow this[int index]
+    {
+        get
+        {
+            var row = _view.Rows[index];
+            if (row.IsGapMarker)
+                return new HexViewRow(row.Address, string.Empty, null, true, row.GapDescription);
+
+            var panel = _fileA ? row.FileA : row.FileB;
+            var cells = panel.Cells.Select(cell => new HexByteCell(
+                cell.Hex,
+                cell.Ascii,
+                cell.Address,
+                cell.State switch
+                {
+                    CompareByteState.Different => "Different",
+                    CompareByteState.OnlyA when _fileA => "OnlyInPanel",
+                    CompareByteState.OnlyB when !_fileA => "OnlyInPanel",
+                    CompareByteState.OnlyA or CompareByteState.OnlyB => "OnlyOther",
+                    _ => string.Empty
+                })).ToArray();
+            return new HexViewRow(row.Address, panel.HexData, panel.Ascii, false, null) { Cells = cells };
+        }
+        set => throw new NotSupportedException();
+    }
+
+    public int IndexOf(HexViewRow item) => Enumerable.Range(0, Count).FirstOrDefault(index => Equals(this[index], item), -1);
+    public bool Contains(HexViewRow item) => IndexOf(item) >= 0;
+    public void CopyTo(HexViewRow[] array, int arrayIndex) { for (var i = 0; i < Count; i++) array[arrayIndex + i] = this[i]; }
+    public IEnumerator<HexViewRow> GetEnumerator() { for (var i = 0; i < Count; i++) yield return this[i]; }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    public void Add(HexViewRow item) => throw new NotSupportedException();
+    public void Clear() => throw new NotSupportedException();
+    public void Insert(int index, HexViewRow item) => throw new NotSupportedException();
+    public bool Remove(HexViewRow item) => throw new NotSupportedException();
+    public void RemoveAt(int index) => throw new NotSupportedException();
 }
 
 public sealed record CompareByteCell(string Hex, string Ascii, CompareByteState State, uint Address);

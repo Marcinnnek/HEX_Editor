@@ -20,6 +20,10 @@ public partial class CompareWindow : Window
         RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
+        FileAView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
+        FileBView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
+        FileAView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
+        FileBView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
         Title = $"Compare: {nameA} ↔ {nameB}";
     }
 
@@ -35,15 +39,6 @@ public partial class CompareWindow : Window
         if (updateA) _fileA = updatedImage;
         if (updateB) _fileB = updatedImage;
         ViewModel.Refresh(_fileA, _fileB);
-    }
-
-    private void Ascii_Changed(object sender, RoutedEventArgs e)
-    {
-        if (AsciiAColumn is not null)
-        {
-            AsciiAColumn.Visibility = ViewModel.ShowAscii ? Visibility.Visible : Visibility.Collapsed;
-            AsciiBColumn.Visibility = ViewModel.ShowAscii ? Visibility.Visible : Visibility.Collapsed;
-        }
     }
 
     private void ApplyRange_Click(object sender, RoutedEventArgs e)
@@ -83,7 +78,7 @@ public partial class CompareWindow : Window
 
     private uint SelectedAddress()
     {
-        if (FileAGrid.SelectedItem is CompareViewRow row && HexAddressParser.TryParse(row.Address, out var address)) return address;
+        if (FileAView.ItemsGrid.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var address)) return address;
         return 0;
     }
 
@@ -95,38 +90,38 @@ public partial class CompareWindow : Window
 
     private void SelectRow(int index)
     {
-        if ((uint)index >= (uint)ViewModel.Rows.Count) return;
-        var row = ViewModel.Rows[index];
+        if ((uint)index >= (uint)ViewModel.FileARows.Count) return;
         _syncingScroll = true;
-        FileAGrid.SelectedItem = row;
-        FileBGrid.SelectedItem = row;
-        FileAGrid.ScrollIntoView(row);
-        FileBGrid.ScrollIntoView(row);
+        FileAView.ItemsGrid.SelectedIndex = index;
+        FileBView.ItemsGrid.SelectedIndex = index;
+        FileAView.ItemsGrid.ScrollIntoView(FileAView.ItemsGrid.Items[index]);
+        FileBView.ItemsGrid.ScrollIntoView(FileBView.ItemsGrid.Items[index]);
         _syncingScroll = false;
     }
 
     private void Panel_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_syncingScroll || sender is not DataGrid source || source.SelectedItem is not CompareViewRow row) return;
+        if (_syncingScroll || sender is not DataGrid source || source.SelectedItem is not HexViewRow) return;
         _syncingScroll = true;
-        var target = ReferenceEquals(source, FileAGrid) ? FileBGrid : FileAGrid;
-        target.SelectedItem = row;
-        target.ScrollIntoView(row);
+        var target = ReferenceEquals(source, FileAView.ItemsGrid) ? FileBView.ItemsGrid : FileAView.ItemsGrid;
+        if ((uint)source.SelectedIndex < (uint)target.Items.Count)
+        {
+            var targetRow = target.Items[source.SelectedIndex];
+            target.SelectedIndex = source.SelectedIndex;
+            target.ScrollIntoView(targetRow);
+        }
         _syncingScroll = false;
     }
 
-    private void ByteCell_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void ByteAddressSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: CompareByteCell cell })
-        {
-            Navigate(cell.Address);
-        }
+        Navigate(e.EndAddress);
     }
 
     private void Grid_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (_syncingScroll || sender is not DataGrid source || e.VerticalChange == 0) return;
-        var target = ReferenceEquals(source, FileAGrid) ? FileBGrid : FileAGrid;
+        var target = ReferenceEquals(source, FileAView.ItemsGrid) ? FileBView.ItemsGrid : FileAView.ItemsGrid;
         var sourceScroll = FindScrollViewer(source);
         var targetScroll = FindScrollViewer(target);
         if (sourceScroll is null || targetScroll is null) return;
@@ -145,4 +140,5 @@ public partial class CompareWindow : Window
             if (nested is not null) return nested;
         }
         return null;
+    }
 }

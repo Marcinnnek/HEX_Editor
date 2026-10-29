@@ -25,6 +25,29 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void SharedPanelRows_ExposeAddressableByteCellsWithSideSpecificHighlights()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20]), new MemorySegment(0x1003, [0x30])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x21]), new MemorySegment(0x1004, [0x40])]),
+            bytesPerRow: 8);
+
+        var fileA = comparison.FileARows[0];
+        var fileB = comparison.FileBRows[0];
+
+        Assert.HasCount(8, fileA.Cells);
+        Assert.AreEqual(0x1001u, fileA.Cells[1].Address);
+        Assert.AreEqual("Different", fileA.Cells[1].Highlight);
+        Assert.AreEqual("Different", fileB.Cells[1].Highlight);
+        Assert.AreEqual("OnlyInPanel", fileA.Cells[3].Highlight);
+        Assert.AreEqual("OnlyOther", fileB.Cells[3].Highlight);
+        Assert.AreEqual("OnlyOther", fileA.Cells[4].Highlight);
+        Assert.AreEqual("OnlyInPanel", fileB.Cells[4].Highlight);
+        Assert.AreEqual(string.Empty, fileA.Cells[5].Highlight);
+        Assert.AreEqual(0x1007u, fileA.Cells[7].Address);
+    }
+
+    [TestMethod]
     public void ComparisonStatus_ReportsEqualityAndDifferenceCountsAndRefreshes()
     {
         var comparison = new CompareViewModel(

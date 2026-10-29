@@ -93,6 +93,8 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
 public sealed record HexViewRow(string Address, string HexData, string? Ascii, bool IsGapMarker, string? GapDescription)
 {
+    public IReadOnlyList<HexByteCell> Cells { get; init; } = Array.Empty<HexByteCell>();
+
     internal static HexViewRow Gap(uint startAddress, uint endAddress) => new(
         string.Empty,
         string.Empty,
@@ -100,6 +102,8 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
         true,
         $"Skipped 0x{startAddress:X8}–0x{endAddress:X8}");
 }
+
+public sealed record HexByteCell(string Hex, string Ascii, uint? Address, string Highlight);
 
 internal sealed class HexImageRows : IList<HexViewRow>
 {
@@ -235,6 +239,7 @@ internal sealed class HexImageRows : IList<HexViewRow>
     {
         var hex = new StringBuilder((_bytesPerRow * 3) - 1);
         var ascii = _showAscii ? new StringBuilder(_bytesPerRow) : null;
+        var cells = new HexByteCell[_bytesPerRow];
         for (var offset = 0; offset < _bytesPerRow; offset++)
         {
             if (offset > 0)
@@ -250,15 +255,17 @@ internal sealed class HexImageRows : IList<HexViewRow>
                 {
                     ascii.Append(value is >= 0x20 and <= 0x7E ? (char)value : '.');
                 }
+                cells[offset] = new HexByteCell(value.ToString("X2"), value is >= 0x20 and <= 0x7E ? ((char)value).ToString() : ".", (uint)address, string.Empty);
             }
             else
             {
                 hex.Append("  ");
                 ascii?.Append(' ');
+                cells[offset] = new HexByteCell(string.Empty, " ", address <= uint.MaxValue ? (uint)address : null, string.Empty);
             }
         }
 
-        return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null);
+        return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null) { Cells = cells };
     }
 
     private RowRange FindRange(int index)

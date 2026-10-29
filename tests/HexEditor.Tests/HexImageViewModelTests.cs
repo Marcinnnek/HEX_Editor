@@ -28,6 +28,21 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void HexRows_ExposeEachAbsoluteByteAddressForSingleOrShiftRangeSelection()
+    {
+        var view = new HexImageViewModel(MemoryImage.FromSegments([new MemorySegment(0x1234, [0xAA, 0xBB])]), bytesPerRow: 8);
+
+        var row = view.Rows[0];
+
+        Assert.HasCount(8, row.Cells);
+        Assert.AreEqual(0x1230u, row.Cells[0].Address);
+        Assert.AreEqual(0x1234u, row.Cells[4].Address);
+        Assert.AreEqual("AA", row.Cells[4].Hex);
+        Assert.AreEqual("BB", row.Cells[5].Hex);
+        Assert.AreEqual(0x1237u, row.Cells[7].Address);
+    }
+
+    [TestMethod]
     public void EditorStatus_ReportsSourceFormatAndModifiedState()
     {
         var model = new MainViewModel();

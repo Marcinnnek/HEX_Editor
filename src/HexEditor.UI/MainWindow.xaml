@@ -21,7 +21,7 @@
                 <ComboBox Width="65" ItemsSource="{Binding ViewModel.RowWidths}"
                           SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
                 <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ImageView.ShowAscii, UpdateSourceTrigger=PropertyChanged}"
-                          VerticalAlignment="Center" Margin="12,0,12,0" Checked="AsciiToggle_Changed" Unchecked="AsciiToggle_Changed" />
+                          VerticalAlignment="Center" Margin="12,0,12,0" />
                 <TextBlock Text="Go to" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <TextBox x:Name="AddressInput" Width="90" VerticalContentAlignment="Center" />
                 <Button Content="Go" Padding="8,4" Margin="4,0,0,0" Click="GoToAddress_Click" />
@@ -32,6 +32,7 @@
                 <TextBox x:Name="RangeStartInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,6,0" />
                 <TextBlock Text="End" VerticalAlignment="Center" Margin="0,0,4,0" />
                 <TextBox x:Name="RangeEndInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,8,0" />
+                <Button Content="Select range" Click="SelectRange_Click" Padding="8,4" Margin="0,0,6,0" ToolTip="Select the inclusive address range above" />
                 <TextBox x:Name="PatternInput" Width="130" ToolTip="Byte or repeating hexadecimal pattern, for example 00 FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
                 <Button Content="Edit / Insert" Click="EditInsert_Click" Padding="8,4" Margin="0,0,4,0" />
                 <Button Content="Fill" Click="Fill_Click" Padding="8,4" Margin="0,0,4,0" />
@@ -114,38 +115,10 @@
                     <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="65" />
                 </DataGrid.Columns>
             </DataGrid>
-            <DataGrid Grid.Column="2" x:Name="HexRowsGrid" ItemsSource="{Binding ViewModel.ImageView.Rows}"
-                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                      HeadersVisibility="Column" SelectionMode="Single"
-                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
-                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                      ScrollViewer.CanContentScroll="True" FontFamily="Consolas" SelectionChanged="HexRowsGrid_SelectionChanged">
-                <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Address" Width="100">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <Grid>
-                                    <TextBlock Text="{Binding Address}" />
-                                    <TextBlock Text="{Binding GapDescription}" FontStyle="Italic">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Visibility" Value="Collapsed" />
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsGapMarker}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible" />
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                </Grid>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="HEX Data" Binding="{Binding HexData}" Width="*" />
-                    <DataGridTextColumn x:Name="AsciiColumn" Header="ASCII" Binding="{Binding Ascii}" Width="220" />
-                </DataGrid.Columns>
-            </DataGrid>
+            <local:HexViewControl Grid.Column="2" x:Name="HexRowsView"
+                                  ItemsSource="{Binding ViewModel.ImageView.Rows}"
+                                  ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
+                                  AddressRangeSelected="HexView_AddressRangeSelected" />
         </Grid>
     </DockPanel>
 </Window>

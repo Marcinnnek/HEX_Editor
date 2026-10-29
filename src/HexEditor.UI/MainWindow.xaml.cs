@@ -440,13 +440,7 @@ public partial class MainWindow : Window
 
     private void GoToAddress_Click(object sender, RoutedEventArgs e)
     {
-        var text = AddressInput.Text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-        {
-            text = text[2..];
-        }
-
-        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var address) ||
+        if (!HexAddressParser.TryParse(AddressInput.Text, out var address) ||
             !ViewModel.TryNavigateToAddress(address, out var rowIndex))
         {
             MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.",
@@ -455,6 +449,24 @@ public partial class MainWindow : Window
         }
 
         SelectRow(rowIndex);
+        ViewModel.SetSelection(address, address);
+        RangeStartInput.Text = address.ToString("X8");
+        RangeEndInput.Text = address.ToString("X8");
+    }
+
+    private void SelectRange_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var start = HexAddressParser.Parse(RangeStartInput.Text);
+            var end = HexAddressParser.Parse(RangeEndInput.Text);
+            ViewModel.SetSelection(start, end);
+            if (ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) SelectRow(rowIndex);
+        }
+        catch (ArgumentException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Invalid selection range", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void ExportSegments_Click(object sender, RoutedEventArgs e)
@@ -468,8 +480,8 @@ public partial class MainWindow : Window
 
     private void ExportRange_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryParseExportAddress(ExportRangeStartInput.Text, out var startAddress) ||
-            !TryParseExportAddress(ExportRangeEndInput.Text, out var endAddress))
+        if (!HexAddressParser.TryParse(ExportRangeStartInput.Text, out var startAddress) ||
+            !HexAddressParser.TryParse(ExportRangeEndInput.Text, out var endAddress))
         {
             MessageBox.Show(this, "Enter both range bounds as 32-bit hexadecimal addresses (for example, 0x08000000).",
                 "Invalid export range", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -519,17 +531,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool TryParseExportAddress(string value, out uint address)
-    {
-        var text = value.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-        {
-            text = text[2..];
-        }
-
-        return uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
-    }
-
     private void RelocateSegment_Click(object sender, RoutedEventArgs e)
     {
         if (SegmentsGrid.SelectedIndex < 0)
@@ -539,13 +540,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var text = AddressInput.Text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-        {
-            text = text[2..];
-        }
-
-        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var destination))
+        if (!HexAddressParser.TryParse(AddressInput.Text, out var destination))
         {
             MessageBox.Show(this, "Enter the destination base as an absolute 32-bit hexadecimal address in the Address field.",
                 "Invalid destination", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -602,36 +597,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void HexRowsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void HexView_AddressRangeSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        if (HexRowsGrid.SelectedItem is not HexViewRow { IsGapMarker: false } row ||
-            !HexAddressParser.TryParse(row.Address, out var start))
-        {
-            ViewModel.ClearSelection();
-            return;
-        }
-
-        var end = (uint)Math.Min(uint.MaxValue, (ulong)start + (uint)ViewModel.ImageView.BytesPerRow - 1);
-        ViewModel.SetSelection(start, end);
-    }
-
-    private void AsciiToggle_Changed(object sender, RoutedEventArgs e)
-    {
-        if (AsciiColumn is not null)
-        {
-            AsciiColumn.Visibility = ViewModel.ImageView.ShowAscii ? Visibility.Visible : Visibility.Collapsed;
-        }
+        ViewModel.SetSelection(e.StartAddress, e.EndAddress);
+        RangeStartInput.Text = e.StartAddress.ToString("X8");
+        RangeEndInput.Text = e.EndAddress.ToString("X8");
     }
 
     private void SelectRow(int rowIndex)
     {
-        if ((uint)rowIndex >= (uint)HexRowsGrid.Items.Count)
-        {
-            return;
-        }
-
-        var row = HexRowsGrid.Items[rowIndex];
-        HexRowsGrid.SelectedItem = row;
-        HexRowsGrid.ScrollIntoView(row);
+        HexRowsView.ScrollToRow(rowIndex);
     }
 }
