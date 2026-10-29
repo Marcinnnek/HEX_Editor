@@ -13,10 +13,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _statusMessage = "Open an Intel HEX or Motorola S-Record file to inspect its occupied memory segments.";
     private string _windowTitle = "HEX Editor";
     private MemoryImage _currentImage = MemoryImage.Empty;
+    private HexImageViewModel _imageView = new(MemoryImage.Empty);
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
+
+    public int[] RowWidths { get; } = [8, 16, 32];
+
+    public HexImageViewModel ImageView
+    {
+        get => _imageView;
+        private set => SetProperty(ref _imageView, value);
+    }
 
     public string StatusMessage
     {
@@ -47,6 +56,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         _currentImage = imported.Image;
+        ImageView = new HexImageViewModel(imported.Image);
 
         Segments.Clear();
         foreach (var segment in imported.Image.Segments)
@@ -62,6 +72,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         WindowTitle = $"{fileName} - HEX Editor";
         StatusMessage = $"{imported.Image.Segments.Count:N0} segments, {totalBytes:N0} bytes | {imported.InputFormat}";
     }
+
+    public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
+
+    public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
 
     private void SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {

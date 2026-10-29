@@ -7,21 +7,65 @@
         mc:Ignorable="d"
         Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640">
     <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
-            <Button Content="Open HEX / S-Record" Padding="12,6" Click="OpenImage_Click" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
+            <Button Content="Open HEX / S-Record" Padding="12,6" Click="OpenImage_Click" Margin="0,0,16,0" />
+            <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <ComboBox Width="72" ItemsSource="{Binding ViewModel.RowWidths}"
+                      SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
+            <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ImageView.ShowAscii, UpdateSourceTrigger=PropertyChanged}"
+                      VerticalAlignment="Center" Margin="16,0,18,0" Checked="AsciiToggle_Changed" Unchecked="AsciiToggle_Changed" />
+            <TextBlock Text="Address" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <TextBox x:Name="AddressInput" Width="120" VerticalContentAlignment="Center" />
+            <Button Content="Go" Padding="10,4" Margin="6,0,0,0" Click="GoToAddress_Click" />
         </StackPanel>
         <TextBlock DockPanel.Dock="Bottom" Margin="0,12,0,0" Text="{Binding ViewModel.StatusMessage}" />
-        <DataGrid ItemsSource="{Binding ViewModel.Segments}"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  CanUserAddRows="False"
-                  HeadersVisibility="Column"
-                  SelectionMode="Single">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
-                <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
-                <DataGridTextColumn Header="Byte Count" Binding="{Binding ByteCount}" Width="120" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="230" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
+                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                      HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="SegmentsGrid_SelectionChanged">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
+                    <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
+                    <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="65" />
+                </DataGrid.Columns>
+            </DataGrid>
+            <DataGrid Grid.Column="2" x:Name="HexRowsGrid" ItemsSource="{Binding ViewModel.ImageView.Rows}"
+                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                      HeadersVisibility="Column" SelectionMode="Single"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.CanContentScroll="True" FontFamily="Consolas">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Address" Width="100">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <TextBlock Text="{Binding Address}" />
+                                    <TextBlock Text="{Binding GapDescription}" FontStyle="Italic">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsGapMarker}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="HEX Data" Binding="{Binding HexData}" Width="*" />
+                    <DataGridTextColumn x:Name="AsciiColumn" Header="ASCII" Binding="{Binding Ascii}" Width="220" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
     </DockPanel>
 </Window>

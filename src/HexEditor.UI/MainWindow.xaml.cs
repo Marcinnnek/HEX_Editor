@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Globalization;
 using HexEditor.Formats;
 
 namespace HexEditor.UI;
@@ -82,5 +83,53 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, exception.Message, "Unable to open file", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void GoToAddress_Click(object sender, RoutedEventArgs e)
+    {
+        var text = AddressInput.Text.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[2..];
+        }
+
+        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var address) ||
+            !ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        {
+            MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.",
+                "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        SelectRow(rowIndex);
+    }
+
+    private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (SegmentsGrid.SelectedIndex >= 0 &&
+            ViewModel.TryNavigateToSegment(SegmentsGrid.SelectedIndex, out var rowIndex))
+        {
+            SelectRow(rowIndex);
+        }
+    }
+
+    private void AsciiToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (AsciiColumn is not null)
+        {
+            AsciiColumn.Visibility = ViewModel.ImageView.ShowAscii ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private void SelectRow(int rowIndex)
+    {
+        if ((uint)rowIndex >= (uint)HexRowsGrid.Items.Count)
+        {
+            return;
+        }
+
+        var row = HexRowsGrid.Items[rowIndex];
+        HexRowsGrid.SelectedItem = row;
+        HexRowsGrid.ScrollIntoView(row);
     }
 }
