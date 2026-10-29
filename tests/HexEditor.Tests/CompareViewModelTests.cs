@@ -1,5 +1,6 @@
 using HexEditor.Core;
 using HexEditor.Compare;
+using HexEditor.Formats;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -45,6 +46,67 @@ public sealed class CompareViewModelTests
         Assert.HasCount(2, workspace.BlocksA);
         Assert.AreEqual(0x4000u, workspace.BlocksA[1].StartAddress);
         Assert.AreEqual(CompareByteState.OnlyA, workspace.Comparison.Rows[^1].States[0]);
+    }
+
+    [TestMethod]
+    public void WorkspaceTab_RefreshesMatchingDocumentPathWhenImagesAreSeparateInstances()
+    {
+        var compareImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var otherImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20])]);
+        var workspace = new CompareWorkspaceTabViewModel(
+            compareImage, otherImage, "left.hex", "right.s19",
+            @"C:\Firmware\image.hex", @"C:\Firmware\other.s19");
+        var editedDocument = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20]), new MemorySegment(0x2000, [0x30])]);
+
+        workspace.RefreshDocument(@"c:\firmware\IMAGE.HEX", editedDocument);
+
+        Assert.AreSame(editedDocument, workspace.Comparison.FileA);
+        Assert.AreSame(otherImage, workspace.Comparison.FileB);
+        Assert.HasCount(2, workspace.BlocksA);
+        Assert.AreEqual(0x2000u, workspace.BlocksA[1].StartAddress);
+        Assert.AreEqual(CompareByteState.Equal, workspace.Comparison.Rows[0].States[0]);
+    }
+
+    [TestMethod]
+    public void WorkspaceTab_RefreshesBothSidesWhenTheyRepresentSameDocument()
+    {
+        var left = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var right = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20])]);
+        var workspace = new CompareWorkspaceTabViewModel(
+            left, right, "left.hex", "same.hex",
+            @"C:\Firmware\image.hex", @"C:\Firmware\IMAGE.HEX");
+        var editedDocument = MemoryImage.FromSegments([new MemorySegment(0x2000, [0x30])]);
+
+        workspace.RefreshDocument(@"C:\Firmware\image.hex", editedDocument);
+
+        Assert.AreSame(editedDocument, workspace.Comparison.FileA);
+        Assert.AreSame(editedDocument, workspace.Comparison.FileB);
+        Assert.HasCount(1, workspace.BlocksA);
+        Assert.HasCount(1, workspace.BlocksB);
+        Assert.AreEqual(0x2000u, workspace.BlocksA[0].StartAddress);
+        Assert.AreEqual("No differences", workspace.Comparison.ComparisonStatus);
+    }
+
+    [TestMethod]
+    public void MainDocumentEditsUndoAndRedo_RefreshSeparateComparisonImageInstances()
+    {
+        const string documentPath = @"C:\Firmware\image.hex";
+        var mainImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var comparisonImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var referenceImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var viewModel = new MainViewModel();
+        viewModel.LoadImage(mainImage, documentPath, MemoryImageExportFormat.IntelHex);
+        var workspace = new CompareWorkspaceTabViewModel(
+            comparisonImage, referenceImage, "image.hex", "other.s19",
+            @"c:\firmware\IMAGE.HEX", @"C:\Firmware\other.s19");
+        viewModel.ImageChanged += (_, updated) => workspace.RefreshDocument(viewModel.SourcePath, updated);
+
+        viewModel.EditByte(0x1000, 0x20, OverlapDecision.OverwriteIncoming);
+        Assert.AreEqual(CompareByteState.Different, workspace.Comparison.Rows[0].States[0]);
+        Assert.IsTrue(viewModel.Undo());
+        Assert.AreEqual(CompareByteState.Equal, workspace.Comparison.Rows[0].States[0]);
+        Assert.IsTrue(viewModel.Redo());
+        Assert.AreEqual(CompareByteState.Different, workspace.Comparison.Rows[0].States[0]);
     }
 
     [TestMethod]
