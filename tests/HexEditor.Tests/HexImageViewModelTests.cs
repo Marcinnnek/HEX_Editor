@@ -13,18 +13,18 @@ public sealed class HexImageViewModelTests
     public void SelectionStatus_TracksInclusiveAddressRangeAndClearsToZeroSelection()
     {
         var model = new MainViewModel();
-        Assert.IsNull(model.CurrentAddress);
-        Assert.AreEqual(0, model.SelectionLength);
+        Assert.IsNull(model.EditorStatus.CurrentAddress);
+        Assert.AreEqual(0, model.EditorStatus.SelectionLength);
 
-        model.SetSelection(0x1234, 0x123F);
-        Assert.AreEqual(0x1234u, model.CurrentAddress);
-        Assert.AreEqual(12L, model.SelectionLength);
-        Assert.AreEqual("00001234", model.CurrentAddressText);
+        model.EditorStatus.SetSelection(0x1234, 0x123F);
+        Assert.AreEqual(0x1234u, model.EditorStatus.CurrentAddress);
+        Assert.AreEqual(12L, model.EditorStatus.SelectionLength);
+        Assert.AreEqual("00001234", model.EditorStatus.CurrentAddressText);
 
-        model.ClearSelection();
-        Assert.IsNull(model.CurrentAddress);
-        Assert.AreEqual(0, model.SelectionLength);
-        Assert.AreEqual("—", model.CurrentAddressText);
+        model.EditorStatus.ClearSelection();
+        Assert.IsNull(model.EditorStatus.CurrentAddress);
+        Assert.AreEqual(0, model.EditorStatus.SelectionLength);
+        Assert.AreEqual("—", model.EditorStatus.CurrentAddressText);
     }
 
     [TestMethod]
@@ -77,12 +77,12 @@ public sealed class HexImageViewModelTests
         var model = new MainViewModel();
         model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xAA])]), "input.hex", MemoryImageExportFormat.IntelHex);
 
-        Assert.AreEqual("Intel HEX", model.ImageFormatText);
-        Assert.AreEqual("Saved", model.ModifiedStateText);
+        Assert.AreEqual("Intel HEX", model.EditorStatus.ImageFormatText);
+        Assert.AreEqual("Saved", model.EditorStatus.ModifiedStateText);
         model.EditByte(0x10, 0xBB, OverlapDecision.OverwriteIncoming);
-        Assert.AreEqual("Modified", model.ModifiedStateText);
+        Assert.AreEqual("Modified", model.EditorStatus.ModifiedStateText);
         Assert.IsTrue(model.Undo());
-        Assert.AreEqual("Saved", model.ModifiedStateText);
+        Assert.AreEqual("Saved", model.EditorStatus.ModifiedStateText);
     }
 
     [TestMethod]
@@ -274,13 +274,13 @@ public sealed class HexImageViewModelTests
     {
         var model = new MainViewModel();
         model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x01, 0x02])]), null, null);
-        model.CalculateChecksum(ChecksumRequest.Additive(0x1000, 0x1001, 16, MissingAddressTreatment.Reject));
+        model.Checksum.Calculate(model.CurrentImage, ChecksumRequest.Additive(0x1000, 0x1001, 16, MissingAddressTreatment.Reject));
 
         model.WriteChecksumResult(0x2000);
 
         Assert.IsTrue(model.IsModified);
         CollectionAssert.AreEqual(new byte[] { 0x00, 0x03 }, model.CurrentImage.Segments[^1].Data.ToArray());
-        Assert.IsFalse(model.ChecksumResult!.IsStale, "Writing outside the input range must preserve the result.");
+        Assert.IsFalse(model.Checksum.Result!.IsStale, "Writing outside the input range must preserve the result.");
         Assert.IsTrue(model.Undo());
         Assert.IsFalse(model.IsModified);
         Assert.IsFalse(model.CurrentImage.TryGetByte(0x2000, out _));
@@ -288,7 +288,7 @@ public sealed class HexImageViewModelTests
         Assert.IsTrue(model.CurrentImage.TryGetByte(0x2001, out _));
 
         model.EditByte(0x1000, 0xFF, OverlapDecision.OverwriteIncoming);
-        Assert.IsTrue(model.ChecksumResult.IsStale);
+        Assert.IsTrue(model.Checksum.Result!.IsStale);
         Assert.Throws<InvalidOperationException>(() => model.WriteChecksumResult(0x3000));
     }
 
@@ -328,6 +328,8 @@ public sealed class HexImageViewModelTests
         Assert.IsTrue(view.Rows[3].IsGapMarker);
         StringAssert.Contains(view.Rows[3].GapDescription!, "00000118");
         StringAssert.Contains(view.Rows[3].GapDescription!, "000001F8");
+        StringAssert.Contains(view.Rows[3].GapDescription!, "...");
+        Assert.IsFalse(view.Rows[3].GapDescription!.Contains("â", StringComparison.Ordinal));
         Assert.AreEqual("00000200", view.Rows[4].Address);
     }
 

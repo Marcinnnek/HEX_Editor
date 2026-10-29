@@ -38,7 +38,7 @@ internal sealed class ChecksumWorkflow(MainViewModel viewModel)
 
     public void Write(uint address, Func<int, string, OverlapDecision> chooseOverlap)
     {
-        var result = viewModel.ChecksumResult ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
+        var result = viewModel.Checksum.Result ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
         var collisions = Enumerable.Range(0, result.WidthBits / 8)
             .Count(offset => viewModel.CurrentImage.TryGetByte(checked(address + (uint)offset), out _));
         var decision = collisions == 0 ? (OverlapDecision?)null : chooseOverlap(collisions, "checksum write");

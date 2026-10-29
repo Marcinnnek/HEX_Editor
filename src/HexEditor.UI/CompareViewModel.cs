@@ -220,7 +220,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
         {
             if (position.IsGap)
             {
-                var description = $"Skipped 0x{position.GapStartAddress:X8}â€“0x{position.GapEndAddress:X8}";
+                var description = $"Skipped 0x{position.GapStartAddress:X8}...0x{position.GapEndAddress:X8}";
                 return new CompareViewRow(string.Empty, EmptyPanel(), EmptyPanel(), Array.Empty<CompareByteState>(), true, description);
             }
 

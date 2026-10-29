@@ -148,7 +148,7 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
         string.Empty,
         null,
         true,
-        $"Skipped 0x{startAddress:X8}â€“0x{endAddress:X8}");
+        $"Skipped 0x{startAddress:X8}...0x{endAddress:X8}");
 }
 
 public sealed record HexByteCell(string Hex, string Ascii, uint? Address, string Highlight);

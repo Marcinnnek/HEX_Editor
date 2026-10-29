@@ -76,8 +76,8 @@
                 <TextBox x:Name="ChecksumWriteAddressInput" Width="80" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,4,0" />
                 <Button Content="Write result" Click="WriteChecksum_Click" Padding="8,4" />
             </WrapPanel>
-            <TextBlock Text="{Binding ViewModel.ChecksumSummary}" Margin="0,4,0,0" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding ViewModel.ChecksumResult.Parameters}" />
+            <TextBlock Text="{Binding ViewModel.Checksum.Summary}" Margin="0,4,0,0" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding ViewModel.Checksum.Result.Parameters}" />
             <WrapPanel VerticalAlignment="Center" Margin="0,0,0,6">
                 <TextBlock Text="Export as" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox x:Name="ExportFormatInput" Width="150" ItemsSource="{Binding ViewModel.ExportFormats}" SelectedIndex="0" />
@@ -93,10 +93,10 @@
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock>
-                <Run Text="Address: " /><Run Text="{Binding ViewModel.CurrentAddressText}" />
-                <Run Text="    Selection: " /><Run Text="{Binding ViewModel.SelectionLength}" /><Run Text=" byte(s)" />
-                <Run Text="    Format: " /><Run Text="{Binding ViewModel.ImageFormatText}" />
-                <Run Text="    State: " /><Run Text="{Binding ViewModel.ModifiedStateText}" />
+                <Run Text="Address: " /><Run Text="{Binding ViewModel.EditorStatus.CurrentAddressText}" />
+                <Run Text="    Selection: " /><Run Text="{Binding ViewModel.EditorStatus.SelectionLength}" /><Run Text=" byte(s)" />
+                <Run Text="    Format: " /><Run Text="{Binding ViewModel.EditorStatus.ImageFormatText}" />
+                <Run Text="    State: " /><Run Text="{Binding ViewModel.EditorStatus.ModifiedStateText}" />
             </TextBlock>
             <TextBlock Margin="0,3,0,0" Text="{Binding ViewModel.StatusMessage}" />
         </StackPanel>

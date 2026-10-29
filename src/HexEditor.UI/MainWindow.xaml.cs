@@ -391,7 +391,7 @@ public partial class MainWindow : Window
         }
 
         SelectRow(rowIndex);
-        ViewModel.SetSelection(address, address);
+        ViewModel.EditorStatus.SetSelection(address, address);
         RangeStartInput.Text = address.ToString("X8");
         RangeEndInput.Text = address.ToString("X8");
     }
@@ -402,7 +402,7 @@ public partial class MainWindow : Window
         {
             var start = HexAddressParser.Parse(RangeStartInput.Text);
             var end = HexAddressParser.Parse(RangeEndInput.Text);
-            ViewModel.SetSelection(start, end);
+            ViewModel.EditorStatus.SetSelection(start, end);
             if (ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) SelectRow(rowIndex);
         }
         catch (ArgumentException exception)
@@ -534,7 +534,7 @@ public partial class MainWindow : Window
 
     private void HexView_AddressRangeSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        ViewModel.SetSelection(e.StartAddress, e.EndAddress);
+        ViewModel.EditorStatus.SetSelection(e.StartAddress, e.EndAddress);
         RangeStartInput.Text = e.StartAddress.ToString("X8");
         RangeEndInput.Text = e.EndAddress.ToString("X8");
     }

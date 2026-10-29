@@ -169,6 +169,10 @@ public sealed class CompareViewModelTests
 
         Assert.HasCount(3, comparison.Rows);
         Assert.IsTrue(comparison.Rows[1].IsGapMarker);
+        StringAssert.Contains(comparison.Rows[1].GapDescription!, "00001010");
+        StringAssert.Contains(comparison.Rows[1].GapDescription!, "8FFFFFF0");
+        StringAssert.Contains(comparison.Rows[1].GapDescription!, "...");
+        Assert.IsFalse(comparison.Rows[1].GapDescription!.Contains("â", StringComparison.Ordinal));
         Assert.IsTrue(comparison.TryNavigateToAddress(0x50000000, out var gapIndex));
         Assert.AreEqual(2, gapIndex);
         Assert.IsFalse(comparison.Rows[gapIndex].IsGapMarker);

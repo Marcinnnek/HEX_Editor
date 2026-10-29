@@ -22,9 +22,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private MemoryImageExportFormat? _sourceFormat;
     private object? _sourceFormatMetadata;
     private EditClipboard? _clipboard;
-    private ChecksumCalculationResult? _checksumResult;
-    private uint? _currentAddress;
-    private long _selectionLength;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -38,6 +35,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action<MemoryImage, MemoryImage>? ImageChanged;
 
+    public EditorStatusViewModel EditorStatus { get; } = new();
+    public ChecksumViewModel Checksum { get; } = new();
+
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
     public int[] RowWidths { get; } = [8, 16, 32];
     public int[] ExportPayloadSizes { get; } = [8, 16, 32];
@@ -50,16 +50,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string? SourcePath => _sourcePath;
     public MemoryImageExportFormat? SourceFormat => _sourceFormat;
     public object? SourceFormatMetadata => _sourceFormatMetadata;
-    public uint? CurrentAddress => _currentAddress;
-    public string CurrentAddressText => _currentAddress?.ToString("X8") ?? "—";
-    public long SelectionLength => _selectionLength;
-    public string ImageFormatText => SourceFormat switch
-    {
-        MemoryImageExportFormat.IntelHex => "Intel HEX",
-        MemoryImageExportFormat.SRecord => "Motorola S-Record",
-        _ => "Unknown format"
-    };
-    public string ModifiedStateText => IsModified ? "Modified" : "Saved";
 
     public HexImageViewModel ImageView
     {
@@ -69,20 +59,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
     public string WindowTitle { get => _windowTitle; private set => SetProperty(ref _windowTitle, value); }
-    public ChecksumCalculationResult? ChecksumResult
-    {
-        get => _checksumResult;
-        private set
-        {
-            if (ReferenceEquals(_checksumResult, value)) return;
-            _checksumResult = value;
-            Raise(nameof(ChecksumResult), nameof(ChecksumSummary));
-        }
-    }
-    public string ChecksumSummary => ChecksumResult is null
-        ? "No checksum calculated."
-        : $"{ChecksumResult.AlgorithmName}: {ChecksumResult.FormattedValue}" + (ChecksumResult.IsStale ? " (STALE — recalculate before writing)" : string.Empty);
-
     public MemoryImageImportPreview PrepareOpen(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -101,7 +77,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _undo.Clear();
         _redo.Clear();
         _currentImage = imported.Image;
-        ChecksumResult = null;
+        Checksum.Clear();
         // An import applied over an already-open image creates merged contents that are not represented
         // by the newly associated source file, so keep them marked unsaved until the user saves explicitly.
         _savedImage = hadExistingImage ? MemoryImage.Empty : imported.Image;
@@ -109,9 +85,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _sourceFormat = imported.InputFormat == "Intel HEX" ? MemoryImageExportFormat.IntelHex : MemoryImageExportFormat.SRecord;
         _sourceFormatMetadata = imported.FormatMetadata;
         RefreshImage();
+        RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(imported.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(ImageFormatText), nameof(ModifiedStateText));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
         NotifyImageChanged(previousImage);
     }
 
@@ -121,14 +98,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _undo.Clear();
         _redo.Clear();
         _currentImage = _savedImage = image;
-        ChecksumResult = null;
+        Checksum.Clear();
         _sourcePath = sourcePath;
         _sourceFormat = format;
         _sourceFormatMetadata = null;
         RefreshImage();
+        RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(format?.ToString());
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(ImageFormatText), nameof(ModifiedStateText));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
     }
 
     public void CloseImage() => LoadImage(MemoryImage.Empty, null, null);
@@ -259,18 +237,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public ChecksumCalculationResult CalculateChecksum(ChecksumRequest request)
     {
-        ArgumentNullException.ThrowIfNull(request);
-        var result = ChecksumCalculator.Calculate(_currentImage, request);
-        ChecksumResult = result;
+        var result = Checksum.Calculate(_currentImage, request);
         StatusMessage = $"{result.AlgorithmName}: {result.FormattedValue} over 0x{result.StartAddress:X8}-0x{result.EndAddress:X8}.";
         return result;
     }
 
     public void WriteChecksumResult(uint address, OverlapDecision? overlapDecision = null)
     {
-        var result = ChecksumResult ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
-        if (result.IsStale)
-            throw new InvalidOperationException("The displayed checksum is stale. Recalculate it before writing.");
+        var result = Checksum.GetWritableResult();
         InsertBytes(address, result.ToBytes(), overlapDecision);
     }
 
@@ -279,11 +253,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!_undo.TryPop(out var previous)) return false;
         var changedImage = _currentImage;
         _redo.Push(_currentImage);
-        UpdateChecksumStale(_currentImage, previous);
+        Checksum.TrackImageChange(_currentImage, previous);
         _currentImage = previous;
         RefreshImage();
         RefreshModifiedTitle();
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ModifiedStateText));
+        RefreshEditorStatus();
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
         NotifyImageChanged(changedImage);
         return true;
     }
@@ -293,11 +268,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!_redo.TryPop(out var next)) return false;
         var changedImage = _currentImage;
         _undo.Push(_currentImage);
-        UpdateChecksumStale(_currentImage, next);
+        Checksum.TrackImageChange(_currentImage, next);
         _currentImage = next;
         RefreshImage();
         RefreshModifiedTitle();
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ModifiedStateText));
+        RefreshEditorStatus();
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
         NotifyImageChanged(changedImage);
         return true;
     }
@@ -319,26 +295,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _savedImage = _currentImage;
         RefreshTitle();
         StatusMessage = $"Saved {_currentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {format}.";
-        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified), nameof(ImageFormatText), nameof(ModifiedStateText));
+        RefreshEditorStatus();
+        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified));
     }
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
-
-    public void SetSelection(uint startAddress, uint endAddress)
-    {
-        if (startAddress > endAddress) throw new ArgumentOutOfRangeException(nameof(startAddress), "Selection start must not exceed its end.");
-        _currentAddress = startAddress;
-        _selectionLength = (long)endAddress - startAddress + 1;
-        Raise(nameof(CurrentAddress), nameof(CurrentAddressText), nameof(SelectionLength));
-    }
-
-    public void ClearSelection()
-    {
-        _currentAddress = null;
-        _selectionLength = 0;
-        Raise(nameof(CurrentAddress), nameof(CurrentAddressText), nameof(SelectionLength));
-    }
 
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
         _fileService.ExportSegments(_currentImage, segmentIndexes, format, maxDataBytesPerRecord, output);
@@ -372,14 +334,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         if (ImagesEqual(_currentImage, next)) return;
         var previousImage = _currentImage;
-        UpdateChecksumStale(_currentImage, next);
+        Checksum.TrackImageChange(_currentImage, next);
         _undo.Push(_currentImage);
         _redo.Clear();
         _currentImage = next;
         RefreshImage();
         RefreshModifiedTitle();
         StatusMessage = "Image modified. Save to write changes to disk.";
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ModifiedStateText));
+        RefreshEditorStatus();
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
         NotifyImageChanged(previousImage);
     }
 
@@ -388,47 +351,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!ReferenceEquals(previousImage, _currentImage)) ImageChanged?.Invoke(previousImage, _currentImage);
     }
 
-    private void UpdateChecksumStale(MemoryImage before, MemoryImage after)
-    {
-        if (ChecksumResult is { IsStale: false } result &&
-            RangeContentsDiffer(before, after, result.StartAddress, result.EndAddress))
-        {
-            ChecksumResult = result with { IsStale = true };
-        }
-    }
-
-    private static bool RangeContentsDiffer(MemoryImage before, MemoryImage after, uint startAddress, uint endAddress)
-    {
-        var left = before.Segments.Where(segment => segment.EndAddress >= startAddress && segment.StartAddress <= endAddress)
-            .Select(segment => Clip(segment, startAddress, endAddress)).ToArray();
-        var right = after.Segments.Where(segment => segment.EndAddress >= startAddress && segment.StartAddress <= endAddress)
-            .Select(segment => Clip(segment, startAddress, endAddress)).ToArray();
-        if (left.Length != right.Length) return true;
-        for (var index = 0; index < left.Length; index++)
-        {
-            if (left[index].StartAddress != right[index].StartAddress ||
-                !left[index].Data.Span.SequenceEqual(right[index].Data.Span)) return true;
-        }
-        return false;
-
-        static MemorySegment Clip(MemorySegment segment, uint from, uint to)
-        {
-            var clippedStart = Math.Max(segment.StartAddress, from);
-            var clippedEnd = Math.Min(segment.EndAddress, to);
-            var offset = checked((int)(clippedStart - segment.StartAddress));
-            var count = checked((int)((ulong)clippedEnd - clippedStart + 1));
-            return new MemorySegment(clippedStart, segment.Data.Span.Slice(offset, count));
-        }
-    }
-
     private void RefreshImage()
     {
-        ClearSelection();
+        EditorStatus.ClearSelection();
         ImageView = new HexImageViewModel(_currentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
         Segments.Clear();
         foreach (var segment in _currentImage.Segments)
             Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount));
     }
+
+    private void RefreshEditorStatus() => EditorStatus.UpdateImageState(_sourceFormat, IsModified);
 
     private void RefreshTitle() => WindowTitle = $"{(string.IsNullOrWhiteSpace(_sourcePath) ? "Untitled" : Path.GetFileName(_sourcePath))}{(IsModified ? " *" : "")} - HEX Editor";
     private void RefreshModifiedTitle() => RefreshTitle();
