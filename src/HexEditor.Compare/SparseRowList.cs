@@ -9,7 +9,7 @@ internal sealed record IndexedSparseRowSpan(ulong StartAddress, ulong EndAddress
 internal readonly record struct SparseRowPosition(bool IsGap, ulong RowAddress, ulong GapStartAddress, ulong GapEndAddress);
 
 /// <summary>Indexes visible address spans and collapsed gaps without materializing each row.</summary>
-internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollectionChanged
+internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollectionChanged where T : class
 {
     private IReadOnlyList<IndexedSparseRowSpan> _spans;
     private readonly Func<SparseRowPosition, T> _createItem;
@@ -92,6 +92,7 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         }
 
         (_spans, _count) = SparseRowIndexBuilder.Build(ranges, _rowWidth);
+        ClearCachedRows();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 

@@ -24,3 +24,6 @@ Reading a HEX or S-Record file into a memory image while retaining its absolute 
 
 **Merge**:
 Combining two memory images by absolute address, with explicit handling for addresses occupied by both images.
+
+**Comparison difference**:
+An absolute address where two memory images contain unequal byte values or where only one image contains a byte. An address absent from both images is not a difference.

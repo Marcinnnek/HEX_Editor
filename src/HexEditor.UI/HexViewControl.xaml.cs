@@ -49,7 +49,7 @@ public partial class HexViewControl : UserControl
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: HexByteCell { Address: uint address } }) return;
+        if (sender is not HexByteRowControl row || !row.TryGetAddressAt(e.GetPosition(row), out var address)) return;
         var anchor = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && _anchorAddress is uint existing ? existing : address;
         _anchorAddress = address;
         AddressRangeSelected?.Invoke(this, new AddressRangeSelectedEventArgs(

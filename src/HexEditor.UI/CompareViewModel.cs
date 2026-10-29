@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Collections.Specialized;
 using System.Runtime.CompilerServices;
 using HexEditor.Core;
 using HexEditor.Compare;
@@ -61,7 +62,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     }
 }
 
-internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>
+internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotifyCollectionChanged
 {
     private readonly MemoryComparisonModel _comparison;
     private readonly bool _fileA;
@@ -70,8 +71,14 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>
     {
         _comparison = comparison;
         _fileA = fileA;
+        _comparison.RowsChanged += (_, _) =>
+        {
+            ClearCachedRows();
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        };
     }
 
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
     public override int Count => _comparison.Rows.Count;
 
     protected override HexViewRow GetAt(int index)
