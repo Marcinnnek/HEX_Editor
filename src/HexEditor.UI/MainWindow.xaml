@@ -1,0 +1,27 @@
+﻿<Window x:Class="HexEditor.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:HexEditor.UI"
+        mc:Ignorable="d"
+        Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12">
+            <Button Content="Open Intel HEX" Padding="12,6" Click="OpenIntelHex_Click" />
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,12,0,0" Text="{Binding ViewModel.StatusMessage}" />
+        <DataGrid ItemsSource="{Binding ViewModel.Segments}"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  HeadersVisibility="Column"
+                  SelectionMode="Single">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
+                <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
+                <DataGridTextColumn Header="Byte Count" Binding="{Binding ByteCount}" Width="120" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

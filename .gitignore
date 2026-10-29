@@ -1,0 +1,5 @@
+**/bin/
+**/obj/
+.vs/
+.restore-output.txt
+.restore-diagnostic.txt
