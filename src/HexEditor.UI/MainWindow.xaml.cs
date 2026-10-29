@@ -322,13 +322,13 @@ public partial class MainWindow : Window
 
     private OverlapDecision AskOverlap(int count, string operation)
     {
-        var choice = MessageBox.Show(this,
+        var choice = ShowYesNoCancelWarning(
             $"{operation} covers {count:N0} occupied byte(s).\n\nYes: replace overlapping bytes\nNo: keep existing bytes\nCancel: cancel this operation",
-            "Overlapping data", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+            "Overlapping data");
         return choice switch
         {
-            MessageBoxResult.Yes => OverlapDecision.OverwriteIncoming,
-            MessageBoxResult.No => OverlapDecision.KeepExisting,
+            YesNoCancelChoice.Yes => OverlapDecision.OverwriteIncoming,
+            YesNoCancelChoice.No => OverlapDecision.KeepExisting,
             _ => OverlapDecision.Cancel
         };
     }
@@ -345,14 +345,22 @@ public partial class MainWindow : Window
                       $"across {summary.Ranges.Count:N0} address range(s).\n\n" +
                       $"Affected ranges: {affectedRanges}\n\n" +
                       "Yes: overwrite with incoming data\nNo: keep existing data\nCancel: cancel import";
-        var choice = MessageBox.Show(this, message, "Overlapping data", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        var choice = ShowYesNoCancelWarning(message, "Overlapping data");
         return choice switch
         {
-            MessageBoxResult.Yes => OverlapDecision.OverwriteIncoming,
-            MessageBoxResult.No => OverlapDecision.KeepExisting,
+            YesNoCancelChoice.Yes => OverlapDecision.OverwriteIncoming,
+            YesNoCancelChoice.No => OverlapDecision.KeepExisting,
             _ => OverlapDecision.Cancel
         };
     }
+
+    private YesNoCancelChoice ShowYesNoCancelWarning(string message, string title)
+        => MessageBox.Show(this, message, title, MessageBoxButton.YesNoCancel, MessageBoxImage.Warning) switch
+        {
+            MessageBoxResult.Yes => YesNoCancelChoice.Yes,
+            MessageBoxResult.No => YesNoCancelChoice.No,
+            _ => YesNoCancelChoice.Cancel
+        };
 
     private static byte[] ParsePattern(string text)
     {
@@ -525,14 +533,20 @@ public partial class MainWindow : Window
                       "Yes: overwrite destination bytes with the relocated segment\n" +
                       "No: keep existing destination bytes\n" +
                       "Cancel: cancel relocation";
-        var choice = MessageBox.Show(this, message, "Overlapping destination data",
-            MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        var choice = ShowYesNoCancelWarning(message, "Overlapping destination data");
         return choice switch
         {
-            MessageBoxResult.Yes => RelocationOverlapDecision.Overwrite,
-            MessageBoxResult.No => RelocationOverlapDecision.KeepExisting,
+            YesNoCancelChoice.Yes => RelocationOverlapDecision.Overwrite,
+            YesNoCancelChoice.No => RelocationOverlapDecision.KeepExisting,
             _ => RelocationOverlapDecision.Cancel
         };
+    }
+
+    private enum YesNoCancelChoice
+    {
+        Yes,
+        No,
+        Cancel
     }
 
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
