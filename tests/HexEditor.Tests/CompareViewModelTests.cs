@@ -162,6 +162,33 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void DifferenceNavigation_UsesAddressSpaceEndsWhenNoRowIsSelected()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0, [0x10])]),
+            MemoryImage.Empty);
+
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromSelection(null, out var next));
+        Assert.AreEqual(0u, next);
+        Assert.IsTrue(comparison.TryFindPreviousDifferenceFromSelection(null, out var previous));
+        Assert.AreEqual(0u, previous);
+    }
+
+    [TestMethod]
+    public void DifferenceNavigation_FromSelectedAddressSearchesStrictlyBeyondSelection()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0, [0x10, 0x20, 0x30])]),
+            MemoryImage.FromSegments([new MemorySegment(0, [0x11, 0x20, 0x31])]));
+
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromSelection(0, out var next));
+        Assert.AreEqual(2u, next);
+        Assert.IsTrue(comparison.TryFindPreviousDifferenceFromSelection(2, out var previous));
+        Assert.AreEqual(0u, previous);
+        Assert.IsFalse(comparison.TryFindPreviousDifferenceFromSelection(0, out _));
+    }
+
+    [TestMethod]
     public void SparseRegions_CollapseLargeGapsAndRangeViewDoesNotExpandThem()
     {
         var fileA = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11]), new MemorySegment(0x90000000, [0x22])]);

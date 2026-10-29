@@ -64,22 +64,20 @@ public partial class CompareWindow : Window
 
     private void NextDifference_Click(object sender, RoutedEventArgs e)
     {
-        var current = SelectedAddress();
-        if (current < uint.MaxValue && ViewModel.TryFindNextDifference(current + 1, out var address)) Navigate(address);
+        if (ViewModel.TryFindNextDifferenceFromSelection(SelectedAddress(), out var address)) Navigate(address);
         else MessageBox.Show(this, "No later differences were found.", "Comparison", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     private void PreviousDifference_Click(object sender, RoutedEventArgs e)
     {
-        var current = SelectedAddress();
-        if (current > 0 && ViewModel.TryFindPreviousDifference(current - 1, out var address)) Navigate(address);
+        if (ViewModel.TryFindPreviousDifferenceFromSelection(SelectedAddress(), out var address)) Navigate(address);
         else MessageBox.Show(this, "No earlier differences were found.", "Comparison", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
-    private uint SelectedAddress()
+    private uint? SelectedAddress()
     {
         if (FileAView.ItemsGrid.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var address)) return address;
-        return 0;
+        return null;
     }
 
     private void Navigate(uint address)
