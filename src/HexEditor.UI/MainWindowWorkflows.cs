@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO;
 using HexEditor.Core;
 using HexEditor.Formats;
@@ -31,7 +30,7 @@ internal sealed class ImageEditWorkflow(ImageEditingSession editing)
     }
 }
 
-/// <summary>Builds and runs checksum operations from the settings supplied by the view.</summary>
+/// <summary>Runs checksum operations and writes a previously calculated result.</summary>
 internal sealed class ChecksumWorkflow(MainViewModel viewModel)
 {
     public ChecksumCalculationResult Calculate(ChecksumRequest request) => viewModel.CalculateChecksum(request);
@@ -44,32 +43,6 @@ internal sealed class ChecksumWorkflow(MainViewModel viewModel)
         var decision = collisions == 0 ? (OverlapDecision?)null : chooseOverlap(collisions, "checksum write");
         if (decision == OverlapDecision.Cancel) return;
         viewModel.WriteChecksumResult(address, decision);
-    }
-
-    public static ChecksumRequest CreateRequest(
-        uint start, uint end, string algorithm, int width, MissingAddressTreatment missingTreatment,
-        byte? fillByte, ChecksumByteOrder byteOrder, string polynomial, string initial,
-        bool reflectInput, bool reflectOutput, string finalXor)
-    {
-        return algorithm switch
-        {
-            "Additive" => ChecksumRequest.Additive(start, end, width, missingTreatment, fillByte, byteOrder),
-            "CRC-16/CCITT-FALSE" => ChecksumRequest.Crc16CcittFalse(start, end, missingTreatment, fillByte, byteOrder),
-            "CRC-32/ISO-HDLC" => ChecksumRequest.Crc32IsoHdlc(start, end, missingTreatment, fillByte, byteOrder),
-            "Custom CRC" => ChecksumRequest.CustomCrc(start, end, width,
-                ParseHexValue(polynomial), ParseHexValue(initial), reflectInput, reflectOutput,
-                ParseHexValue(finalXor), missingTreatment, fillByte, byteOrder),
-            _ => throw new ArgumentException("Choose a checksum algorithm.")
-        };
-    }
-
-    private static ulong ParseHexValue(string text)
-    {
-        text = text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
-        if (!ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
-            throw new ArgumentException("Enter a hexadecimal checksum parameter.");
-        return value;
     }
 }
 
