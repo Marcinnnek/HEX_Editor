@@ -9,7 +9,9 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Globalization;
+using HexEditor.Core;
 using HexEditor.Formats;
+using HexEditor.Tools;
 
 namespace HexEditor.UI;
 
@@ -285,6 +287,71 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CalculateChecksum_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var start = ParseAddress(RangeStartInput.Text);
+            var end = ParseAddress(RangeEndInput.Text);
+            var width = int.Parse(((ComboBoxItem)ChecksumWidthInput.SelectedItem).Content.ToString()!, CultureInfo.InvariantCulture);
+            var missingTreatment = MissingTreatmentInput.SelectedIndex switch
+            {
+                0 => MissingAddressTreatment.Reject,
+                1 => MissingAddressTreatment.FillByte,
+                _ => throw new ArgumentException("Choose how missing addresses are treated.")
+            };
+            byte? fillByte = missingTreatment == MissingAddressTreatment.FillByte
+                ? byte.Parse(HoleFillByteInput.Text.Trim().Replace("0x", string.Empty, StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture)
+                : null;
+            var byteOrder = ChecksumByteOrderInput.SelectedIndex switch
+            {
+                0 => ChecksumByteOrder.BigEndian,
+                1 => ChecksumByteOrder.LittleEndian,
+                _ => throw new ArgumentException("Choose the byte order.")
+            };
+            var algorithm = ((ComboBoxItem)ChecksumAlgorithmInput.SelectedItem).Content.ToString();
+            var request = algorithm switch
+            {
+                "Additive" => ChecksumRequest.Additive(start, end, width, missingTreatment, fillByte, byteOrder),
+                "CRC-16/CCITT-FALSE" => ChecksumRequest.Crc16CcittFalse(start, end, missingTreatment, fillByte, byteOrder),
+                "CRC-32/ISO-HDLC" => ChecksumRequest.Crc32IsoHdlc(start, end, missingTreatment, fillByte, byteOrder),
+                "Custom CRC" => ChecksumRequest.CustomCrc(
+                    start, end, width,
+                    ParseHexValue(ChecksumPolynomialInput.Text),
+                    ParseHexValue(ChecksumInitialInput.Text),
+                    ReflectInputCheckBox.IsChecked == true,
+                    ReflectOutputCheckBox.IsChecked == true,
+                    ParseHexValue(ChecksumFinalXorInput.Text),
+                    missingTreatment, fillByte, byteOrder),
+                _ => throw new ArgumentException("Choose a checksum algorithm.")
+            };
+            ViewModel.CalculateChecksum(request);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to calculate checksum", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void WriteChecksum_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var address = ParseAddress(ChecksumWriteAddressInput.Text);
+            var result = ViewModel.ChecksumResult ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
+            var collisions = Enumerable.Range(0, result.WidthBits / 8)
+                .Count(offset => ViewModel.CurrentImage.TryGetByte(checked(address + (uint)offset), out _));
+            var decision = collisions == 0 ? (OverlapDecision?)null : AskOverlap(collisions, "checksum write");
+            if (decision == OverlapDecision.Cancel) return;
+            ViewModel.WriteChecksumResult(address, decision);
+            Title = ViewModel.WindowTitle;
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to write checksum", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CopyRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
     private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
     private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
@@ -341,6 +408,15 @@ public partial class MainWindow : Window
         return address;
     }
 
+    private static ulong ParseHexValue(string text)
+    {
+        text = text.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
+        if (!ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
+            throw new ArgumentException("Enter a hexadecimal checksum parameter.");
+        return value;
+    }
+
     private void ShowEditError(Exception exception) => MessageBox.Show(this, exception.Message, "Unable to edit image", MessageBoxButton.OK, MessageBoxImage.Error);
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -385,6 +461,142 @@ public partial class MainWindow : Window
         }
 
         SelectRow(rowIndex);
+    }
+
+    private void ExportSegments_Click(object sender, RoutedEventArgs e)
+    {
+        var segmentIndexes = SegmentsGrid.SelectedItems
+            .Cast<MemorySegmentRow>()
+            .Select(ViewModel.Segments.IndexOf)
+            .ToArray();
+        ExportToFile((format, payloadSize, output) => ViewModel.ExportSegments(segmentIndexes, format, payloadSize, output));
+    }
+
+    private void ExportRange_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryParseExportAddress(ExportRangeStartInput.Text, out var startAddress) ||
+            !TryParseExportAddress(ExportRangeEndInput.Text, out var endAddress))
+        {
+            MessageBox.Show(this, "Enter both range bounds as 32-bit hexadecimal addresses (for example, 0x08000000).",
+                "Invalid export range", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        ExportToFile((format, payloadSize, output) =>
+            ViewModel.ExportAddressRange(startAddress, endAddress, format, payloadSize, output));
+    }
+
+    private void ExportToFile(Action<MemoryImageExportFormat, int, Stream> export)
+    {
+        if (ExportFormatInput.SelectedItem is not MemoryImageExportFormat format ||
+            ExportPayloadInput.SelectedItem is not int payloadSize)
+        {
+            MessageBox.Show(this, "Choose an output format and a record payload size of 8, 16, or 32 bytes.",
+                "Export options required", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var isIntelHex = format == MemoryImageExportFormat.IntelHex;
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export selected memory data",
+            Filter = isIntelHex
+                ? "Intel HEX (*.hex)|*.hex|All files (*.*)|*.*"
+                : "Motorola S-Record (*.srec)|*.srec|All files (*.*)|*.*",
+            DefaultExt = isIntelHex ? ".hex" : ".srec",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            using var output = File.Create(dialog.FileName);
+            export(format, payloadSize, output);
+            ViewModel.ReportExported(System.IO.Path.GetFileName(dialog.FileName));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to export selected data", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static bool TryParseExportAddress(string value, out uint address)
+    {
+        var text = value.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[2..];
+        }
+
+        return uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
+    }
+
+    private void RelocateSegment_Click(object sender, RoutedEventArgs e)
+    {
+        if (SegmentsGrid.SelectedIndex < 0)
+        {
+            MessageBox.Show(this, "Select an occupied segment to relocate.", "No segment selected",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var text = AddressInput.Text.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[2..];
+        }
+
+        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var destination))
+        {
+            MessageBox.Show(this, "Enter the destination base as an absolute 32-bit hexadecimal address in the Address field.",
+                "Invalid destination", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var preview = ViewModel.PrepareRelocation(SegmentsGrid.SelectedIndex, destination);
+            var decision = RelocationOverlapDecision.Overwrite;
+            if (preview.Overlaps.Count > 0)
+            {
+                var identicalCount = preview.Overlaps.Count(overlap => overlap.ValuesAreIdentical);
+                var differentCount = preview.Overlaps.Count - identicalCount;
+                var addresses = string.Join(", ", preview.Overlaps.Take(8).Select(overlap => $"0x{overlap.Address:X8}"));
+                if (preview.Overlaps.Count > 8)
+                {
+                    addresses += $", and {preview.Overlaps.Count - 8:N0} more";
+                }
+
+                var message = $"The destination overlaps {preview.Overlaps.Count:N0} occupied byte(s) " +
+                              $"({identicalCount:N0} identical, {differentCount:N0} different).\n\n" +
+                              $"Affected addresses: {addresses}\n\n" +
+                              "Yes: overwrite destination bytes with the relocated segment\n" +
+                              "No: keep existing destination bytes\n" +
+                              "Cancel: cancel relocation";
+                var choice = MessageBox.Show(this, message, "Overlapping destination data",
+                    MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                decision = choice switch
+                {
+                    MessageBoxResult.Yes => RelocationOverlapDecision.Overwrite,
+                    MessageBoxResult.No => RelocationOverlapDecision.KeepExisting,
+                    _ => RelocationOverlapDecision.Cancel
+                };
+            }
+
+            if (ViewModel.ApplyRelocation(preview, decision) && ViewModel.TryNavigateToAddress(destination, out var rowIndex))
+            {
+                SelectRow(rowIndex);
+            }
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Invalid relocation", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)

@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\HexEditor.Core\HexEditor.Core.csproj" />
     <ProjectReference Include="..\..\src\HexEditor.Compare\HexEditor.Compare.csproj" />
     <ProjectReference Include="..\..\src\HexEditor.Formats\HexEditor.Formats.csproj" />
+    <ProjectReference Include="..\..\src\HexEditor.Tools\HexEditor.Tools.csproj" />
     <ProjectReference Include="..\..\src\HexEditor.UI\HexEditor.UI.csproj" />
   </ItemGroup>
 

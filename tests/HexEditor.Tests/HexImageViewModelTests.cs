@@ -1,6 +1,8 @@
+using System.Text;
 using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.UI;
+using HexEditor.Tools;
 
 namespace HexEditor.Tests;
 
@@ -192,6 +194,29 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void ChecksumWrite_IsUndoableAndCoveredEditsMarkDisplayedResultStale()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x01, 0x02])]), null, null);
+        model.CalculateChecksum(ChecksumRequest.Additive(0x1000, 0x1001, 16, MissingAddressTreatment.Reject));
+
+        model.WriteChecksumResult(0x2000);
+
+        Assert.IsTrue(model.IsModified);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x03 }, model.CurrentImage.Segments[^1].Data.ToArray());
+        Assert.IsFalse(model.ChecksumResult!.IsStale, "Writing outside the input range must preserve the result.");
+        Assert.IsTrue(model.Undo());
+        Assert.IsFalse(model.IsModified);
+        Assert.IsFalse(model.CurrentImage.TryGetByte(0x2000, out _));
+        Assert.IsTrue(model.Redo());
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x2001, out _));
+
+        model.EditByte(0x1000, 0xFF, OverlapDecision.OverwriteIncoming);
+        Assert.IsTrue(model.ChecksumResult.IsStale);
+        Assert.Throws<InvalidOperationException>(() => model.WriteChecksumResult(0x3000));
+    }
+
+    [TestMethod]
     public void Row_UsesAbsoluteAlignedAddressAndDistinguishesHolesFromStoredBytes()
     {
         var image = MemoryImage.FromSegments(
@@ -278,5 +303,26 @@ public sealed class HexImageViewModelTests
         Assert.HasCount(327680, view.Rows);
         Assert.AreEqual("00000000", view.Rows[0].Address);
         Assert.AreEqual("009FFFE0", view.Rows[^1].Address);
+    }
+
+    [TestMethod]
+    public void MainViewModel_ExportsOnlySelectedSegmentAndCanReimportIt()
+    {
+        const string sourceRecords = ":020010001011CD\n:0100200020BF\n:00000001FF\n";
+        var fileService = new MemoryImageFileService();
+        var viewModel = new MainViewModel();
+        using var source = new MemoryStream(Encoding.ASCII.GetBytes(sourceRecords));
+        viewModel.ApplyImport(
+            fileService.PrepareImport(source),
+            OverlapDecision.OverwriteIncoming);
+        using var exported = new MemoryStream();
+
+        viewModel.ExportSegments([1], MemoryImageExportFormat.SRecord, 8, exported);
+        exported.Position = 0;
+        var imported = fileService.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+
+        Assert.HasCount(1, imported.Segments);
+        Assert.AreEqual(0x20u, imported.Segments[0].StartAddress);
+        CollectionAssert.AreEqual(new byte[] { 0x20 }, imported.Segments[0].Data.ToArray());
     }
 }
