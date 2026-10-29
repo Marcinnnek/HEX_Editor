@@ -43,7 +43,7 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
-    public void EditorAndComparison_UseTheSameSparseRowNavigationAndGapLayout()
+    public void EditorAndComparison_ShareSparseLayoutAndCompareCanNavigateIntoGaps()
     {
         var image = MemoryImage.FromSegments([
             new MemorySegment(0x1001, [0xAA, 0xBB]),
@@ -58,12 +58,17 @@ public sealed class HexImageViewModelTests
             Assert.AreEqual(editor.Rows[i].Address, comparison.Rows[i].Address);
         }
 
-        foreach (var address in new uint[] { 0x1001, 0x1002, 0x1010, 0x1020 })
+        foreach (var address in new uint[] { 0x1001, 0x1002, 0x1020 })
         {
             Assert.IsTrue(editor.TryNavigateToAddress(address, out var editorIndex));
             Assert.IsTrue(comparison.TryNavigateToAddress(address, out var comparisonIndex));
             Assert.AreEqual(editorIndex, comparisonIndex);
         }
+
+        Assert.IsTrue(comparison.TryNavigateToAddress(0x1010, out var gapIndex));
+        Assert.IsFalse(comparison.Rows[gapIndex].IsGapMarker);
+        Assert.AreEqual("00001010", comparison.Rows[gapIndex].Address);
+        Assert.IsLessThanOrEqualTo(comparison.Rows.Count, 5);
     }
 
     [TestMethod]

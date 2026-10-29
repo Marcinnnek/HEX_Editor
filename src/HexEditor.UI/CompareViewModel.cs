@@ -18,6 +18,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private CompareViewMode _viewMode;
     private uint _rangeStart;
     private uint _rangeEnd = uint.MaxValue;
+    private uint? _navigationAddress;
     private SparseRowList<CompareViewRow> _rows;
     private ComparePanelRows _fileARows;
     private ComparePanelRows _fileBRows;
@@ -65,7 +66,15 @@ public sealed class CompareViewModel : INotifyPropertyChanged
         RebuildRows();
     }
 
-    public bool TryNavigateToAddress(uint address, out int rowIndex) => _rows.TryGetRowIndex(address, out rowIndex);
+    public bool TryNavigateToAddress(uint address, out int rowIndex)
+    {
+        if (_rows.TryGetRowIndex(address, out rowIndex) && !_rows[rowIndex].IsGapMarker)
+            return true;
+
+        _navigationAddress = address;
+        RebuildRows();
+        return _rows.TryGetRowIndex(address, out rowIndex);
+    }
 
     public bool TryFindNextDifference(uint address, out uint difference) => TryFindDifference(address, forward: true, out difference);
     public bool TryFindPreviousDifference(uint address, out uint difference) => TryFindDifference(address, forward: false, out difference);
@@ -234,6 +243,11 @@ public sealed class CompareViewModel : INotifyPropertyChanged
         if (_viewMode == CompareViewMode.DifferencesOnly)
         {
             var intervals = GetDifferenceRows().Select(address => ((ulong)address, (ulong)address));
+            if (_navigationAddress is uint navigationAddress)
+            {
+                var rowAddress = (ulong)(navigationAddress / width) * width;
+                intervals = intervals.Append((rowAddress, rowAddress));
+            }
             return BuildSparseRanges(intervals, width, includeOneBlankRow: false, markLargeGaps: false);
         }
 
@@ -252,7 +266,14 @@ public sealed class CompareViewModel : INotifyPropertyChanged
                     : ((ulong)uint.MaxValue + 1, (ulong)uint.MaxValue + 1);
             })
             .Where(interval => interval.Item1 <= uint.MaxValue)
-            .OrderBy(interval => interval.Item1);
+            .ToList();
+        if (_navigationAddress is uint address &&
+            (_viewMode != CompareViewMode.AddressRange || IsInSelectedAddressRange(address)))
+        {
+            var rowAddress = (ulong)(address / width) * width;
+            intervalsToDisplay.Add((rowAddress, rowAddress));
+        }
+        intervalsToDisplay.Sort((left, right) => left.Item1.CompareTo(right.Item1));
         return BuildSparseRanges(intervalsToDisplay, width, includeOneBlankRow: true, markLargeGaps: true);
     }
 

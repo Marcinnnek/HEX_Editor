@@ -227,7 +227,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            _imageEdits.Fill(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
+            ViewModel.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -284,9 +284,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Copy(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Cut(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Delete(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CopyRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {

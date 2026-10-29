@@ -16,11 +16,6 @@ internal sealed class ImageEditWorkflow(MainViewModel viewModel)
         viewModel.InsertBytes(address, bytes, decision);
     }
 
-    public void Fill(uint start, uint end, IReadOnlyList<byte> pattern) => viewModel.FillRange(start, end, pattern);
-    public void Copy(uint start, uint end) => viewModel.CopyRange(start, end);
-    public void Cut(uint start, uint end) => viewModel.CutRange(start, end);
-    public void Delete(uint start, uint end) => viewModel.DeleteRange(start, end);
-
     public void Paste(uint address, Func<int, string, OverlapDecision> chooseOverlap)
     {
         var collisions = viewModel.GetPasteOverlapCount(address);

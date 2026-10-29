@@ -170,13 +170,16 @@ public sealed class CompareViewModelTests
         Assert.HasCount(3, comparison.Rows);
         Assert.IsTrue(comparison.Rows[1].IsGapMarker);
         Assert.IsTrue(comparison.TryNavigateToAddress(0x50000000, out var gapIndex));
-        Assert.AreEqual(1, gapIndex);
+        Assert.AreEqual(2, gapIndex);
+        Assert.IsFalse(comparison.Rows[gapIndex].IsGapMarker);
+        Assert.AreEqual("50000000", comparison.Rows[gapIndex].Address);
+        Assert.IsLessThanOrEqualTo(comparison.Rows.Count, 5, "Navigating into a large gap must keep the sparse row count bounded.");
 
         comparison.SetAddressRange(0x1000, 0x90000000);
         comparison.ViewMode = CompareViewMode.AddressRange;
-        Assert.HasCount(3, comparison.Rows);
+        Assert.HasCount(5, comparison.Rows);
         comparison.ViewMode = CompareViewMode.DifferencesOnly;
-        Assert.HasCount(2, comparison.Rows);
+        Assert.HasCount(3, comparison.Rows);
         Assert.IsFalse(comparison.Rows.Any(row => row.IsGapMarker));
     }
 }
