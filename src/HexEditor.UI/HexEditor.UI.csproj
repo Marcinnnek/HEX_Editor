@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\HexEditor.Core\HexEditor.Core.csproj" />
     <ProjectReference Include="..\HexEditor.Formats\HexEditor.Formats.csproj" />
+    <ProjectReference Include="..\HexEditor.Compare\HexEditor.Compare.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

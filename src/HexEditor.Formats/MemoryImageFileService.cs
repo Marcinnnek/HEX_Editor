@@ -12,20 +12,14 @@ public sealed class MemoryImageFileService
     {
         ArgumentNullException.ThrowIfNull(image);
         if (startAddress > endAddress)
-        {
             throw new ArgumentException("The start address must be less than or equal to the end address.", nameof(startAddress));
-        }
 
         var selectedSegments = new List<HexEditor.Core.MemorySegment>();
         foreach (var segment in image.Segments)
         {
             var start = Math.Max((ulong)startAddress, segment.StartAddress);
             var end = Math.Min((ulong)endAddress, segment.EndAddress);
-            if (start > end)
-            {
-                continue;
-            }
-
+            if (start > end) continue;
             var offset = checked((int)(start - segment.StartAddress));
             var count = checked((int)(end - start + 1));
             selectedSegments.Add(new HexEditor.Core.MemorySegment((uint)start, segment.Data.Span.Slice(offset, count)));
@@ -43,27 +37,60 @@ public sealed class MemoryImageFileService
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(segmentIndexes);
-
         var indexes = segmentIndexes.Distinct().Order().ToArray();
         if (indexes.Length == 0)
-        {
             throw new InvalidOperationException("Select at least one occupied segment to export.");
-        }
 
         var selectedSegments = new List<HexEditor.Core.MemorySegment>(indexes.Length);
         foreach (var index in indexes)
         {
             if ((uint)index >= (uint)image.Segments.Count)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(segmentIndexes), index,
+                throw new ArgumentOutOfRangeException(nameof(segmentIndexes), index,
                     $"Segment index {index} is outside the available range 0-{image.Segments.Count - 1}.");
-            }
-
             selectedSegments.Add(image.Segments[index]);
         }
 
         ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output);
+    }
+
+    public void SaveAtomically(
+        HexEditor.Core.MemoryImage image,
+        string path,
+        MemoryImageExportFormat format,
+        int maxDataBytesPerRecord,
+        bool overwriteExisting)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var targetPath = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(targetPath)!;
+        Directory.CreateDirectory(directory);
+        if (File.Exists(targetPath) && !overwriteExisting)
+            throw new IOException($"The target file already exists: {targetPath}");
+
+        var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(targetPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.WriteThrough))
+            {
+                Export(image, format, maxDataBytesPerRecord, output);
+                output.Flush(flushToDisk: true);
+            }
+
+            if (File.Exists(targetPath))
+            {
+                if (!overwriteExisting) throw new IOException($"The target file already exists: {targetPath}");
+                File.Move(temporaryPath, targetPath, overwrite: true);
+            }
+            else
+            {
+                File.Move(temporaryPath, targetPath);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
+        }
     }
 
     public void Export(
@@ -110,12 +137,8 @@ public sealed class MemoryImageFileService
         Stream output)
     {
         if (selectedSegments.Count == 0)
-        {
             throw new InvalidOperationException("The selected address range contains no occupied bytes.");
-        }
-
-        var selectedImage = HexEditor.Core.MemoryImage.FromSegments(selectedSegments);
-        Export(selectedImage, format, maxDataBytesPerRecord, output);
+        Export(HexEditor.Core.MemoryImage.FromSegments(selectedSegments), format, maxDataBytesPerRecord, output);
     }
 
     public MemoryImageImportPreview PrepareImport(

@@ -9,6 +9,95 @@ namespace HexEditor.Tests;
 public sealed class HexImageViewModelTests
 {
     [TestMethod]
+    public void Edits_PreserveSparseOffsetsAndSupportUndoRedo()
+    {
+        var model = new MainViewModel();
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x10, 0x20]),
+            new MemorySegment(0x1004, [0x40])]);
+        model.LoadImage(image, "input.hex", MemoryImageExportFormat.IntelHex);
+
+        model.CopyRange(0x1000, 0x1004);
+        model.DeleteRange(0x1000, 0x1004);
+        Assert.IsEmpty(model.CurrentImage.Segments);
+        model.PasteAt(0x2000, OverlapDecision.OverwriteIncoming);
+
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x2000, out var first));
+        Assert.AreEqual((byte)0x10, first);
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x2001, out var second));
+        Assert.AreEqual((byte)0x20, second);
+        Assert.IsFalse(model.CurrentImage.TryGetByte(0x2002, out _));
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x2004, out var last));
+        Assert.AreEqual((byte)0x40, last);
+        Assert.IsTrue(model.IsModified);
+
+        Assert.IsTrue(model.Undo());
+        Assert.IsEmpty(model.CurrentImage.Segments);
+        Assert.IsTrue(model.Redo());
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x2004, out _));
+    }
+
+    [TestMethod]
+    public void Insert_RequiresAnExplicitDecisionForOccupiedAddresses()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xAA])]), null, null);
+
+        var preview = model.PreviewInsert(0x10, [0xBB, 0xCC]);
+        Assert.AreEqual(1, preview.OverlapCount);
+        Assert.IsNull(preview.Apply(null));
+        Assert.IsTrue(preview.Apply(OverlapDecision.KeepExisting)!.TryGetByte(0x10, out var kept));
+        Assert.AreEqual((byte)0xAA, kept);
+        Assert.IsTrue(preview.Apply(OverlapDecision.OverwriteIncoming)!.TryGetByte(0x10, out var replaced));
+        Assert.AreEqual((byte)0xBB, replaced);
+        Assert.IsTrue(preview.Apply(OverlapDecision.OverwriteIncoming)!.TryGetByte(0x11, out var added));
+        Assert.AreEqual((byte)0xCC, added);
+        Assert.AreEqual(1, model.PreviewInsert(0x10, [0xAA]).OverlapCount, "An identical occupied value still requires an explicit decision.");
+    }
+
+    [TestMethod]
+    public void FillAndDelete_ChangeOccupancyWithoutShiftingLaterAddresses()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11, 0x22, 0x33, 0x44, 0x55])]), null, null);
+
+        model.FillRange(0x1001, 0x1006, [0xAA, 0xBB]);
+        CollectionAssert.AreEqual(new byte[] { 0x11, 0xAA, 0xBB, 0xAA, 0xBB, 0xAA, 0xBB },
+            model.CurrentImage.Segments.Single().Data.ToArray());
+        model.DeleteRange(0x1002, 0x1004);
+
+        Assert.HasCount(2, model.CurrentImage.Segments);
+        Assert.AreEqual(0x1000u, model.CurrentImage.Segments[0].StartAddress);
+        Assert.AreEqual(0x1001u, model.CurrentImage.Segments[0].EndAddress);
+        Assert.AreEqual(0x1005u, model.CurrentImage.Segments[1].StartAddress);
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x1005, out var later));
+        Assert.AreEqual((byte)0xAA, later);
+    }
+
+    [TestMethod]
+    public void SaveAs_ChangesAssociationOnlyAfterSuccessfulAtomicSave()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x20, [0xA5])]), null, null);
+        model.EditByte(0x20, 0x5A, OverlapDecision.OverwriteIncoming);
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}.hex");
+        File.WriteAllText(path, "keep existing");
+        try
+        {
+            Assert.Throws<IOException>(() => model.SaveAs(path, MemoryImageExportFormat.IntelHex, overwriteExisting: false));
+            Assert.IsTrue(model.IsModified);
+            Assert.IsNull(model.SourcePath);
+            Assert.AreEqual("keep existing", File.ReadAllText(path));
+
+            model.SaveAs(path, MemoryImageExportFormat.IntelHex, overwriteExisting: true);
+            Assert.IsFalse(model.IsModified);
+            Assert.AreEqual(Path.GetFullPath(path), model.SourcePath);
+            Assert.AreEqual(MemoryImageExportFormat.IntelHex, model.SourceFormat);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [TestMethod]
     public void Row_UsesAbsoluteAlignedAddressAndDistinguishesHolesFromStoredBytes()
     {
         var image = MemoryImage.FromSegments(

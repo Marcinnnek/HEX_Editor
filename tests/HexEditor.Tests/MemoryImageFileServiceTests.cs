@@ -304,6 +304,32 @@ public sealed class MemoryImageFileServiceTests
         StringAssert.Contains(noSegments.Message, "Select at least one occupied segment");
     }
 
+    [TestMethod]
+    public void SaveAtomically_RefusesUnconfirmedOverwriteAndKeepsExistingFileOnExportFailure()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}.hex");
+        var original = "preserve this file";
+        File.WriteAllText(path, original);
+        try
+        {
+            var service = new MemoryImageFileService();
+            var image = MemoryImage.FromSegments([new MemorySegment(0x1234, [0xAA])]);
+            Assert.Throws<IOException>(() => service.SaveAtomically(image, path, MemoryImageExportFormat.IntelHex, 16, overwriteExisting: false));
+            Assert.AreEqual(original, File.ReadAllText(path));
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => service.SaveAtomically(image, path, (MemoryImageExportFormat)99, 16, overwriteExisting: true));
+            Assert.AreEqual(original, File.ReadAllText(path));
+
+            service.SaveAtomically(image, path, MemoryImageExportFormat.IntelHex, 16, overwriteExisting: true);
+            Assert.AreNotEqual(original, File.ReadAllText(path));
+            Assert.IsFalse(Directory.EnumerateFiles(Path.GetDirectoryName(path)!, $".{Path.GetFileName(path)}.*.tmp").Any());
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     private static int? GetDataRecordPayloadLength(string line, MemoryImageExportFormat format)
     {
         if (format == MemoryImageExportFormat.IntelHex)
