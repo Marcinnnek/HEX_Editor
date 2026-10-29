@@ -8,7 +8,8 @@ public sealed class MemoryImageFileService
         uint endAddress,
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
-        Stream output)
+        Stream output,
+        object? formatMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (startAddress > endAddress)
@@ -25,7 +26,7 @@ public sealed class MemoryImageFileService
             selectedSegments.Add(new HexEditor.Core.MemorySegment((uint)start, segment.Data.Span.Slice(offset, count)));
         }
 
-        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output);
+        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output, formatMetadata);
     }
 
     public void ExportSegments(
@@ -33,7 +34,8 @@ public sealed class MemoryImageFileService
         IEnumerable<int> segmentIndexes,
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
-        Stream output)
+        Stream output,
+        object? formatMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(segmentIndexes);
@@ -50,7 +52,7 @@ public sealed class MemoryImageFileService
             selectedSegments.Add(image.Segments[index]);
         }
 
-        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output);
+        ExportSelectedImage(selectedSegments, format, maxDataBytesPerRecord, output, formatMetadata);
     }
 
     public void SaveAtomically(
@@ -58,7 +60,8 @@ public sealed class MemoryImageFileService
         string path,
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
-        bool overwriteExisting)
+        bool overwriteExisting,
+        object? formatMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -73,7 +76,7 @@ public sealed class MemoryImageFileService
         {
             using (var output = new FileStream(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.WriteThrough))
             {
-                Export(image, format, maxDataBytesPerRecord, output);
+                Export(image, format, maxDataBytesPerRecord, output, formatMetadata);
                 output.Flush(flushToDisk: true);
             }
 
@@ -97,7 +100,8 @@ public sealed class MemoryImageFileService
         HexEditor.Core.MemoryImage image,
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
-        Stream output)
+        Stream output,
+        object? formatMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(image);
         ArgumentNullException.ThrowIfNull(output);
@@ -122,23 +126,51 @@ public sealed class MemoryImageFileService
         switch (format)
         {
             case MemoryImageExportFormat.IntelHex:
-                IntelHexWriter.Write(image, maxDataBytesPerRecord, output);
+                IntelHexWriter.Write(image, maxDataBytesPerRecord, output, GetIntelMetadata(formatMetadata));
                 break;
             case MemoryImageExportFormat.SRecord:
-                SRecordWriter.Write(image, maxDataBytesPerRecord, output);
+                SRecordWriter.Write(image, maxDataBytesPerRecord, output, GetExecutionStartAddress(formatMetadata));
                 break;
         }
     }
+
+    public static object? ConvertMetadata(object? metadata, MemoryImageExportFormat format, int dataRecordCount = 0)
+    {
+        var startAddress = GetExecutionStartAddress(metadata);
+        return format switch
+        {
+            MemoryImageExportFormat.IntelHex when metadata is IntelHexMetadata intel => intel,
+            MemoryImageExportFormat.IntelHex => startAddress is { } start ? new IntelHexMetadata(start, null, null) : new IntelHexMetadata(null, null, null),
+            MemoryImageExportFormat.SRecord => new SRecordMetadata(startAddress, dataRecordCount),
+            _ => throw new ArgumentOutOfRangeException(nameof(format))
+        };
+    }
+
+    private static IntelHexMetadata? GetIntelMetadata(object? metadata) => metadata switch
+    {
+        IntelHexMetadata intel => intel,
+        SRecordMetadata { StartAddress: { } start } => new IntelHexMetadata(start, null, null),
+        _ => null
+    };
+
+    private static uint? GetExecutionStartAddress(object? metadata) => metadata switch
+    {
+        IntelHexMetadata { StartLinearAddress: { } start } => start,
+        IntelHexMetadata { StartSegmentCodeSegment: { } code, StartSegmentInstructionPointer: { } pointer } => checked(((uint)code << 4) + pointer),
+        SRecordMetadata { StartAddress: { } start } => start,
+        _ => null
+    };
 
     private void ExportSelectedImage(
         IReadOnlyList<HexEditor.Core.MemorySegment> selectedSegments,
         MemoryImageExportFormat format,
         int maxDataBytesPerRecord,
-        Stream output)
+        Stream output,
+        object? formatMetadata = null)
     {
         if (selectedSegments.Count == 0)
             throw new InvalidOperationException("The selected address range contains no occupied bytes.");
-        Export(HexEditor.Core.MemoryImage.FromSegments(selectedSegments), format, maxDataBytesPerRecord, output);
+        Export(HexEditor.Core.MemoryImage.FromSegments(selectedSegments), format, maxDataBytesPerRecord, output, formatMetadata);
     }
 
     public MemoryImageImportPreview PrepareImport(

@@ -230,6 +230,34 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void Export_PreservesExecutionStartAddressForBothFormatsAndFormatSwitches()
+    {
+        var service = new MemoryImageFileService();
+        var intelSource = new MemoryStream(Encoding.ASCII.GetBytes(":0400000500001234B1\r\n:02001000AABB89\r\n:00000001FF\r\n"));
+        var intel = service.PrepareImport(intelSource).Apply(OverlapDecision.KeepExisting)!;
+        using var intelExport = new MemoryStream();
+        service.Export(intel.Image, MemoryImageExportFormat.IntelHex, 16, intelExport, intel.FormatMetadata);
+        intelExport.Position = 0;
+        var intelAgain = service.PrepareImport(intelExport).Apply(OverlapDecision.KeepExisting)!;
+        Assert.AreEqual(0x1234u, ((IntelHexMetadata)intelAgain.FormatMetadata!).StartLinearAddress);
+        AssertImagesEqual(intel.Image, intelAgain.Image);
+
+        using var srecExport = new MemoryStream();
+        service.Export(intel.Image, MemoryImageExportFormat.SRecord, 16, srecExport, intel.FormatMetadata);
+        srecExport.Position = 0;
+        var srecAgain = service.PrepareImport(srecExport).Apply(OverlapDecision.KeepExisting)!;
+        Assert.AreEqual(0x1234u, ((SRecordMetadata)srecAgain.FormatMetadata!).StartAddress);
+        AssertImagesEqual(intel.Image, srecAgain.Image);
+
+        using var backToIntel = new MemoryStream();
+        service.Export(srecAgain.Image, MemoryImageExportFormat.IntelHex, 16, backToIntel, srecAgain.FormatMetadata);
+        backToIntel.Position = 0;
+        var switchedAgain = service.PrepareImport(backToIntel).Apply(OverlapDecision.KeepExisting)!;
+        Assert.AreEqual(0x1234u, ((IntelHexMetadata)switchedAgain.FormatMetadata!).StartLinearAddress);
+        AssertImagesEqual(intel.Image, switchedAgain.Image);
+    }
+
+    [TestMethod]
     public void ExportSegments_RoundTripsOnlyRequestedOccupiedSegments()
     {
         var source = MemoryImage.FromSegments(
@@ -339,5 +367,15 @@ public sealed class MemoryImageFileServiceTests
 
         var addressBytes = line[1] switch { '1' => 2, '2' => 3, '3' => 4, _ => 0 };
         return addressBytes == 0 ? null : Convert.ToByte(line[2..4], 16) - addressBytes - 1;
+    }
+
+    private static void AssertImagesEqual(MemoryImage expected, MemoryImage actual)
+    {
+        Assert.HasCount(expected.Segments.Count, actual.Segments);
+        for (var index = 0; index < expected.Segments.Count; index++)
+        {
+            Assert.AreEqual(expected.Segments[index].StartAddress, actual.Segments[index].StartAddress);
+            CollectionAssert.AreEqual(expected.Segments[index].Data.ToArray(), actual.Segments[index].Data.ToArray());
+        }
     }
 }

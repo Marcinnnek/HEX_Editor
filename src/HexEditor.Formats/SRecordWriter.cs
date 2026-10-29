@@ -6,9 +6,10 @@ namespace HexEditor.Formats;
 
 internal static class SRecordWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output)
+    public static void Write(MemoryImage image, int maxPayload, Stream output, uint? startAddress)
     {
         var highestAddress = image.Segments.Count == 0 ? 0 : image.Segments[^1].EndAddress;
+        if (startAddress is { } entryAddress) highestAddress = Math.Max(highestAddress, entryAddress);
         var addressBytes = highestAddress <= 0xFFFF ? 2 : highestAddress <= 0xFFFFFF ? 3 : 4;
         var dataType = addressBytes switch { 2 => '1', 3 => '2', _ => '3' };
         var terminationType = addressBytes switch { 2 => '9', 3 => '8', _ => '7' };
@@ -29,7 +30,7 @@ internal static class SRecordWriter
             }
         }
 
-        WriteRecord(writer, terminationType, 0, addressBytes, ReadOnlySpan<byte>.Empty);
+        WriteRecord(writer, terminationType, startAddress ?? 0, addressBytes, ReadOnlySpan<byte>.Empty);
     }
 
     private static void WriteRecord(

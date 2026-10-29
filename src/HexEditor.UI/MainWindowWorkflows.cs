@@ -7,25 +7,25 @@ using HexEditor.Tools;
 namespace HexEditor.UI;
 
 /// <summary>Coordinates image edit use cases while leaving prompts and control state to the WPF view.</summary>
-internal sealed class ImageEditWorkflow(MainViewModel viewModel)
+internal sealed class ImageEditWorkflow(ImageEditingSession editing)
 {
     public void Insert(uint address, IReadOnlyList<byte> bytes, Func<int, string, OverlapDecision> chooseOverlap)
     {
-        var preview = viewModel.PreviewInsert(address, bytes);
+        var preview = editing.PreviewInsert(address, bytes);
         var decision = preview.OverlapCount == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(preview.OverlapCount, "insert/replace");
-        viewModel.InsertBytes(address, bytes, decision);
+        editing.InsertBytes(address, bytes, decision);
     }
 
     public void Paste(uint address, Func<int, string, OverlapDecision> chooseOverlap)
     {
-        var collisions = viewModel.GetPasteOverlapCount(address);
-        viewModel.PasteAt(address, collisions == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(collisions, "paste"));
+        var collisions = editing.GetPasteOverlapCount(address);
+        editing.PasteAt(address, collisions == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(collisions, "paste"));
     }
 
     public bool Relocate(int segmentIndex, uint destination, Func<MemoryRelocationPreview, RelocationOverlapDecision> chooseOverlap)
     {
-        var preview = viewModel.PrepareRelocation(segmentIndex, destination);
-        return viewModel.ApplyRelocation(preview, preview.Overlaps.Count == 0
+        var preview = editing.PrepareRelocation(segmentIndex, destination);
+        return editing.ApplyRelocation(preview, preview.Overlaps.Count == 0
             ? RelocationOverlapDecision.Overwrite
             : chooseOverlap(preview));
     }
@@ -43,7 +43,7 @@ internal sealed class ChecksumWorkflow(MainViewModel viewModel)
             .Count(offset => viewModel.CurrentImage.TryGetByte(checked(address + (uint)offset), out _));
         var decision = collisions == 0 ? (OverlapDecision?)null : chooseOverlap(collisions, "checksum write");
         if (decision == OverlapDecision.Cancel) return;
-        viewModel.WriteChecksumResult(address, decision);
+        viewModel.Editing.InsertBytes(address, result.ToBytes(), decision);
     }
 
     public static ChecksumRequest CreateRequest(
@@ -97,6 +97,8 @@ internal sealed class ComparisonImageLoader(MainViewModel viewModel)
 /// <summary>Coordinates import, save, and export operations around the active memory image.</summary>
 internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
 {
+    private readonly MemoryImageFileService _fileService = new();
+
     public void Open(string path, Func<MemoryImageImportPreview, OverlapDecision> chooseOverlap)
     {
         var preview = viewModel.PrepareOpen(path);
@@ -107,6 +109,12 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
 
     public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting) =>
         viewModel.SaveAs(path, format, overwriteExisting);
+
+    public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int payloadSize, Stream output) =>
+        _fileService.ExportSegments(viewModel.CurrentImage, segmentIndexes, format, payloadSize, output, viewModel.SourceFormatMetadata);
+
+    public void ExportAddressRange(uint start, uint end, MemoryImageExportFormat format, int payloadSize, Stream output) =>
+        _fileService.ExportAddressRange(viewModel.CurrentImage, start, end, format, payloadSize, output, viewModel.SourceFormatMetadata);
 
     public bool ApplyMerge(LoadedMemoryImage destination, MemoryImageMergePreview preview,
         MemoryImageMergeChoice? defaultChoice, IEnumerable<MemoryImageMergeRangeOverride> rangeOverrides,

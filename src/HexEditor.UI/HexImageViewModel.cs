@@ -49,7 +49,13 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool TryNavigateToAddress(uint address, out int rowIndex) => _rows.TryGetRowIndex(address, out rowIndex);
+    public bool TryNavigateToAddress(uint address, out int rowIndex)
+    {
+        var originalRowCount = _rows.Count;
+        var found = _rows.TryGetRowIndex(address, out rowIndex);
+        if (_rows.Count != originalRowCount) OnPropertyChanged(nameof(Rows));
+        return found;
+    }
 
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex)
     {

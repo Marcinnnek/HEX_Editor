@@ -68,12 +68,9 @@ public sealed class CompareViewModel : INotifyPropertyChanged
 
     public bool TryNavigateToAddress(uint address, out int rowIndex)
     {
-        if (_rows.TryGetRowIndex(address, out rowIndex) && !_rows[rowIndex].IsGapMarker)
-            return true;
-
         _navigationAddress = address;
         RebuildRows();
-        return _rows.TryGetRowIndex(address, out rowIndex);
+        return _rows.TryGetRowIndex(address, out rowIndex) && !_rows[rowIndex].IsGapMarker;
     }
 
     public bool TryFindNextDifference(uint address, out uint difference) => TryFindDifference(address, forward: true, out difference);

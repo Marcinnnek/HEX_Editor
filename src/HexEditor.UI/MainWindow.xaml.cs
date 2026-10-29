@@ -30,7 +30,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
-        _imageEdits = new ImageEditWorkflow(ViewModel);
+        _imageEdits = new ImageEditWorkflow(ViewModel.Editing);
         _checksums = new ChecksumWorkflow(ViewModel);
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
@@ -198,13 +198,13 @@ public partial class MainWindow : Window
 
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Undo();
+        ViewModel.Editing.Undo();
         Title = ViewModel.WindowTitle;
     }
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Redo();
+        ViewModel.Editing.Redo();
         Title = ViewModel.WindowTitle;
     }
 
@@ -227,7 +227,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            ViewModel.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
+            ViewModel.Editing.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -285,8 +285,8 @@ public partial class MainWindow : Window
     }
 
     private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CopyRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.Editing.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.Editing.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
@@ -417,7 +417,7 @@ public partial class MainWindow : Window
             .Cast<MemorySegmentRow>()
             .Select(ViewModel.Segments.IndexOf)
             .ToArray();
-        ExportToFile((format, payloadSize, output) => ViewModel.ExportSegments(segmentIndexes, format, payloadSize, output));
+        ExportToFile((format, payloadSize, output) => _files.ExportSegments(segmentIndexes, format, payloadSize, output));
     }
 
     private void ExportRange_Click(object sender, RoutedEventArgs e)
@@ -431,7 +431,7 @@ public partial class MainWindow : Window
         }
 
         ExportToFile((format, payloadSize, output) =>
-            ViewModel.ExportAddressRange(startAddress, endAddress, format, payloadSize, output));
+            _files.ExportAddressRange(startAddress, endAddress, format, payloadSize, output));
     }
 
     private void ExportToFile(Action<MemoryImageExportFormat, int, Stream> export)

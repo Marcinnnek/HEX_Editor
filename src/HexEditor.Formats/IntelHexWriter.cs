@@ -6,7 +6,7 @@ namespace HexEditor.Formats;
 
 internal static class IntelHexWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output)
+    public static void Write(MemoryImage image, int maxPayload, Stream output, IntelHexMetadata? metadata)
     {
         using var writer = new StreamWriter(output, Encoding.ASCII, 1024, leaveOpen: true);
         uint? currentUpperAddress = null;
@@ -35,6 +35,18 @@ internal static class IntelHexWriter
                 WriteRecord(writer, lowAddress, 0x00, segment.Data.Span.Slice(offset, count));
                 offset += count;
             }
+        }
+
+        if (metadata?.StartSegmentCodeSegment is { } codeSegment && metadata.StartSegmentInstructionPointer is { } instructionPointer)
+        {
+            byte[] startSegment = [(byte)(codeSegment >> 8), (byte)codeSegment, (byte)(instructionPointer >> 8), (byte)instructionPointer];
+            WriteRecord(writer, 0, 0x03, startSegment);
+        }
+
+        if (metadata?.StartLinearAddress is { } startLinearAddress)
+        {
+            byte[] startLinear = [(byte)(startLinearAddress >> 24), (byte)(startLinearAddress >> 16), (byte)(startLinearAddress >> 8), (byte)startLinearAddress];
+            WriteRecord(writer, 0, 0x05, startLinear);
         }
 
         WriteRecord(writer, 0, 0x01, ReadOnlySpan<byte>.Empty);

@@ -369,7 +369,28 @@ public sealed class HexImageViewModelTests
         Assert.IsTrue(view.TryNavigateToSegment(1, out var segmentRow));
         Assert.AreEqual(addressRow, segmentRow);
         Assert.IsTrue(view.TryNavigateToAddress(0x5000, out var gapRow));
-        Assert.IsTrue(view.Rows[gapRow].IsGapMarker);
+        Assert.IsFalse(view.Rows[gapRow].IsGapMarker);
+        Assert.AreEqual("00005000", view.Rows[gapRow].Address);
+    }
+
+    [TestMethod]
+    public void Navigation_IntoCollapsedLargeGapCreatesOnlyTargetRow()
+    {
+        var image = MemoryImage.FromSegments(
+        [
+            new MemorySegment(0x1000, [0x11]),
+            new MemorySegment(0xF0000000, [0x22])
+        ]);
+        var view = new HexImageViewModel(image, bytesPerRow: 16);
+        Assert.HasCount(3, view.Rows);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0x50000003, out var targetRow));
+
+        Assert.HasCount(5, view.Rows);
+        Assert.AreEqual("50000000", view.Rows[targetRow].Address);
+        Assert.IsFalse(view.Rows[targetRow].IsGapMarker);
+        Assert.IsTrue(view.Rows[1].IsGapMarker);
+        Assert.IsTrue(view.Rows[3].IsGapMarker);
     }
 
     [TestMethod]
@@ -402,5 +423,38 @@ public sealed class HexImageViewModelTests
         Assert.HasCount(1, imported.Segments);
         Assert.AreEqual(0x20u, imported.Segments[0].StartAddress);
         CollectionAssert.AreEqual(new byte[] { 0x20 }, imported.Segments[0].Data.ToArray());
+    }
+
+    [TestMethod]
+    public void SaveAs_RetainsExecutionAddressWhenSavingInSourceOrOtherFormat()
+    {
+        const string records = ":0400000500001234B1\n:02001000AABB89\n:00000001FF\n";
+        var service = new MemoryImageFileService();
+        using var input = new MemoryStream(Encoding.ASCII.GetBytes(records));
+        var preview = service.PrepareImport(input);
+        var model = new MainViewModel();
+        model.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+        var srecPath = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}.srec");
+        var intelPath = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}.hex");
+        try
+        {
+            model.SaveAs(srecPath, MemoryImageExportFormat.SRecord, overwriteExisting: false);
+            Assert.AreEqual(0x1234u, ((SRecordMetadata)model.SourceFormatMetadata!).StartAddress);
+            using var srec = File.OpenRead(srecPath);
+            var importedSrec = service.PrepareImport(srec).Apply(OverlapDecision.OverwriteIncoming)!;
+            Assert.AreEqual(0x1234u, ((SRecordMetadata)importedSrec.FormatMetadata!).StartAddress);
+
+            model.SaveAs(intelPath, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
+            Assert.AreEqual(0x1234u, ((IntelHexMetadata)model.SourceFormatMetadata!).StartLinearAddress);
+            using var intel = File.OpenRead(intelPath);
+            var importedIntel = service.PrepareImport(intel).Apply(OverlapDecision.OverwriteIncoming)!;
+            Assert.AreEqual(0x1234u, ((IntelHexMetadata)importedIntel.FormatMetadata!).StartLinearAddress);
+            Assert.IsFalse(model.IsModified);
+        }
+        finally
+        {
+            File.Delete(srecPath);
+            File.Delete(intelPath);
+        }
     }
 }

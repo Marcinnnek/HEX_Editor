@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Specialized;
 
 namespace HexEditor.UI;
 
@@ -7,9 +8,9 @@ internal readonly record struct SparseRowSpan(ulong StartAddress, ulong EndAddre
 internal readonly record struct SparseRowPosition(bool IsGap, ulong RowAddress, ulong GapStartAddress, ulong GapEndAddress);
 
 /// <summary>Indexes visible address spans and collapsed gaps without materializing each row.</summary>
-internal sealed class SparseRowList<T> : IList<T>
+internal sealed class SparseRowList<T> : IList<T>, INotifyCollectionChanged
 {
-    private readonly IReadOnlyList<IndexedSpan> _spans;
+    private IReadOnlyList<IndexedSpan> _spans;
     private readonly Func<SparseRowPosition, T> _createItem;
     private readonly uint _rowWidth;
 
@@ -35,8 +36,9 @@ internal sealed class SparseRowList<T> : IList<T>
         Count = checked((int)nextIndex);
     }
 
-    public int Count { get; }
+    public int Count { get; private set; }
     public bool IsReadOnly => true;
+    public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     public T this[int index]
     {
@@ -72,13 +74,52 @@ internal sealed class SparseRowList<T> : IList<T>
             }
             else
             {
-                rowIndex = span.StartIndex + (span.IsGap ? 0 : checked((int)((rowAddress - span.StartAddress) / _rowWidth)));
+                if (span.IsGap)
+                {
+                    ExpandNavigationRow(span, rowAddress);
+                    return TryGetRowIndex(address, out rowIndex);
+                }
+
+                rowIndex = span.StartIndex + checked((int)((rowAddress - span.StartAddress) / _rowWidth));
                 return true;
             }
         }
 
         rowIndex = -1;
         return false;
+    }
+
+    private void ExpandNavigationRow(IndexedSpan targetGap, ulong rowAddress)
+    {
+        var ranges = new List<SparseRowSpan>(_spans.Count + 2);
+        foreach (var span in _spans)
+        {
+            if (!ReferenceEquals(span, targetGap))
+            {
+                ranges.Add(new SparseRowSpan(span.StartAddress, span.EndAddress, span.IsGap));
+                continue;
+            }
+
+            if (rowAddress > span.StartAddress)
+                ranges.Add(new SparseRowSpan(span.StartAddress, rowAddress - _rowWidth, IsGap: true));
+            ranges.Add(new SparseRowSpan(rowAddress, rowAddress));
+            if (rowAddress < span.EndAddress)
+                ranges.Add(new SparseRowSpan(rowAddress + _rowWidth, span.EndAddress, IsGap: true));
+        }
+
+        var indexed = new List<IndexedSpan>(ranges.Count);
+        long nextIndex = 0;
+        foreach (var range in ranges)
+        {
+            var count = range.IsGap ? 1L : checked((long)(((range.EndAddress - range.StartAddress) / _rowWidth) + 1));
+            indexed.Add(new IndexedSpan(range.StartAddress, range.EndAddress, range.IsGap,
+                checked((int)nextIndex), checked((int)count)));
+            nextIndex += count;
+        }
+
+        _spans = indexed;
+        Count = checked((int)nextIndex);
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
     public int IndexOf(T item)
