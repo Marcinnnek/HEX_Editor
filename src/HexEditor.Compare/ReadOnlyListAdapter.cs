@@ -45,4 +45,3 @@ internal abstract class ReadOnlyListAdapter<T> : IList<T>
     public bool Remove(T item) => throw new NotSupportedException();
     public void RemoveAt(int index) => throw new NotSupportedException();
 }
-

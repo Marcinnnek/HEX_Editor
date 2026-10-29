@@ -140,4 +140,3 @@ public partial class CompareView : UserControl
         return null;
     }
 }
-
