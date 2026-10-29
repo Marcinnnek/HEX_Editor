@@ -1,0 +1,48 @@
+<Window x:Class="HexEditor.UI.CompareWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Compare memory images" Height="720" Width="1400" MinHeight="460" MinWidth="900">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <ComboBox x:Name="RowWidthBox" Width="70" ItemsSource="{Binding RowWidths}" SelectedItem="{Binding ViewModel.BytesPerRow}" />
+            <CheckBox x:Name="AsciiToggle" Content="Show ASCII" IsChecked="{Binding ViewModel.ShowAscii}" VerticalAlignment="Center" Margin="14,0" Checked="Ascii_Changed" Unchecked="Ascii_Changed" />
+            <ComboBox x:Name="ViewModeBox" Width="150" ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewModel.ViewMode}" />
+            <TextBlock Text="Start" VerticalAlignment="Center" Margin="10,0,4,0" />
+            <TextBox x:Name="RangeStartBox" Width="92" Text="00000000" />
+            <TextBlock Text="End" VerticalAlignment="Center" Margin="8,0,4,0" />
+            <TextBox x:Name="RangeEndBox" Width="92" Text="FFFFFFFF" />
+            <Button Content="Apply range" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
+            <TextBox x:Name="AddressBox" Width="110" Margin="12,0,0,0" VerticalContentAlignment="Center" />
+            <Button Content="Go" Margin="4,0" Padding="8,3" Click="Go_Click" />
+            <Button Content="Previous difference" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
+            <Button Content="Next difference" Padding="8,3" Click="NextDifference_Click" />
+        </StackPanel>
+        <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <DataGrid x:Name="FileAGrid" Grid.Column="0" ItemsSource="{Binding ViewModel.Rows}"
+                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" FontFamily="Consolas"
+                      SelectionChanged="Panel_SelectionChanged" ScrollViewer.ScrollChanged="Grid_ScrollChanged">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Address" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate><Grid><TextBlock Text="{Binding Address}"/><TextBlock Text="{Binding GapDescription}" FontStyle="Italic" TextTrimming="CharacterEllipsis"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsGapMarker}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="HEX Data" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><ItemsControl ItemsSource="{Binding FileA.Cells}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Padding="2,0" MouseLeftButtonDown="ByteCell_Click"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Different"><Setter Property="Background" Value="#FFFFB8B8"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyA"><Setter Property="Background" Value="#FFFFD993"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyB"><Setter Property="Background" Value="#FFD7D7D7"/></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{Binding Hex}" Width="22" TextAlignment="Center"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    <DataGridTemplateColumn x:Name="AsciiAColumn" Header="ASCII" Width="150"><DataGridTemplateColumn.CellTemplate><DataTemplate><ItemsControl ItemsSource="{Binding FileA.Cells}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Padding="2,0" MouseLeftButtonDown="ByteCell_Click"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Different"><Setter Property="Background" Value="#FFFFB8B8"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyA"><Setter Property="Background" Value="#FFFFD993"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyB"><Setter Property="Background" Value="#FFD7D7D7"/></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{Binding Ascii}" Width="9" TextAlignment="Center"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+            <GridSplitter Grid.Column="1" Width="8" HorizontalAlignment="Stretch"/>
+            <DataGrid x:Name="FileBGrid" Grid.Column="2" ItemsSource="{Binding ViewModel.Rows}"
+                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" FontFamily="Consolas"
+                      SelectionChanged="Panel_SelectionChanged" ScrollViewer.ScrollChanged="Grid_ScrollChanged">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="Address" Width="90"><DataGridTemplateColumn.CellTemplate><DataTemplate><Grid><TextBlock Text="{Binding Address}"/><TextBlock Text="{Binding GapDescription}" FontStyle="Italic" TextTrimming="CharacterEllipsis"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsGapMarker}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="HEX Data" Width="*"><DataGridTemplateColumn.CellTemplate><DataTemplate><ItemsControl ItemsSource="{Binding FileB.Cells}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Padding="2,0" MouseLeftButtonDown="ByteCell_Click"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Different"><Setter Property="Background" Value="#FFFFB8B8"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyA"><Setter Property="Background" Value="#FFD7D7D7"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyB"><Setter Property="Background" Value="#FFB5E7B5"/></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{Binding Hex}" Width="22" TextAlignment="Center"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                    <DataGridTemplateColumn x:Name="AsciiBColumn" Header="ASCII" Width="150"><DataGridTemplateColumn.CellTemplate><DataTemplate><ItemsControl ItemsSource="{Binding FileB.Cells}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><Border Padding="2,0" MouseLeftButtonDown="ByteCell_Click"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="Transparent"/><Style.Triggers><DataTrigger Binding="{Binding State}" Value="Different"><Setter Property="Background" Value="#FFFFB8B8"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyA"><Setter Property="Background" Value="#FFD7D7D7"/></DataTrigger><DataTrigger Binding="{Binding State}" Value="OnlyB"><Setter Property="Background" Value="#FFB5E7B5"/></DataTrigger></Style.Triggers></Style></Border.Style><TextBlock Text="{Binding Ascii}" Width="9" TextAlignment="Center"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </DockPanel>
+</Window>

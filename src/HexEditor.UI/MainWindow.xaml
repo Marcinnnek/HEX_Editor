@@ -9,6 +9,7 @@
     <DockPanel Margin="12">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
             <Button Content="Open HEX / S-Record" Padding="12,6" Click="OpenImage_Click" Margin="0,0,16,0" />
+            <Button Content="Compare images" Padding="12,6" Click="CompareImages_Click" Margin="0,0,16,0" />
             <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
             <ComboBox Width="72" ItemsSource="{Binding ViewModel.RowWidths}"
                       SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />

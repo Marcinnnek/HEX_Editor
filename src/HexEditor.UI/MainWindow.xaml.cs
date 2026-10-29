@@ -27,6 +27,40 @@ public partial class MainWindow : Window
 
     public MainViewModel ViewModel { get; }
 
+    private void CompareImages_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Select the first firmware image",
+            Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot|All files (*.*)|*.*",
+            CheckFileExists = true
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        var pathA = dialog.FileName;
+        dialog.Title = "Select the second firmware image";
+        if (dialog.ShowDialog(this) != true) return;
+        var pathB = dialog.FileName;
+
+        try
+        {
+            var fileA = LoadImage(pathA);
+            var fileB = LoadImage(pathB);
+            new CompareWindow(fileA, fileB, System.IO.Path.GetFileName(pathA), System.IO.Path.GetFileName(pathB)) { Owner = this }.Show();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to compare files", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static HexEditor.Core.MemoryImage LoadImage(string path)
+    {
+        var service = new MemoryImageFileService();
+        using var stream = File.OpenRead(path);
+        var preview = service.PrepareImport(stream, HexEditor.Core.MemoryImage.Empty, path);
+        return preview.Apply(OverlapDecision.OverwriteIncoming)?.Image ?? HexEditor.Core.MemoryImage.Empty;
+    }
+
     private void OpenImage_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
