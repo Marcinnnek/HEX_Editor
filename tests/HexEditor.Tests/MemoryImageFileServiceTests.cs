@@ -1,4 +1,5 @@
 using System.Text;
+using HexEditor.Core;
 using HexEditor.Formats;
 
 namespace HexEditor.Tests;
@@ -7,12 +8,118 @@ namespace HexEditor.Tests;
 public sealed class MemoryImageFileServiceTests
 {
     [TestMethod]
+    public void Import_DetectsSRecordFromContentAndPreservesAbsoluteAddress()
+    {
+        const string sRecord = "S1051234AABB4F\nS9030000FC\n";
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+
+        var preview = new MemoryImageFileService().PrepareImport(stream, sourcePath: "misleading.hex");
+        var result = preview.Apply(OverlapDecision.OverwriteIncoming)!;
+
+        Assert.AreEqual("Motorola S-Record", result.InputFormat);
+        Assert.AreEqual("misleading.hex", result.SourcePath);
+        Assert.IsTrue(result.Image.TryGetByte(0x1234, out var first));
+        Assert.AreEqual((byte)0xAA, first);
+        Assert.IsTrue(result.Image.TryGetByte(0x1235, out var second));
+        Assert.AreEqual((byte)0xBB, second);
+    }
+
+    [TestMethod]
+    public void Import_IdenticalInternalAndExistingOverlapsAreSummarizedAndKeptOnRequest()
+    {
+        const string sRecord = "S1051234AABB4F\nS1041235BBF9\nS9030000FC\n";
+        var existing = MemoryImage.FromSegments([new MemorySegment(0x1235, [0xBB, 0xCC])]);
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+
+        var preview = new MemoryImageFileService().PrepareImport(stream, existing, "input.s19");
+        var result = preview.Apply(OverlapDecision.KeepExisting)!;
+
+        Assert.AreEqual(2, preview.OverlapSummary.IdenticalByteCount);
+        Assert.AreEqual(0, preview.OverlapSummary.DifferentByteCount);
+        Assert.IsTrue(result.Image.TryGetByte(0x1234, out var newByte));
+        Assert.AreEqual((byte)0xAA, newByte);
+        Assert.IsTrue(result.Image.TryGetByte(0x1235, out var keptByte));
+        Assert.AreEqual((byte)0xBB, keptByte);
+        Assert.IsTrue(result.Image.TryGetByte(0x1236, out var existingByte));
+        Assert.AreEqual((byte)0xCC, existingByte);
+    }
+
+    [TestMethod]
+    public void Import_OverwriteSelectsLaterRecordAndCancelDoesNotApply()
+    {
+        const string sRecord = "S1041234AA0B\nS1041234BBFA\nS9030000FC\n";
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+
+        var preview = new MemoryImageFileService().PrepareImport(stream);
+        var result = preview.Apply(OverlapDecision.OverwriteIncoming)!;
+
+        Assert.AreEqual(1, preview.OverlapSummary.DifferentByteCount);
+        var keptResult = preview.Apply(OverlapDecision.KeepExisting)!;
+        Assert.IsTrue(keptResult.Image.TryGetByte(0x1234, out var keptValue));
+        Assert.AreEqual((byte)0xAA, keptValue);
+        Assert.IsTrue(result.Image.TryGetByte(0x1234, out var value));
+        Assert.AreEqual((byte)0xBB, value);
+        Assert.IsNull(preview.Apply(OverlapDecision.Cancel));
+    }
+
+    [TestMethod]
+    public void Import_DetectsIntelHexFromContentAndSummarizesIdenticalRecordOverlap()
+    {
+        const string intelHex = ":02000000AABB99\n:01000100BB43\n:00000001FF\n";
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
+
+        var preview = new MemoryImageFileService().PrepareImport(stream, sourcePath: "input.s19");
+        var result = preview.Apply(OverlapDecision.KeepExisting)!;
+
+        Assert.AreEqual("Intel HEX", result.InputFormat);
+        Assert.AreEqual(1, preview.OverlapSummary.IdenticalByteCount);
+        Assert.AreEqual(0, preview.OverlapSummary.DifferentByteCount);
+        Assert.IsTrue(result.Image.TryGetByte(1, out var value));
+        Assert.AreEqual((byte)0xBB, value);
+    }
+
+    [TestMethod]
+    public void Import_InvalidSRecordChecksumReportsLineAndReason()
+    {
+        const string sRecord = "S1041234AA00\nS9030000FC\n";
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+
+        var exception = Assert.Throws<MemoryImageImportException>(
+            () => new MemoryImageFileService().PrepareImport(stream));
+
+        Assert.AreEqual(1, exception.LineNumber);
+        StringAssert.Contains(exception.Reason, "checksum");
+    }
+
+    [TestMethod]
+    public void Import_SRecordAddressWidthsAndCountRecordAreValidated()
+    {
+        const string sRecord =
+            "S1041234AA0B\n" +
+            "S205123456BBA3\n" +
+            "S306A0000000CC8D\n" +
+            "S5030003F9\n" +
+            "S70500000000FA\n";
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+
+        var result = new MemoryImageFileService().PrepareImport(stream).Apply(OverlapDecision.OverwriteIncoming)!;
+
+        Assert.IsTrue(result.Image.TryGetByte(0x1234, out var s1));
+        Assert.AreEqual((byte)0xAA, s1);
+        Assert.IsTrue(result.Image.TryGetByte(0x123456, out var s2));
+        Assert.AreEqual((byte)0xBB, s2);
+        Assert.IsTrue(result.Image.TryGetByte(0xA0000000, out var s3));
+        Assert.AreEqual((byte)0xCC, s3);
+        Assert.AreEqual(3, ((SRecordMetadata)result.FormatMetadata!).DataRecordCount);
+    }
+
+    [TestMethod]
     public void ImportIntelHex_PreservesSparseAbsoluteAddresses()
     {
         const string intelHex = ":02000004A0005A\n:0200000041427B\n:0100020043BA\n:0100100043AC\n:0400000500001234B1\n:00000001FF\n";
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
 
-        var result = new MemoryImageFileService().ImportIntelHex(stream, "fixture.hex");
+        var result = new MemoryImageFileService().PrepareImport(stream, sourcePath: "fixture.hex").Apply(OverlapDecision.OverwriteIncoming)!;
 
         Assert.AreEqual("Intel HEX", result.InputFormat);
         Assert.AreEqual("fixture.hex", result.SourcePath);
@@ -27,16 +134,16 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
-    public void ImportIntelHex_InvalidSyntaxReportsLineAndReason()
+    public void PrepareImport_UnknownFormatReportsLineAndReason()
     {
         const string intelHex = "not an Intel HEX record\n";
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
 
         var exception = Assert.Throws<MemoryImageImportException>(
-            () => new MemoryImageFileService().ImportIntelHex(stream));
+            () => new MemoryImageFileService().PrepareImport(stream));
 
         Assert.AreEqual(1, exception.LineNumber);
-        StringAssert.Contains(exception.Reason, "starting with ':'");
+        StringAssert.Contains(exception.Reason, "Unable to detect format");
     }
 
     [TestMethod]
@@ -46,7 +153,7 @@ public sealed class MemoryImageFileServiceTests
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
 
         var exception = Assert.Throws<MemoryImageImportException>(
-            () => new MemoryImageFileService().ImportIntelHex(stream));
+            () => new MemoryImageFileService().PrepareImport(stream));
 
         Assert.AreEqual(1, exception.LineNumber);
         StringAssert.Contains(exception.Reason, "length is incorrect");
@@ -59,7 +166,7 @@ public sealed class MemoryImageFileServiceTests
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
 
         var exception = Assert.Throws<MemoryImageImportException>(
-            () => new MemoryImageFileService().ImportIntelHex(stream));
+            () => new MemoryImageFileService().PrepareImport(stream));
 
         Assert.AreEqual(2, exception.LineNumber);
         StringAssert.Contains(exception.Reason, "checksum");
@@ -72,7 +179,7 @@ public sealed class MemoryImageFileServiceTests
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
 
         var exception = Assert.Throws<MemoryImageImportException>(
-            () => new MemoryImageFileService().ImportIntelHex(stream));
+            () => new MemoryImageFileService().PrepareImport(stream));
 
         Assert.AreEqual(2, exception.LineNumber);
         StringAssert.Contains(exception.Reason, "32-bit address range");
