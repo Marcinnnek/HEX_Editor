@@ -87,4 +87,39 @@ public sealed class MemoryImage
         value = default;
         return false;
     }
+
+    public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress)
+    {
+        if ((uint)segmentIndex >= (uint)_segments.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(segmentIndex));
+        }
+
+        var source = _segments[segmentIndex];
+        var destinationEnd = (ulong)destinationBaseAddress + (uint)source.ByteCount - 1;
+        if (destinationEnd > uint.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(destinationBaseAddress), "The relocated segment extends beyond the 32-bit address range.");
+        }
+
+        var overlaps = new List<RelocationOverlap>();
+        foreach (var segment in _segments.Where((_, index) => index != segmentIndex))
+        {
+            var start = Math.Max((ulong)destinationBaseAddress, segment.StartAddress);
+            var end = Math.Min(destinationEnd, segment.EndAddress);
+            if (start > end)
+            {
+                continue;
+            }
+
+            for (var address = start; address <= end; address++)
+            {
+                var incoming = source.Data.Span[(int)(address - destinationBaseAddress)];
+                _ = segment.TryGetByte((uint)address, out var existing);
+                overlaps.Add(new RelocationOverlap((uint)address, existing, incoming));
+            }
+        }
+
+        return new MemoryRelocationPreview(this, segmentIndex, destinationBaseAddress, overlaps);
+    }
 }

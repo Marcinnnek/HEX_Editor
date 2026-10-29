@@ -22,6 +22,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private object? _sourceFormatMetadata;
     private EditClipboard? _clipboard;
 
+    public MainViewModel(MemoryImage? image = null)
+    {
+        if (image is not null)
+        {
+            _currentImage = _savedImage = image;
+            RefreshImage();
+        }
+    }
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
@@ -259,6 +268,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
         StatusMessage = $"Exported selected occupied bytes to {fileName}.";
     }
 
+    public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) =>
+        _currentImage.PrepareRelocation(segmentIndex, destinationBaseAddress);
+
+    public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        var relocated = preview.Apply(decision);
+        if (relocated is null)
+        {
+            return false;
+        }
+
+        Commit(relocated);
+        return true;
+    }
+
     private void Commit(MemoryImage next)
     {
         if (ImagesEqual(_currentImage, next)) return;
@@ -273,7 +298,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void RefreshImage()
     {
-        ImageView = new HexImageViewModel(_currentImage);
+        ImageView = new HexImageViewModel(_currentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
         Segments.Clear();
         foreach (var segment in _currentImage.Segments)
             Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount));
