@@ -38,6 +38,43 @@
                 <Button Content="Paste at Start" Click="Paste_Click" Padding="8,4" Margin="0,0,4,0" />
                 <Button Content="Delete" Click="Delete_Click" Padding="8,4" />
             </WrapPanel>
+            <WrapPanel Margin="0,6,0,0" VerticalAlignment="Center">
+                <TextBlock Text="Checksum" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <ComboBox x:Name="ChecksumAlgorithmInput" Width="170" SelectedIndex="0" Margin="0,0,6,0">
+                    <ComboBoxItem Content="Additive" />
+                    <ComboBoxItem Content="CRC-16/CCITT-FALSE" />
+                    <ComboBoxItem Content="CRC-32/ISO-HDLC" />
+                    <ComboBoxItem Content="Custom CRC" />
+                </ComboBox>
+                <TextBlock Text="Width" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <ComboBox x:Name="ChecksumWidthInput" Width="55" SelectedIndex="0" Margin="0,0,6,0">
+                    <ComboBoxItem Content="8" />
+                    <ComboBoxItem Content="16" />
+                    <ComboBoxItem Content="32" />
+                </ComboBox>
+                <TextBlock Text="Holes" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <ComboBox x:Name="MissingTreatmentInput" Width="95" SelectedIndex="0" Margin="0,0,6,0">
+                    <ComboBoxItem Content="Reject" />
+                    <ComboBoxItem Content="Fill byte" />
+                </ComboBox>
+                <TextBox x:Name="HoleFillByteInput" Width="45" ToolTip="Fill byte in hex" Text="FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock Text="Order" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <ComboBox x:Name="ChecksumByteOrderInput" Width="100" SelectedIndex="0" Margin="0,0,6,0">
+                    <ComboBoxItem Content="Big endian" />
+                    <ComboBoxItem Content="Little endian" />
+                </ComboBox>
+                <TextBox x:Name="ChecksumPolynomialInput" Width="72" Text="1021" ToolTip="Custom CRC polynomial in hex" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                <TextBox x:Name="ChecksumInitialInput" Width="72" Text="FFFF" ToolTip="Custom CRC initial value in hex" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                <CheckBox x:Name="ReflectInputCheckBox" Content="RefIn" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <CheckBox x:Name="ReflectOutputCheckBox" Content="RefOut" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox x:Name="ChecksumFinalXorInput" Width="72" Text="0" ToolTip="Custom CRC final XOR in hex" VerticalContentAlignment="Center" Margin="0,0,6,0" />
+                <Button Content="Calculate" Click="CalculateChecksum_Click" Padding="8,4" Margin="0,0,4,0" />
+                <TextBlock Text="Write at" VerticalAlignment="Center" Margin="0,0,4,0" />
+                <TextBox x:Name="ChecksumWriteAddressInput" Width="80" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                <Button Content="Write result" Click="WriteChecksum_Click" Padding="8,4" />
+            </WrapPanel>
+            <TextBlock Text="{Binding ViewModel.ChecksumSummary}" Margin="0,4,0,0" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding ViewModel.ChecksumResult.Parameters}" />
         </StackPanel>
         <TextBlock DockPanel.Dock="Bottom" Margin="0,12,0,0" Text="{Binding ViewModel.StatusMessage}" />
         <Grid>

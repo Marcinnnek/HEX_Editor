@@ -1,6 +1,7 @@
 using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.UI;
+using HexEditor.Tools;
 
 namespace HexEditor.Tests;
 
@@ -94,6 +95,29 @@ public sealed class HexImageViewModelTests
             Assert.AreEqual(MemoryImageExportFormat.IntelHex, model.SourceFormat);
         }
         finally { File.Delete(path); }
+    }
+
+    [TestMethod]
+    public void ChecksumWrite_IsUndoableAndCoveredEditsMarkDisplayedResultStale()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x01, 0x02])]), null, null);
+        model.CalculateChecksum(ChecksumRequest.Additive(0x1000, 0x1001, 16, MissingAddressTreatment.Reject));
+
+        model.WriteChecksumResult(0x2000);
+
+        Assert.IsTrue(model.IsModified);
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x03 }, model.CurrentImage.Segments[^1].Data.ToArray());
+        Assert.IsFalse(model.ChecksumResult!.IsStale, "Writing outside the input range must preserve the result.");
+        Assert.IsTrue(model.Undo());
+        Assert.IsFalse(model.IsModified);
+        Assert.IsFalse(model.CurrentImage.TryGetByte(0x2000, out _));
+        Assert.IsTrue(model.Redo());
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x2001, out _));
+
+        model.EditByte(0x1000, 0xFF, OverlapDecision.OverwriteIncoming);
+        Assert.IsTrue(model.ChecksumResult.IsStale);
+        Assert.Throws<InvalidOperationException>(() => model.WriteChecksumResult(0x3000));
     }
 
     [TestMethod]

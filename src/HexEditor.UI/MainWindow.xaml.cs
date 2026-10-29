@@ -10,6 +10,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Globalization;
 using HexEditor.Formats;
+using HexEditor.Tools;
 
 namespace HexEditor.UI;
 
@@ -220,6 +221,71 @@ public partial class MainWindow : Window
         }
     }
 
+    private void CalculateChecksum_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var start = ParseAddress(RangeStartInput.Text);
+            var end = ParseAddress(RangeEndInput.Text);
+            var width = int.Parse(((ComboBoxItem)ChecksumWidthInput.SelectedItem).Content.ToString()!, CultureInfo.InvariantCulture);
+            var missingTreatment = MissingTreatmentInput.SelectedIndex switch
+            {
+                0 => MissingAddressTreatment.Reject,
+                1 => MissingAddressTreatment.FillByte,
+                _ => throw new ArgumentException("Choose how missing addresses are treated.")
+            };
+            byte? fillByte = missingTreatment == MissingAddressTreatment.FillByte
+                ? byte.Parse(HoleFillByteInput.Text.Trim().Replace("0x", string.Empty, StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture)
+                : null;
+            var byteOrder = ChecksumByteOrderInput.SelectedIndex switch
+            {
+                0 => ChecksumByteOrder.BigEndian,
+                1 => ChecksumByteOrder.LittleEndian,
+                _ => throw new ArgumentException("Choose the byte order.")
+            };
+            var algorithm = ((ComboBoxItem)ChecksumAlgorithmInput.SelectedItem).Content.ToString();
+            var request = algorithm switch
+            {
+                "Additive" => ChecksumRequest.Additive(start, end, width, missingTreatment, fillByte, byteOrder),
+                "CRC-16/CCITT-FALSE" => ChecksumRequest.Crc16CcittFalse(start, end, missingTreatment, fillByte, byteOrder),
+                "CRC-32/ISO-HDLC" => ChecksumRequest.Crc32IsoHdlc(start, end, missingTreatment, fillByte, byteOrder),
+                "Custom CRC" => ChecksumRequest.CustomCrc(
+                    start, end, width,
+                    ParseHexValue(ChecksumPolynomialInput.Text),
+                    ParseHexValue(ChecksumInitialInput.Text),
+                    ReflectInputCheckBox.IsChecked == true,
+                    ReflectOutputCheckBox.IsChecked == true,
+                    ParseHexValue(ChecksumFinalXorInput.Text),
+                    missingTreatment, fillByte, byteOrder),
+                _ => throw new ArgumentException("Choose a checksum algorithm.")
+            };
+            ViewModel.CalculateChecksum(request);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to calculate checksum", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void WriteChecksum_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var address = ParseAddress(ChecksumWriteAddressInput.Text);
+            var result = ViewModel.ChecksumResult ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
+            var collisions = Enumerable.Range(0, result.WidthBits / 8)
+                .Count(offset => ViewModel.CurrentImage.TryGetByte(checked(address + (uint)offset), out _));
+            var decision = collisions == 0 ? (OverlapDecision?)null : AskOverlap(collisions, "checksum write");
+            if (decision == OverlapDecision.Cancel) return;
+            ViewModel.WriteChecksumResult(address, decision);
+            Title = ViewModel.WindowTitle;
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to write checksum", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CopyRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
     private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
     private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
@@ -274,6 +340,15 @@ public partial class MainWindow : Window
         if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var address))
             throw new ArgumentException("Enter a 32-bit hexadecimal address.");
         return address;
+    }
+
+    private static ulong ParseHexValue(string text)
+    {
+        text = text.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
+        if (!ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
+            throw new ArgumentException("Enter a hexadecimal checksum parameter.");
+        return value;
     }
 
     private void ShowEditError(Exception exception) => MessageBox.Show(this, exception.Message, "Unable to edit image", MessageBoxButton.OK, MessageBoxImage.Error);
