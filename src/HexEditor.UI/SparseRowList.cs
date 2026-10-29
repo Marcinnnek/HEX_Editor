@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Specialized;
 
 namespace HexEditor.UI;
@@ -8,11 +7,12 @@ internal readonly record struct SparseRowSpan(ulong StartAddress, ulong EndAddre
 internal readonly record struct SparseRowPosition(bool IsGap, ulong RowAddress, ulong GapStartAddress, ulong GapEndAddress);
 
 /// <summary>Indexes visible address spans and collapsed gaps without materializing each row.</summary>
-internal sealed class SparseRowList<T> : IList<T>, INotifyCollectionChanged
+internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollectionChanged
 {
     private IReadOnlyList<IndexedSpan> _spans;
     private readonly Func<SparseRowPosition, T> _createItem;
     private readonly uint _rowWidth;
+    private int _count;
 
     public SparseRowList(IEnumerable<SparseRowSpan> spans, int bytesPerRow, Func<SparseRowPosition, T> createItem)
     {
@@ -33,26 +33,21 @@ internal sealed class SparseRowList<T> : IList<T>, INotifyCollectionChanged
         }
 
         _spans = indexed;
-        Count = checked((int)nextIndex);
+        _count = checked((int)nextIndex);
     }
 
-    public int Count { get; private set; }
-    public bool IsReadOnly => true;
+    public override int Count => _count;
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
-    public T this[int index]
+    protected override T GetAt(int index)
     {
-        get
-        {
-            if ((uint)index >= (uint)Count) throw new ArgumentOutOfRangeException(nameof(index));
-            var span = FindSpan(index);
-            var position = span.IsGap
-                ? new SparseRowPosition(true, 0, span.StartAddress, span.EndAddress)
-                : new SparseRowPosition(false,
-                    span.StartAddress + (ulong)(index - span.StartIndex) * _rowWidth, 0, 0);
-            return _createItem(position);
-        }
-        set => throw new NotSupportedException();
+        if ((uint)index >= (uint)Count) throw new ArgumentOutOfRangeException(nameof(index));
+        var span = FindSpan(index);
+        var position = span.IsGap
+            ? new SparseRowPosition(true, 0, span.StartAddress, span.EndAddress)
+            : new SparseRowPosition(false,
+                span.StartAddress + (ulong)(index - span.StartIndex) * _rowWidth, 0, 0);
+        return _createItem(position);
     }
 
     public bool TryGetRowIndex(uint address, out int rowIndex)
@@ -118,38 +113,9 @@ internal sealed class SparseRowList<T> : IList<T>, INotifyCollectionChanged
         }
 
         _spans = indexed;
-        Count = checked((int)nextIndex);
+        _count = checked((int)nextIndex);
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
-
-    public int IndexOf(T item)
-    {
-        for (var index = 0; index < Count; index++)
-            if (EqualityComparer<T>.Default.Equals(this[index], item)) return index;
-        return -1;
-    }
-
-    public bool Contains(T item) => IndexOf(item) >= 0;
-
-    public void CopyTo(T[] array, int arrayIndex)
-    {
-        ArgumentNullException.ThrowIfNull(array);
-        if (arrayIndex < 0 || arrayIndex > array.Length) throw new ArgumentOutOfRangeException(nameof(arrayIndex));
-        if (array.Length - arrayIndex < Count) throw new ArgumentException("The destination array is too small.", nameof(array));
-        for (var index = 0; index < Count; index++) array[arrayIndex + index] = this[index];
-    }
-
-    public IEnumerator<T> GetEnumerator()
-    {
-        for (var index = 0; index < Count; index++) yield return this[index];
-    }
-
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-    public void Add(T item) => throw new NotSupportedException();
-    public void Clear() => throw new NotSupportedException();
-    public void Insert(int index, T item) => throw new NotSupportedException();
-    public bool Remove(T item) => throw new NotSupportedException();
-    public void RemoveAt(int index) => throw new NotSupportedException();
 
     private IndexedSpan FindSpan(int index)
     {
