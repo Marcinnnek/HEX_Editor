@@ -6,7 +6,7 @@
     <DockPanel Margin="14">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Preview result" Padding="12,6" Margin="0,0,8,0" Click="PreviewResult_Click" />
-            <Button Content="Apply merge" Padding="12,6" Margin="0,0,8,0" IsDefault="True" Click="Apply_Click" />
+            <Button x:Name="ApplyButton" Content="Apply merge" Padding="12,6" Margin="0,0,8,0" IsDefault="True" IsEnabled="False" Click="Apply_Click" />
             <Button Content="Cancel" Padding="12,6" IsCancel="True" Click="Cancel_Click" />
         </StackPanel>
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
@@ -15,7 +15,7 @@
                 <TextBlock Text="Direction" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox x:Name="DirectionBox" Width="300" SelectionChanged="Direction_SelectionChanged" />
                 <TextBlock Text="Default overlap choice" VerticalAlignment="Center" Margin="18,0,6,0" />
-                <ComboBox x:Name="DefaultChoiceBox" Width="230" />
+                <ComboBox x:Name="DefaultChoiceBox" Width="230" SelectionChanged="Policy_SelectionChanged" />
             </WrapPanel>
             <TextBlock x:Name="DirectionSummary" FontWeight="SemiBold" TextWrapping="Wrap" />
             <TextBlock x:Name="OverlapSummary" Margin="0,4,0,0" TextWrapping="Wrap" />

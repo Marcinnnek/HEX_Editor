@@ -61,6 +61,7 @@ public partial class MergeWindow : Window
 
     private void RebuildPreview()
     {
+        ApplyButton.IsEnabled = false;
         var reverse = ((MergeDirectionOption)DirectionBox.SelectedItem).Reverse;
         var destination = reverse ? _imageB : _imageA;
         var source = reverse ? _imageA : _imageB;
@@ -76,6 +77,11 @@ public partial class MergeWindow : Window
               $"{Preview.IdenticalOverlapByteCount:N0} identical and {Preview.DifferentOverlapByteCount:N0} different.";
     }
 
+    private void Policy_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    {
+        if (ApplyButton is not null) ApplyButton.IsEnabled = false;
+    }
+
     private void AddOverride_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -88,6 +94,7 @@ public partial class MergeWindow : Window
             // Resolve validates that explicit override ranges do not conflict with existing overrides.
             Preview.Resolve(DefaultChoice, RangeOverrides.Append(candidate));
             OverrideRows.Add(new MergeOverrideRow(candidate));
+            ApplyButton.IsEnabled = false;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {
@@ -97,7 +104,11 @@ public partial class MergeWindow : Window
 
     private void RemoveOverride_Click(object sender, RoutedEventArgs e)
     {
-        if (OverrideList.SelectedItem is MergeOverrideRow row) OverrideRows.Remove(row);
+        if (OverrideList.SelectedItem is MergeOverrideRow row)
+        {
+            OverrideRows.Remove(row);
+            ApplyButton.IsEnabled = false;
+        }
     }
 
     private void PreviewResult_Click(object sender, RoutedEventArgs e)
@@ -110,6 +121,7 @@ public partial class MergeWindow : Window
             {
                 Owner = this
             }.ShowDialog();
+            ApplyButton.IsEnabled = true;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {
@@ -119,6 +131,11 @@ public partial class MergeWindow : Window
 
     private void Apply_Click(object sender, RoutedEventArgs e)
     {
+        if (!ApplyButton.IsEnabled)
+        {
+            MessageBox.Show(this, "Preview the resolved result before applying the merge.", "Merge preview required", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
         try
         {
             _ = Preview.Resolve(DefaultChoice, RangeOverrides);
