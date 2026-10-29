@@ -132,4 +132,3 @@ internal static class SparseRowIndexBuilder
         return (indexed, checked((int)nextIndex));
     }
 }
-
