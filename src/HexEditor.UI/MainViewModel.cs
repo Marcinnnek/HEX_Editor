@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Runtime.CompilerServices;
+using HexEditor.Core;
 using HexEditor.Formats;
 
 namespace HexEditor.UI;
@@ -9,8 +10,9 @@ namespace HexEditor.UI;
 public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly MemoryImageFileService _fileService = new();
-    private string _statusMessage = "Open an Intel HEX file to inspect its occupied memory segments.";
+    private string _statusMessage = "Open an Intel HEX or Motorola S-Record file to inspect its occupied memory segments.";
     private string _windowTitle = "HEX Editor";
+    private MemoryImage _currentImage = MemoryImage.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -28,12 +30,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
         private set => SetProperty(ref _windowTitle, value);
     }
 
-    public void OpenIntelHex(string path)
+    public MemoryImageImportPreview PrepareOpen(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-
         using var stream = File.OpenRead(path);
-        var imported = _fileService.ImportIntelHex(stream, path);
+        return _fileService.PrepareImport(stream, _currentImage, path);
+    }
+
+    public void ApplyImport(MemoryImageImportPreview preview, OverlapDecision decision)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        var imported = preview.Apply(decision);
+        if (imported is null)
+        {
+            return;
+        }
+
+        _currentImage = imported.Image;
 
         Segments.Clear();
         foreach (var segment in imported.Image.Segments)
@@ -45,7 +58,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         var totalBytes = imported.Image.Segments.Sum(segment => (long)segment.ByteCount);
-        var fileName = Path.GetFileName(path);
+        var fileName = Path.GetFileName(imported.SourcePath ?? "memory image");
         WindowTitle = $"{fileName} - HEX Editor";
         StatusMessage = $"{imported.Image.Segments.Count:N0} segments, {totalBytes:N0} bytes | {imported.InputFormat}";
     }

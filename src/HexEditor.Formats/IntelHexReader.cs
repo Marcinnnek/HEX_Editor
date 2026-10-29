@@ -6,7 +6,7 @@ namespace HexEditor.Formats;
 
 internal static class IntelHexReader
 {
-    public static (MemoryImage Image, IntelHexMetadata Metadata) Read(Stream input)
+    public static (IReadOnlyList<MemorySegment> Records, IntelHexMetadata Metadata) Read(Stream input)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (!input.CanRead)
@@ -86,25 +86,11 @@ internal static class IntelHexReader
             throw Error(Math.Max(lineNumber, 1), "The file is missing an end-of-file record.");
         }
 
-        var orderedRecords = records.OrderBy(record => record.Segment.StartAddress).ToArray();
-        for (var index = 1; index < orderedRecords.Length; index++)
-        {
-            var previous = orderedRecords[index - 1];
-            var current = orderedRecords[index];
-            if (current.Segment.StartAddress <= previous.Segment.EndAddress)
-            {
-                throw Error(
-                    current.LineNumber,
-                    $"Data overlaps an earlier record at address range 0x{current.Segment.StartAddress:X8}-0x{Math.Min(current.Segment.EndAddress, previous.Segment.EndAddress):X8}.");
-            }
-        }
-
-        var image = MemoryImage.FromSegments(orderedRecords.Select(record => record.Segment));
         var metadata = new IntelHexMetadata(
             startLinearAddress,
             startSegmentCodeSegment,
             startSegmentInstructionPointer);
-        return (image, metadata);
+        return (records.Select(record => record.Segment).ToArray(), metadata);
     }
 
     private static (ushort Address, byte RecordType, byte[] Data) ParseRecord(string line, int lineNumber)
