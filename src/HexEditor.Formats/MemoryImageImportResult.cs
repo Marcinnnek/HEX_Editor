@@ -4,6 +4,9 @@ namespace HexEditor.Formats;
 
 public sealed record MemoryImageImportResult(
     MemoryImage Image,
-    string InputFormat,
+    MemoryImageExportFormat DetectedFormat,
     string? SourcePath,
-    object? FormatMetadata);
+    object? FormatMetadata)
+{
+    public string InputFormat => DetectedFormat.GetDisplayName();
+}

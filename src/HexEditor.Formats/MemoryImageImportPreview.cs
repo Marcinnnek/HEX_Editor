@@ -18,19 +18,20 @@ public sealed class MemoryImageImportPreview
     internal MemoryImageImportPreview(
         MemoryImage existingImage,
         IEnumerable<MemorySegment> records,
-        string inputFormat,
+        MemoryImageExportFormat detectedFormat,
         string? sourcePath,
         object? metadata)
     {
         _existingImage = existingImage;
         _records = Array.AsReadOnly(records.ToArray());
-        InputFormat = inputFormat;
+        DetectedFormat = detectedFormat;
         SourcePath = sourcePath;
         FormatMetadata = metadata;
         OverlapSummary = BuildOverlapSummary(existingImage, _records);
     }
 
-    public string InputFormat { get; }
+    public MemoryImageExportFormat DetectedFormat { get; }
+    public string InputFormat => DetectedFormat.GetDisplayName();
     public string? SourcePath { get; }
     public object? FormatMetadata { get; }
     public OverlapSummary OverlapSummary { get; }
@@ -72,7 +73,7 @@ public sealed class MemoryImageImportPreview
         run.Flush(segments);
         return new MemoryImageImportResult(
             MemoryImage.FromSegments(segments),
-            InputFormat,
+            DetectedFormat,
             SourcePath,
             FormatMetadata);
     }

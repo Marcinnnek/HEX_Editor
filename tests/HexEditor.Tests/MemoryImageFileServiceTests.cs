@@ -17,6 +17,7 @@ public sealed class MemoryImageFileServiceTests
         var result = preview.Apply(OverlapDecision.OverwriteIncoming)!;
 
         Assert.AreEqual("Motorola S-Record", result.InputFormat);
+        Assert.AreEqual(MemoryImageExportFormat.SRecord, result.DetectedFormat);
         Assert.AreEqual("misleading.hex", result.SourcePath);
         Assert.IsTrue(result.Image.TryGetByte(0x1234, out var first));
         Assert.AreEqual((byte)0xAA, first);
@@ -72,6 +73,7 @@ public sealed class MemoryImageFileServiceTests
         var result = preview.Apply(OverlapDecision.KeepExisting)!;
 
         Assert.AreEqual("Intel HEX", result.InputFormat);
+        Assert.AreEqual(MemoryImageExportFormat.IntelHex, result.DetectedFormat);
         Assert.AreEqual(1, preview.OverlapSummary.IdenticalByteCount);
         Assert.AreEqual(0, preview.OverlapSummary.DifferentByteCount);
         Assert.IsTrue(result.Image.TryGetByte(1, out var value));

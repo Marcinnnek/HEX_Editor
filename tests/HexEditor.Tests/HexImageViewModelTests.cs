@@ -289,7 +289,10 @@ public sealed class HexImageViewModelTests
 
         model.EditByte(0x1000, 0xFF, OverlapDecision.OverwriteIncoming);
         Assert.IsTrue(model.Checksum.Result!.IsStale);
+        var imageBeforeRejectedWrite = model.CurrentImage;
         Assert.Throws<InvalidOperationException>(() => model.WriteChecksumResult(0x3000));
+        Assert.AreSame(imageBeforeRejectedWrite, model.CurrentImage, "A stale checksum must not change the image.");
+        Assert.IsFalse(model.CurrentImage.TryGetByte(0x3000, out _));
     }
 
     [TestMethod]

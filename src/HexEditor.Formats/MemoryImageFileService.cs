@@ -221,15 +221,15 @@ public sealed class MemoryImageFileService
             metadata);
     }
 
-    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, string Format, object Metadata) ReadIntelHex(Stream input)
+    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, MemoryImageExportFormat Format, object Metadata) ReadIntelHex(Stream input)
     {
         var (records, metadata) = IntelHexReader.Read(input);
-        return (records, "Intel HEX", metadata);
+        return (records, MemoryImageExportFormat.IntelHex, metadata);
     }
 
-    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, string Format, object Metadata) ReadSRecord(Stream input)
+    private static (IReadOnlyList<HexEditor.Core.MemorySegment> Records, MemoryImageExportFormat Format, object Metadata) ReadSRecord(Stream input)
     {
         var (records, metadata) = SRecordReader.Read(input);
-        return (records, "Motorola S-Record", metadata);
+        return (records, MemoryImageExportFormat.SRecord, metadata);
     }
 }
