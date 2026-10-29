@@ -1,4 +1,6 @@
+using System.Text;
 using HexEditor.Core;
+using HexEditor.Formats;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -93,5 +95,26 @@ public sealed class HexImageViewModelTests
         Assert.HasCount(327680, view.Rows);
         Assert.AreEqual("00000000", view.Rows[0].Address);
         Assert.AreEqual("009FFFE0", view.Rows[^1].Address);
+    }
+
+    [TestMethod]
+    public void MainViewModel_ExportsOnlySelectedSegmentAndCanReimportIt()
+    {
+        const string sourceRecords = ":020010001011CD\n:0100200020BF\n:00000001FF\n";
+        var fileService = new MemoryImageFileService();
+        var viewModel = new MainViewModel();
+        using var source = new MemoryStream(Encoding.ASCII.GetBytes(sourceRecords));
+        viewModel.ApplyImport(
+            fileService.PrepareImport(source),
+            OverlapDecision.OverwriteIncoming);
+        using var exported = new MemoryStream();
+
+        viewModel.ExportSegments([1], MemoryImageExportFormat.SRecord, 8, exported);
+        exported.Position = 0;
+        var imported = fileService.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+
+        Assert.HasCount(1, imported.Segments);
+        Assert.AreEqual(0x20u, imported.Segments[0].StartAddress);
+        CollectionAssert.AreEqual(new byte[] { 0x20 }, imported.Segments[0].Data.ToArray());
     }
 }

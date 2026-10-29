@@ -7,16 +7,30 @@
         mc:Ignorable="d"
         Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640">
     <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,12" VerticalAlignment="Center">
-            <Button Content="Open HEX / S-Record" Padding="12,6" Click="OpenImage_Click" Margin="0,0,16,0" />
-            <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <ComboBox Width="72" ItemsSource="{Binding ViewModel.RowWidths}"
-                      SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
-            <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ImageView.ShowAscii, UpdateSourceTrigger=PropertyChanged}"
-                      VerticalAlignment="Center" Margin="16,0,18,0" Checked="AsciiToggle_Changed" Unchecked="AsciiToggle_Changed" />
-            <TextBlock Text="Address" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <TextBox x:Name="AddressInput" Width="120" VerticalContentAlignment="Center" />
-            <Button Content="Go" Padding="10,4" Margin="6,0,0,0" Click="GoToAddress_Click" />
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
+                <Button Content="Open HEX / S-Record" Padding="12,6" Click="OpenImage_Click" Margin="0,0,16,0" />
+                <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <ComboBox Width="72" ItemsSource="{Binding ViewModel.RowWidths}"
+                          SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ImageView.ShowAscii, UpdateSourceTrigger=PropertyChanged}"
+                          VerticalAlignment="Center" Margin="16,0,18,0" Checked="AsciiToggle_Changed" Unchecked="AsciiToggle_Changed" />
+                <TextBlock Text="Address" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBox x:Name="AddressInput" Width="120" VerticalContentAlignment="Center" />
+                <Button Content="Go" Padding="10,4" Margin="6,0,0,0" Click="GoToAddress_Click" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Export as" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <ComboBox x:Name="ExportFormatInput" Width="150" ItemsSource="{Binding ViewModel.ExportFormats}" SelectedIndex="0" />
+                <TextBlock Text="Max record bytes" VerticalAlignment="Center" Margin="12,0,6,0" />
+                <ComboBox x:Name="ExportPayloadInput" Width="64" ItemsSource="{Binding ViewModel.ExportPayloadSizes}" SelectedIndex="1" />
+                <Button Content="Export selected segments" Padding="10,4" Margin="12,0,0,0" Click="ExportSegments_Click" />
+                <TextBlock Text="or range" VerticalAlignment="Center" Margin="12,0,6,0" />
+                <TextBox x:Name="ExportRangeStartInput" Width="90" ToolTip="Start address (hex)" VerticalContentAlignment="Center" />
+                <TextBlock Text="to" VerticalAlignment="Center" Margin="6,0" />
+                <TextBox x:Name="ExportRangeEndInput" Width="90" ToolTip="End address (hex)" VerticalContentAlignment="Center" />
+                <Button Content="Export range" Padding="10,4" Margin="6,0,0,0" Click="ExportRange_Click" />
+            </StackPanel>
         </StackPanel>
         <TextBlock DockPanel.Dock="Bottom" Margin="0,12,0,0" Text="{Binding ViewModel.StatusMessage}" />
         <Grid>
@@ -27,7 +41,7 @@
             </Grid.ColumnDefinitions>
             <DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                       AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                      HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="SegmentsGrid_SelectionChanged">
+                      HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
                     <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />

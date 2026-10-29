@@ -229,6 +229,81 @@ public sealed class MemoryImageFileServiceTests
         }
     }
 
+    [TestMethod]
+    public void ExportSegments_RoundTripsOnlyRequestedOccupiedSegments()
+    {
+        var source = MemoryImage.FromSegments(
+        [
+            new MemorySegment(0x1000, [0x10, 0x11]),
+            new MemorySegment(0x2000, [0x20]),
+            new MemorySegment(0x3000, [0x30, 0x31])
+        ]);
+        var service = new MemoryImageFileService();
+
+        foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+        {
+            using var exported = new MemoryStream();
+            service.ExportSegments(source, [2, 0], format, 8, exported);
+            exported.Position = 0;
+            var imported = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+
+            Assert.HasCount(2, imported.Segments);
+            Assert.AreEqual(0x1000u, imported.Segments[0].StartAddress);
+            CollectionAssert.AreEqual(new byte[] { 0x10, 0x11 }, imported.Segments[0].Data.ToArray());
+            Assert.AreEqual(0x3000u, imported.Segments[1].StartAddress);
+            CollectionAssert.AreEqual(new byte[] { 0x30, 0x31 }, imported.Segments[1].Data.ToArray());
+            Assert.IsFalse(imported.TryGetByte(0x2000, out _));
+        }
+    }
+
+    [TestMethod]
+    public void ExportAddressRange_ClipsSegmentsAndPreservesHolesForBothFormats()
+    {
+        var source = MemoryImage.FromSegments(
+        [
+            new MemorySegment(0x1000, [0x10, 0x11, 0x12, 0x13]),
+            new MemorySegment(0x1006, [0x16, 0x17]),
+            new MemorySegment(0x2000, [0x20])
+        ]);
+        var service = new MemoryImageFileService();
+
+        foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+        {
+            using var exported = new MemoryStream();
+            service.ExportAddressRange(source, 0x1001, 0x1006, format, 8, exported);
+            exported.Position = 0;
+            var imported = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+
+            Assert.HasCount(2, imported.Segments);
+            Assert.AreEqual(0x1001u, imported.Segments[0].StartAddress);
+            CollectionAssert.AreEqual(new byte[] { 0x11, 0x12, 0x13 }, imported.Segments[0].Data.ToArray());
+            Assert.AreEqual(0x1006u, imported.Segments[1].StartAddress);
+            CollectionAssert.AreEqual(new byte[] { 0x16 }, imported.Segments[1].Data.ToArray());
+            Assert.IsFalse(imported.TryGetByte(0x1000, out _));
+            Assert.IsFalse(imported.TryGetByte(0x1004, out _));
+            Assert.IsFalse(imported.TryGetByte(0x2000, out _));
+        }
+    }
+
+    [TestMethod]
+    public void ExportSelection_RejectsEmptyAndInvalidBoundsWithActionableErrors()
+    {
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11])]);
+        var service = new MemoryImageFileService();
+
+        var reversed = Assert.Throws<ArgumentException>(
+            () => service.ExportAddressRange(image, 0x1001, 0x1000, MemoryImageExportFormat.IntelHex, 8, Stream.Null));
+        StringAssert.Contains(reversed.Message, "start address must be less than or equal to the end address");
+
+        var empty = Assert.Throws<InvalidOperationException>(
+            () => service.ExportAddressRange(image, 0x2000, 0x2FFF, MemoryImageExportFormat.IntelHex, 8, Stream.Null));
+        StringAssert.Contains(empty.Message, "contains no occupied bytes");
+
+        var noSegments = Assert.Throws<InvalidOperationException>(
+            () => service.ExportSegments(image, [], MemoryImageExportFormat.IntelHex, 8, Stream.Null));
+        StringAssert.Contains(noSegments.Message, "Select at least one occupied segment");
+    }
+
     private static int? GetDataRecordPayloadLength(string line, MemoryImageExportFormat format)
     {
         if (format == MemoryImageExportFormat.IntelHex)
