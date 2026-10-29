@@ -48,6 +48,25 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void ComparisonPanelAtAddressSpaceEnd_DoesNotWrapCellAddresses()
+    {
+        var lastAddress = uint.MaxValue;
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(lastAddress, [0xA5])]),
+            MemoryImage.Empty,
+            bytesPerRow: 16);
+
+        Assert.IsTrue(comparison.TryNavigateToAddress(lastAddress, out var rowIndex));
+        var cells = comparison.FileARows[rowIndex].Cells;
+
+        for (var offset = 0; offset < cells.Count; offset++)
+        {
+            Assert.AreEqual(0xFFFFFFF0u + (uint)offset, cells[offset].Address);
+        }
+        Assert.AreEqual(lastAddress, cells[^1].Address);
+    }
+
+    [TestMethod]
     public void ComparisonStatus_ReportsEqualityAndDifferenceCountsAndRefreshes()
     {
         var comparison = new CompareViewModel(

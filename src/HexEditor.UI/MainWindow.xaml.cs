@@ -21,11 +21,19 @@ namespace HexEditor.UI;
 public partial class MainWindow : Window
 {
     private readonly List<CompareWindow> _comparisonWindows = [];
+    private readonly ImageEditWorkflow _imageEdits;
+    private readonly ChecksumWorkflow _checksums;
+    private readonly ComparisonImageLoader _comparisonImageLoader;
+    private readonly MemoryImageFileWorkflow _files;
 
     public MainWindow()
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
+        _imageEdits = new ImageEditWorkflow(ViewModel);
+        _checksums = new ChecksumWorkflow(ViewModel);
+        _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
+        _files = new MemoryImageFileWorkflow(ViewModel);
         ViewModel.ImageChanged += ViewModel_ImageChanged;
         DataContext = this;
         Closing += MainWindow_Closing;
@@ -49,8 +57,8 @@ public partial class MainWindow : Window
 
         try
         {
-            var imageA = LoadImageForMerge(pathA);
-            var imageB = LoadImageForMerge(pathB);
+            var imageA = _comparisonImageLoader.Load(pathA);
+            var imageB = _comparisonImageLoader.Load(pathB);
             var window = new CompareWindow(imageA.Image, imageB.Image, System.IO.Path.GetFileName(pathA), System.IO.Path.GetFileName(pathB)) { Owner = this };
             _comparisonWindows.Add(window);
             window.Closed += (_, _) => _comparisonWindows.Remove(window);
@@ -60,19 +68,6 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, exception.Message, "Unable to compare files", MessageBoxButton.OK, MessageBoxImage.Error);
         }
-    }
-
-    private LoadedMemoryImage LoadImageForMerge(string path)
-    {
-        if (PathsEqual(ViewModel.SourcePath, path))
-            return new LoadedMemoryImage(ViewModel.CurrentImage, ViewModel.SourcePath!, ViewModel.SourceFormat);
-
-        var service = new MemoryImageFileService();
-        using var stream = File.OpenRead(path);
-        var preview = service.PrepareImport(stream, HexEditor.Core.MemoryImage.Empty, path);
-        var imported = preview.Apply(OverlapDecision.OverwriteIncoming) ?? throw new InvalidOperationException("The selected image could not be imported.");
-        var format = imported.InputFormat == "Intel HEX" ? MemoryImageExportFormat.IntelHex : MemoryImageExportFormat.SRecord;
-        return new LoadedMemoryImage(imported.Image, path, format);
     }
 
     private void MergeImages_Click(object sender, RoutedEventArgs e)
@@ -95,21 +90,15 @@ public partial class MainWindow : Window
 
         try
         {
-            var imageA = LoadImageForMerge(destinationDialog.FileName);
-            var imageB = LoadImageForMerge(sourceDialog.FileName);
+            var imageA = _comparisonImageLoader.Load(destinationDialog.FileName);
+            var imageB = _comparisonImageLoader.Load(sourceDialog.FileName);
             var dialog = new MergeWindow(imageA.Image, imageB.Image,
                 System.IO.Path.GetFileName(destinationDialog.FileName),
                 System.IO.Path.GetFileName(sourceDialog.FileName)) { Owner = this };
             if (dialog.ShowDialog() != true) return;
 
             var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
-            if (!ReferenceEquals(ViewModel.CurrentImage, destination.Image))
-            {
-                if (!ConfirmCloseImage()) return;
-                ViewModel.LoadImage(destination.Image, destination.Path, destination.Format);
-            }
-
-            ViewModel.ApplyMerge(dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides);
+            if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides, ConfirmCloseImage)) return;
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
@@ -123,11 +112,6 @@ public partial class MainWindow : Window
         foreach (var comparison in _comparisonWindows.ToArray())
             comparison.RefreshImage(previousImage, updatedImage);
     }
-
-    private static bool PathsEqual(string? first, string second) =>
-        !string.IsNullOrWhiteSpace(first) && string.Equals(System.IO.Path.GetFullPath(first), System.IO.Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
-
-    private sealed record LoadedMemoryImage(HexEditor.Core.MemoryImage Image, string? Path, MemoryImageExportFormat? Format);
 
     private void OpenImage_Click(object sender, RoutedEventArgs e)
     {
@@ -145,40 +129,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var preview = ViewModel.PrepareOpen(dialog.FileName);
-            var decision = OverlapDecision.OverwriteIncoming;
-            if (preview.OverlapSummary.TotalByteCount > 0)
-            {
-                var summary = preview.OverlapSummary;
-                var affectedRanges = string.Join(
-                    ", ",
-                    summary.Ranges.Take(8).Select(range =>
-                        $"0x{range.StartAddress:X8}-0x{range.EndAddress:X8}"));
-                if (summary.Ranges.Count > 8)
-                {
-                    affectedRanges += $", and {summary.Ranges.Count - 8:N0} more";
-                }
-
-                var message = $"This import overlaps {summary.TotalByteCount:N0} byte(s) " +
-                              $"({summary.IdenticalByteCount:N0} identical, {summary.DifferentByteCount:N0} different) " +
-                              $"across {summary.Ranges.Count:N0} address range(s).\n\n" +
-                              $"Affected ranges: {affectedRanges}\n\n" +
-                              "Yes: overwrite with incoming data\nNo: keep existing data\nCancel: cancel import";
-                var choice = MessageBox.Show(
-                    this,
-                    message,
-                    "Overlapping data",
-                    MessageBoxButton.YesNoCancel,
-                    MessageBoxImage.Warning);
-                decision = choice switch
-                {
-                    MessageBoxResult.Yes => OverlapDecision.OverwriteIncoming,
-                    MessageBoxResult.No => OverlapDecision.KeepExisting,
-                    _ => OverlapDecision.Cancel
-                };
-            }
-
-            ViewModel.ApplyImport(preview, decision);
+            _files.Open(dialog.FileName, ChooseImportOverlap);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
@@ -192,7 +143,7 @@ public partial class MainWindow : Window
         try
         {
             if (ViewModel.SourcePath is null || ViewModel.SourceFormat is null) { SaveAs_Click(sender, e); return; }
-            ViewModel.Save();
+            _files.Save();
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -227,7 +178,7 @@ public partial class MainWindow : Window
         }
         try
         {
-            ViewModel.SaveAs(dialog.FileName, format, overwrite);
+            _files.SaveAs(dialog.FileName, format, overwrite);
             Title = ViewModel.WindowTitle;
             return true;
         }
@@ -263,9 +214,7 @@ public partial class MainWindow : Window
         {
             var address = ParseAddress(RangeStartInput.Text);
             var bytes = ParsePattern(PatternInput.Text);
-            var preview = ViewModel.PreviewInsert(address, bytes);
-            var decision = preview.OverlapCount == 0 ? OverlapDecision.OverwriteIncoming : AskOverlap(preview.OverlapCount, "insert/replace");
-            ViewModel.InsertBytes(address, bytes, decision);
+            _imageEdits.Insert(address, bytes, AskOverlap);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -278,7 +227,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            ViewModel.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
+            _imageEdits.Fill(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -309,23 +258,11 @@ public partial class MainWindow : Window
                 1 => ChecksumByteOrder.LittleEndian,
                 _ => throw new ArgumentException("Choose the byte order.")
             };
-            var algorithm = ((ComboBoxItem)ChecksumAlgorithmInput.SelectedItem).Content.ToString();
-            var request = algorithm switch
-            {
-                "Additive" => ChecksumRequest.Additive(start, end, width, missingTreatment, fillByte, byteOrder),
-                "CRC-16/CCITT-FALSE" => ChecksumRequest.Crc16CcittFalse(start, end, missingTreatment, fillByte, byteOrder),
-                "CRC-32/ISO-HDLC" => ChecksumRequest.Crc32IsoHdlc(start, end, missingTreatment, fillByte, byteOrder),
-                "Custom CRC" => ChecksumRequest.CustomCrc(
-                    start, end, width,
-                    ParseHexValue(ChecksumPolynomialInput.Text),
-                    ParseHexValue(ChecksumInitialInput.Text),
-                    ReflectInputCheckBox.IsChecked == true,
-                    ReflectOutputCheckBox.IsChecked == true,
-                    ParseHexValue(ChecksumFinalXorInput.Text),
-                    missingTreatment, fillByte, byteOrder),
-                _ => throw new ArgumentException("Choose a checksum algorithm.")
-            };
-            ViewModel.CalculateChecksum(request);
+            var algorithm = ((ComboBoxItem)ChecksumAlgorithmInput.SelectedItem).Content.ToString()!;
+            var request = ChecksumWorkflow.CreateRequest(start, end, algorithm, width, missingTreatment, fillByte, byteOrder,
+                ChecksumPolynomialInput.Text, ChecksumInitialInput.Text, ReflectInputCheckBox.IsChecked == true,
+                ReflectOutputCheckBox.IsChecked == true, ChecksumFinalXorInput.Text);
+            _checksums.Calculate(request);
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
         {
@@ -338,12 +275,7 @@ public partial class MainWindow : Window
         try
         {
             var address = ParseAddress(ChecksumWriteAddressInput.Text);
-            var result = ViewModel.ChecksumResult ?? throw new InvalidOperationException("Calculate a checksum before writing a result.");
-            var collisions = Enumerable.Range(0, result.WidthBits / 8)
-                .Count(offset => ViewModel.CurrentImage.TryGetByte(checked(address + (uint)offset), out _));
-            var decision = collisions == 0 ? (OverlapDecision?)null : AskOverlap(collisions, "checksum write");
-            if (decision == OverlapDecision.Cancel) return;
-            ViewModel.WriteChecksumResult(address, decision);
+            _checksums.Write(address, AskOverlap);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
@@ -352,18 +284,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CopyRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.CutRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => ViewModel.DeleteRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Copy(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Cut(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Delete(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             var address = ParseAddress(RangeStartInput.Text);
-            var collisions = ViewModel.GetPasteOverlapCount(address);
-            var decision = collisions == 0 ? OverlapDecision.OverwriteIncoming : AskOverlap(collisions, "paste");
-            ViewModel.PasteAt(address, decision);
+            _imageEdits.Paste(address, AskOverlap);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -391,6 +321,27 @@ public partial class MainWindow : Window
         };
     }
 
+    private OverlapDecision ChooseImportOverlap(MemoryImageImportPreview preview)
+    {
+        var summary = preview.OverlapSummary;
+        if (summary.TotalByteCount == 0) return OverlapDecision.OverwriteIncoming;
+        var affectedRanges = string.Join(", ", summary.Ranges.Take(8).Select(range =>
+            $"0x{range.StartAddress:X8}-0x{range.EndAddress:X8}"));
+        if (summary.Ranges.Count > 8) affectedRanges += $", and {summary.Ranges.Count - 8:N0} more";
+        var message = $"This import overlaps {summary.TotalByteCount:N0} byte(s) " +
+                      $"({summary.IdenticalByteCount:N0} identical, {summary.DifferentByteCount:N0} different) " +
+                      $"across {summary.Ranges.Count:N0} address range(s).\n\n" +
+                      $"Affected ranges: {affectedRanges}\n\n" +
+                      "Yes: overwrite with incoming data\nNo: keep existing data\nCancel: cancel import";
+        var choice = MessageBox.Show(this, message, "Overlapping data", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        return choice switch
+        {
+            MessageBoxResult.Yes => OverlapDecision.OverwriteIncoming,
+            MessageBoxResult.No => OverlapDecision.KeepExisting,
+            _ => OverlapDecision.Cancel
+        };
+    }
+
     private static byte[] ParsePattern(string text)
     {
         var parts = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
@@ -401,15 +352,6 @@ public partial class MainWindow : Window
 
     private static uint ParseAddress(string text)
         => HexAddressParser.Parse(text);
-
-    private static ulong ParseHexValue(string text)
-    {
-        text = text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
-        if (!ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
-            throw new ArgumentException("Enter a hexadecimal checksum parameter.");
-        return value;
-    }
 
     private void ShowEditError(Exception exception) => MessageBox.Show(this, exception.Message, "Unable to edit image", MessageBoxButton.OK, MessageBoxImage.Error);
 
@@ -427,7 +369,7 @@ public partial class MainWindow : Window
         if (ViewModel.SourcePath is null || ViewModel.SourceFormat is null) return TrySaveAs();
         try
         {
-            ViewModel.Save();
+            _files.Save();
             Title = ViewModel.WindowTitle;
             return true;
         }
@@ -521,9 +463,7 @@ public partial class MainWindow : Window
 
         try
         {
-            using var output = File.Create(dialog.FileName);
-            export(format, payloadSize, output);
-            ViewModel.ReportExported(System.IO.Path.GetFileName(dialog.FileName));
+            _files.Export(dialog.FileName, output => export(format, payloadSize, output));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
@@ -549,35 +489,8 @@ public partial class MainWindow : Window
 
         try
         {
-            var preview = ViewModel.PrepareRelocation(SegmentsGrid.SelectedIndex, destination);
-            var decision = RelocationOverlapDecision.Overwrite;
-            if (preview.Overlaps.Count > 0)
-            {
-                var identicalCount = preview.Overlaps.Count(overlap => overlap.ValuesAreIdentical);
-                var differentCount = preview.Overlaps.Count - identicalCount;
-                var addresses = string.Join(", ", preview.Overlaps.Take(8).Select(overlap => $"0x{overlap.Address:X8}"));
-                if (preview.Overlaps.Count > 8)
-                {
-                    addresses += $", and {preview.Overlaps.Count - 8:N0} more";
-                }
-
-                var message = $"The destination overlaps {preview.Overlaps.Count:N0} occupied byte(s) " +
-                              $"({identicalCount:N0} identical, {differentCount:N0} different).\n\n" +
-                              $"Affected addresses: {addresses}\n\n" +
-                              "Yes: overwrite destination bytes with the relocated segment\n" +
-                              "No: keep existing destination bytes\n" +
-                              "Cancel: cancel relocation";
-                var choice = MessageBox.Show(this, message, "Overlapping destination data",
-                    MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
-                decision = choice switch
-                {
-                    MessageBoxResult.Yes => RelocationOverlapDecision.Overwrite,
-                    MessageBoxResult.No => RelocationOverlapDecision.KeepExisting,
-                    _ => RelocationOverlapDecision.Cancel
-                };
-            }
-
-            if (ViewModel.ApplyRelocation(preview, decision) && ViewModel.TryNavigateToAddress(destination, out var rowIndex))
+            if (_imageEdits.Relocate(SegmentsGrid.SelectedIndex, destination, AskRelocationOverlap) &&
+                ViewModel.TryNavigateToAddress(destination, out var rowIndex))
             {
                 SelectRow(rowIndex);
             }
@@ -586,6 +499,28 @@ public partial class MainWindow : Window
         {
             MessageBox.Show(this, exception.Message, "Invalid relocation", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private RelocationOverlapDecision AskRelocationOverlap(MemoryRelocationPreview preview)
+    {
+        var identicalCount = preview.Overlaps.Count(overlap => overlap.ValuesAreIdentical);
+        var differentCount = preview.Overlaps.Count - identicalCount;
+        var addresses = string.Join(", ", preview.Overlaps.Take(8).Select(overlap => $"0x{overlap.Address:X8}"));
+        if (preview.Overlaps.Count > 8) addresses += $", and {preview.Overlaps.Count - 8:N0} more";
+        var message = $"The destination overlaps {preview.Overlaps.Count:N0} occupied byte(s) " +
+                      $"({identicalCount:N0} identical, {differentCount:N0} different).\n\n" +
+                      $"Affected addresses: {addresses}\n\n" +
+                      "Yes: overwrite destination bytes with the relocated segment\n" +
+                      "No: keep existing destination bytes\n" +
+                      "Cancel: cancel relocation";
+        var choice = MessageBox.Show(this, message, "Overlapping destination data",
+            MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        return choice switch
+        {
+            MessageBoxResult.Yes => RelocationOverlapDecision.Overwrite,
+            MessageBoxResult.No => RelocationOverlapDecision.KeepExisting,
+            _ => RelocationOverlapDecision.Cancel
+        };
     }
 
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)

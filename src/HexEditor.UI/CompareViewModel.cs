@@ -121,7 +121,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
             var state = rawAddress <= uint.MaxValue ? GetState((uint)rawAddress) : CompareByteState.Equal;
             var text = hasValue ? value.ToString("X2") : string.Empty;
             var character = hasValue ? (value is >= 0x20 and <= 0x7E ? (char)value : '.') : ' ';
-            cells[offset] = new CompareByteCell(text, character.ToString(), state, (uint)rawAddress);
+            cells[offset] = new CompareByteCell(text, character.ToString(), state, rawAddress <= uint.MaxValue ? (uint)rawAddress : null);
             hex.Append(hasValue ? text : "  ");
             ascii?.Append(character);
         }
@@ -309,7 +309,7 @@ internal sealed class ComparePanelRows : IList<HexViewRow>
     public void RemoveAt(int index) => throw new NotSupportedException();
 }
 
-public sealed record CompareByteCell(string Hex, string Ascii, CompareByteState State, uint Address);
+public sealed record CompareByteCell(string Hex, string Ascii, CompareByteState State, uint? Address);
 public sealed record ComparePanelRow(IReadOnlyList<CompareByteCell> Cells, string HexData, string? Ascii);
 public sealed record CompareViewRow(string Address, ComparePanelRow FileA, ComparePanelRow FileB, IReadOnlyList<CompareByteState> States, bool IsGapMarker, string? GapDescription);
 
