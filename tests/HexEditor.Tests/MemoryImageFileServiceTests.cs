@@ -161,21 +161,72 @@ public sealed class MemoryImageFileServiceTests
     {
         const string sRecord =
             "S1041234AA0B\n" +
-            "S205123456BBA3\n" +
-            "S306A0000000CC8D\n" +
-            "S5030003F9\n" +
-            "S70500000000FA\n";
+            "S1041235BBF9\n" +
+            "S5030002FA\n" +
+            "S9030000FC\n";
         using var stream = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
 
         var result = new MemoryImageFileService().PrepareImport(stream).Apply(OverlapDecision.OverwriteIncoming)!;
 
         Assert.IsTrue(result.Image.TryGetByte(0x1234, out var s1));
         Assert.AreEqual((byte)0xAA, s1);
-        Assert.IsTrue(result.Image.TryGetByte(0x123456, out var s2));
-        Assert.AreEqual((byte)0xBB, s2);
-        Assert.IsTrue(result.Image.TryGetByte(0xA0000000, out var s3));
-        Assert.AreEqual((byte)0xCC, s3);
-        Assert.AreEqual(3, ((SRecordMetadata)result.FormatMetadata!).DataRecordCount);
+        Assert.IsTrue(result.Image.TryGetByte(0x1235, out var second));
+        Assert.AreEqual((byte)0xBB, second);
+        Assert.AreEqual(2, ((SRecordMetadata)result.FormatMetadata!).DataRecordCount);
+    }
+
+    [TestMethod]
+    [DataRow("S1041234AA0B", '1', 0x1234u)]
+    [DataRow("S205123456AAB4", '2', 0x123456u)]
+    [DataRow("S30612345678AA3B", '3', 0x12345678u)]
+    public void Import_SRecordAcceptsHomogeneousDataAndMatchingTermination(string dataRecord, char type, uint address)
+    {
+        var termination = type switch
+        {
+            '1' => "S9030000FC",
+            '2' => "S804000000FB",
+            '3' => "S70500000000FA",
+            _ => throw new AssertFailedException("Unexpected S-record test type.")
+        };
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes($"{dataRecord}\n{termination}\n"));
+
+        var result = new MemoryImageFileService().PrepareImport(stream).Apply(OverlapDecision.OverwriteIncoming)!;
+
+        Assert.IsTrue(result.Image.TryGetByte(address, out var value));
+        Assert.AreEqual((byte)0xAA, value);
+    }
+
+    [TestMethod]
+    [DataRow("S1041234AA0B", "S205123456AAB4", "S804000000FB")]
+    [DataRow("S1041234AA0B", "S30612345678AA3B", "S70500000000FA")]
+    [DataRow("S205123456AAB4", "S1041234AA0B", "S9030000FC")]
+    [DataRow("S205123456AAB4", "S30612345678AA3B", "S70500000000FA")]
+    [DataRow("S30612345678AA3B", "S1041234AA0B", "S9030000FC")]
+    [DataRow("S30612345678AA3B", "S205123456AAB4", "S804000000FB")]
+    public void Import_SRecordRejectsMixedDataAddressWidthsAtOffendingLine(string firstRecord, string secondRecord, string termination)
+    {
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes($"{firstRecord}\n{secondRecord}\n{termination}\n"));
+
+        var exception = Assert.Throws<MemoryImageImportException>(
+            () => new MemoryImageFileService().PrepareImport(stream));
+
+        Assert.AreEqual(2, exception.LineNumber);
+        StringAssert.Contains(exception.Reason, "address width");
+    }
+
+    [TestMethod]
+    [DataRow("S1041234AA0B", "S804000000FB", "address width")]
+    [DataRow("S205123456AAB4", "S9030000FC", "address width")]
+    [DataRow("S30612345678AA3B", "S804000000FB", "address width")]
+    public void Import_SRecordRejectsTerminationWithMismatchedAddressWidth(string dataRecord, string termination, string reason)
+    {
+        using var stream = new MemoryStream(Encoding.ASCII.GetBytes($"{dataRecord}\n{termination}\n"));
+
+        var exception = Assert.Throws<MemoryImageImportException>(
+            () => new MemoryImageFileService().PrepareImport(stream));
+
+        Assert.AreEqual(2, exception.LineNumber);
+        StringAssert.Contains(exception.Reason, reason);
     }
 
     [TestMethod]

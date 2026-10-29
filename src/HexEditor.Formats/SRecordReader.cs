@@ -23,7 +23,7 @@ internal static class SRecordReader
         var sawHeader = false;
         int? declaredDataRecordCount = null;
         uint? startAddress = null;
-        char? lastDataType = null;
+        char? dataRecordType = null;
         ParsedRecord? headerRecord = null;
 
         while (reader.ReadLine() is { } line)
@@ -54,8 +54,13 @@ internal static class SRecordReader
                         throw Error(lineNumber, "No data records are allowed after the S5 or S6 count record.");
                     }
 
+                    if (dataRecordType is not null && dataRecordType != record.Type)
+                    {
+                        throw Error(lineNumber, $"All data records must use the same S-record type and address width; S{record.Type} does not match S{dataRecordType}.");
+                    }
+
                     dataRecords.Add(record);
-                    lastDataType = record.Type;
+                    dataRecordType = record.Type;
                     break;
                 case '5':
                 case '6':
@@ -74,7 +79,7 @@ internal static class SRecordReader
                 case '7':
                 case '8':
                 case '9':
-                    var expectedTermination = lastDataType switch
+                    var expectedTermination = dataRecordType switch
                     {
                         '1' => '9',
                         '2' => '8',
