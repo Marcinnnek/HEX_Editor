@@ -26,6 +26,86 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void Import_ReportsProgressAndCanBeCancelledWithoutProducingAPreview()
+    {
+        using var source = new MemoryStream();
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, new byte[4096])]);
+        new MemoryImageFileService().Export(image, MemoryImageExportFormat.IntelHex, 8, source);
+        source.Position = 0;
+        using var cancellation = new CancellationTokenSource();
+        var progress = new CancellingProgress(cancellation, "Parsing records");
+
+        Assert.Throws<OperationCanceledException>(() =>
+            new MemoryImageFileService().PrepareImport(source, cancellationToken: cancellation.Token, progress: progress));
+        Assert.IsGreaterThan(0, progress.Reports);
+    }
+
+    [TestMethod]
+    public void SaveAtomically_CancellationPreservesExistingDestinationAndRemovesTemporaryFile()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "firmware.hex");
+        File.WriteAllText(path, "keep existing data");
+        using var cancellation = new CancellationTokenSource();
+        var progress = new CancellingProgress(cancellation, "Writing records");
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, new byte[4096])]);
+        try
+        {
+            Assert.Throws<OperationCanceledException>(() =>
+                new MemoryImageFileService().SaveAtomically(image, path, MemoryImageExportFormat.IntelHex, 8,
+                    overwriteExisting: true, cancellationToken: cancellation.Token, progress: progress));
+
+            Assert.AreEqual("keep existing data", File.ReadAllText(path));
+            CollectionAssert.AreEqual(new[] { "firmware.hex" }, Directory.GetFiles(directory).Select(Path.GetFileName).ToArray());
+            Assert.IsGreaterThan(0, progress.Reports);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [TestMethod]
+    public void ExportAtomically_CancellationDoesNotLeaveAPartialDestination()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, "export.hex");
+        using var cancellation = new CancellationTokenSource();
+        var progress = new CancellingProgress(cancellation, "Writing records");
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, new byte[4096])]);
+        try
+        {
+            Assert.Throws<OperationCanceledException>(() =>
+                new MemoryImageFileService().ExportAtomically(path, overwriteExisting: false,
+                    (output, token, operationProgress) => new MemoryImageFileService().Export(image,
+                        MemoryImageExportFormat.SRecord, 8, output, cancellationToken: token, progress: operationProgress),
+                    cancellation.Token, progress));
+
+            Assert.IsFalse(File.Exists(path));
+            Assert.IsEmpty(Directory.GetFiles(directory));
+            Assert.IsGreaterThan(0, progress.Reports);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private sealed class CancellingProgress(CancellationTokenSource cancellation, string stage) : IProgress<MemoryImageFileProgress>
+    {
+        public int Reports { get; private set; }
+
+        public void Report(MemoryImageFileProgress value)
+        {
+            if (value.Stage != stage) return;
+            Reports++;
+            cancellation.Cancel();
+        }
+    }
+
+    [TestMethod]
     public void SRecordHeader_IsPreservedInMetadataAndRoundTripsWithMemoryBytes()
     {
         const string sRecord = "S0061234484558CE\nS1051234AABB4F\nS5030001FB\nS9030000FC\n";
@@ -33,7 +113,8 @@ public sealed class MemoryImageFileServiceTests
         using var source = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
 
         var imported = service.PrepareImport(source).Apply(OverlapDecision.OverwriteIncoming)!;
-        var metadata = (SRecordMetadata)imported.FormatMetadata!;
+        var formatMetadata = imported.FormatMetadata!;
+        var metadata = formatMetadata.SRecord!;
         Assert.AreEqual((ushort)0x1234, metadata.HeaderAddress);
         CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, metadata.HeaderData!.ToArray());
         Assert.AreEqual(1, metadata.DataRecordCount);
@@ -43,7 +124,7 @@ public sealed class MemoryImageFileServiceTests
         Assert.AreEqual((byte)0xBB, second);
 
         using var exported = new MemoryStream();
-        service.Export(imported.Image, MemoryImageExportFormat.SRecord, 8, exported, metadata);
+        service.Export(imported.Image, MemoryImageExportFormat.SRecord, 8, exported, formatMetadata);
         var serialized = Encoding.ASCII.GetString(exported.ToArray());
         var records = serialized.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
         Assert.AreEqual("S0061234484558CE", records[0]);
@@ -53,7 +134,7 @@ public sealed class MemoryImageFileServiceTests
         var path = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}.s19");
         try
         {
-            service.SaveAtomically(imported.Image, path, MemoryImageExportFormat.SRecord, 8, overwriteExisting: false, formatMetadata: metadata);
+            service.SaveAtomically(imported.Image, path, MemoryImageExportFormat.SRecord, 8, overwriteExisting: false, formatMetadata: formatMetadata);
             var savedRecords = File.ReadAllLines(path);
             Assert.AreEqual("S0061234484558CE", savedRecords[0]);
         }
@@ -63,7 +144,7 @@ public sealed class MemoryImageFileServiceTests
         }
 
         var roundTripped = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!;
-        var roundTripMetadata = (SRecordMetadata)roundTripped.FormatMetadata!;
+        var roundTripMetadata = roundTripped.FormatMetadata!.SRecord!;
         Assert.AreEqual((ushort)0x1234, roundTripMetadata.HeaderAddress);
         CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, roundTripMetadata.HeaderData!.ToArray());
         Assert.AreEqual(1, roundTripMetadata.DataRecordCount);
@@ -172,7 +253,7 @@ public sealed class MemoryImageFileServiceTests
         Assert.AreEqual((byte)0xAA, s1);
         Assert.IsTrue(result.Image.TryGetByte(0x1235, out var second));
         Assert.AreEqual((byte)0xBB, second);
-        Assert.AreEqual(2, ((SRecordMetadata)result.FormatMetadata!).DataRecordCount);
+        Assert.AreEqual(2, result.FormatMetadata!.SRecord!.DataRecordCount);
     }
 
     [TestMethod]
@@ -239,7 +320,7 @@ public sealed class MemoryImageFileServiceTests
 
         Assert.AreEqual("Intel HEX", result.InputFormat);
         Assert.AreEqual("fixture.hex", result.SourcePath);
-        Assert.AreEqual(0x1234u, ((IntelHexMetadata)result.FormatMetadata!).StartLinearAddress);
+        Assert.AreEqual(0x1234u, result.FormatMetadata!.IntelHex!.StartLinearAddress);
         Assert.HasCount(2, result.Image.Segments);
         Assert.AreEqual(0xA0000000u, result.Image.Segments[0].StartAddress);
         CollectionAssert.AreEqual(new byte[] { 0x41, 0x42, 0x43 }, result.Image.Segments[0].Data.ToArray());
@@ -355,21 +436,21 @@ public sealed class MemoryImageFileServiceTests
         service.Export(intel.Image, MemoryImageExportFormat.IntelHex, 16, intelExport, intel.FormatMetadata);
         intelExport.Position = 0;
         var intelAgain = service.PrepareImport(intelExport).Apply(OverlapDecision.KeepExisting)!;
-        Assert.AreEqual(0x1234u, ((IntelHexMetadata)intelAgain.FormatMetadata!).StartLinearAddress);
+        Assert.AreEqual(0x1234u, intelAgain.FormatMetadata!.IntelHex!.StartLinearAddress);
         AssertImagesEqual(intel.Image, intelAgain.Image);
 
         using var srecExport = new MemoryStream();
         service.Export(intel.Image, MemoryImageExportFormat.SRecord, 16, srecExport, intel.FormatMetadata);
         srecExport.Position = 0;
         var srecAgain = service.PrepareImport(srecExport).Apply(OverlapDecision.KeepExisting)!;
-        Assert.AreEqual(0x1234u, ((SRecordMetadata)srecAgain.FormatMetadata!).StartAddress);
+        Assert.AreEqual(0x1234u, srecAgain.FormatMetadata!.SRecord!.StartAddress);
         AssertImagesEqual(intel.Image, srecAgain.Image);
 
         using var backToIntel = new MemoryStream();
         service.Export(srecAgain.Image, MemoryImageExportFormat.IntelHex, 16, backToIntel, srecAgain.FormatMetadata);
         backToIntel.Position = 0;
         var switchedAgain = service.PrepareImport(backToIntel).Apply(OverlapDecision.KeepExisting)!;
-        Assert.AreEqual(0x1234u, ((IntelHexMetadata)switchedAgain.FormatMetadata!).StartLinearAddress);
+        Assert.AreEqual(0x1234u, switchedAgain.FormatMetadata!.IntelHex!.StartLinearAddress);
         AssertImagesEqual(intel.Image, switchedAgain.Image);
     }
 

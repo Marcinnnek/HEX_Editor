@@ -6,7 +6,8 @@ namespace HexEditor.Formats;
 
 internal static class SRecordWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output, SRecordMetadata metadata)
+    public static void Write(MemoryImage image, int maxPayload, Stream output, SRecordMetadata metadata,
+        CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(metadata);
         var headerData = metadata.HeaderData ?? [];
@@ -28,10 +29,13 @@ internal static class SRecordWriter
         }
 
         var dataRecordCount = 0;
+        long writtenBytes = 0;
+        var totalBytes = image.Segments.Sum(segment => (long)segment.ByteCount);
         foreach (var segment in image.Segments)
         {
             for (var offset = 0; offset < segment.ByteCount;)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var count = Math.Min(maxPayload, segment.ByteCount - offset);
                 WriteRecord(
                     writer,
@@ -41,9 +45,12 @@ internal static class SRecordWriter
                     segment.Data.Span.Slice(offset, count));
                 dataRecordCount++;
                 offset += count;
+                writtenBytes += count;
+                progress?.Report(new MemoryImageFileProgress("Writing records", writtenBytes, totalBytes));
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (dataRecordCount <= 0xFFFFFF)
         {
             var countAddressBytes = dataRecordCount <= ushort.MaxValue ? 2 : 3;

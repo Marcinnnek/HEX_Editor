@@ -20,7 +20,7 @@ public sealed class MemoryImageImportPreview
         IEnumerable<MemorySegment> records,
         MemoryImageExportFormat detectedFormat,
         string? sourcePath,
-        object? metadata)
+        MemoryImageFormatMetadata? metadata)
     {
         _existingImage = existingImage;
         _records = Array.AsReadOnly(records.ToArray());
@@ -33,7 +33,7 @@ public sealed class MemoryImageImportPreview
     public MemoryImageExportFormat DetectedFormat { get; }
     public string InputFormat => DetectedFormat.GetDisplayName();
     public string? SourcePath { get; }
-    public object? FormatMetadata { get; }
+    public MemoryImageFormatMetadata? FormatMetadata { get; }
     public OverlapSummary OverlapSummary { get; }
 
     public MemoryImageImportResult? Apply(OverlapDecision decision)

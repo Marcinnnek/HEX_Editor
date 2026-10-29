@@ -460,18 +460,18 @@ public sealed class HexImageViewModelTests
         try
         {
             model.SaveAs(srecPath, MemoryImageExportFormat.SRecord, overwriteExisting: false);
-            Assert.AreEqual(0x1234u, ((SRecordMetadata)model.SourceFormatMetadata!).StartAddress);
+            Assert.AreEqual(0x1234u, model.SourceFormatMetadata!.SRecord!.StartAddress);
             using var srec = File.OpenRead(srecPath);
             var importedSrec = service.PrepareImport(srec).Apply(OverlapDecision.OverwriteIncoming)!;
-            Assert.AreEqual(0x1234u, ((SRecordMetadata)importedSrec.FormatMetadata!).StartAddress);
-            Assert.AreEqual((ushort)0x1234, ((SRecordMetadata)importedSrec.FormatMetadata!).HeaderAddress);
-            CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, ((SRecordMetadata)importedSrec.FormatMetadata!).HeaderData!);
+            Assert.AreEqual(0x1234u, importedSrec.FormatMetadata!.SRecord!.StartAddress);
+            Assert.AreEqual((ushort)0x1234, importedSrec.FormatMetadata.SRecord.HeaderAddress);
+            CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, importedSrec.FormatMetadata.SRecord.HeaderData!);
 
             model.SaveAs(intelPath, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
-            Assert.AreEqual(0x1234u, ((IntelHexMetadata)model.SourceFormatMetadata!).StartLinearAddress);
+            Assert.AreEqual(0x1234u, model.SourceFormatMetadata!.IntelHex!.StartLinearAddress);
             using var intel = File.OpenRead(intelPath);
             var importedIntel = service.PrepareImport(intel).Apply(OverlapDecision.OverwriteIncoming)!;
-            Assert.AreEqual(0x1234u, ((IntelHexMetadata)importedIntel.FormatMetadata!).StartLinearAddress);
+            Assert.AreEqual(0x1234u, importedIntel.FormatMetadata!.IntelHex!.StartLinearAddress);
             Assert.IsFalse(model.IsModified);
         }
         finally

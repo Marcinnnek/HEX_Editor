@@ -6,7 +6,8 @@ namespace HexEditor.Formats;
 
 internal static class IntelHexReader
 {
-    public static (IReadOnlyList<MemorySegment> Records, IntelHexMetadata Metadata) Read(Stream input)
+    public static (IReadOnlyList<MemorySegment> Records, IntelHexMetadata Metadata) Read(
+        Stream input, CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (!input.CanRead)
@@ -31,7 +32,9 @@ internal static class IntelHexReader
 
         while (reader.ReadLine() is { } line)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lineNumber++;
+            progress?.Report(new MemoryImageFileProgress("Parsing records", lineNumber));
 
             if (sawEndOfFile)
             {

@@ -6,16 +6,20 @@ namespace HexEditor.Formats;
 
 internal static class IntelHexWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output, IntelHexMetadata? metadata)
+    public static void Write(MemoryImage image, int maxPayload, Stream output, IntelHexMetadata? metadata,
+        CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
     {
         using var writer = new StreamWriter(output, Encoding.ASCII, 1024, leaveOpen: true);
         uint? currentUpperAddress = null;
+        long writtenBytes = 0;
+        var totalBytes = image.Segments.Sum(segment => (long)segment.ByteCount);
 
         foreach (var segment in image.Segments)
         {
             var offset = 0;
             while (offset < segment.ByteCount)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var address = (ulong)segment.StartAddress + (uint)offset;
                 var upperAddress = (ushort)(address >> 16);
                 if (currentUpperAddress != upperAddress)
@@ -34,6 +38,8 @@ internal static class IntelHexWriter
                 var count = Math.Min(maxPayload, Math.Min(bytesBeforeBoundary, segment.ByteCount - offset));
                 WriteRecord(writer, lowAddress, 0x00, segment.Data.Span.Slice(offset, count));
                 offset += count;
+                writtenBytes += count;
+                progress?.Report(new MemoryImageFileProgress("Writing records", writtenBytes, totalBytes));
             }
         }
 
@@ -49,6 +55,7 @@ internal static class IntelHexWriter
             WriteRecord(writer, 0, 0x05, startLinear);
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         WriteRecord(writer, 0, 0x01, ReadOnlySpan<byte>.Empty);
     }
 

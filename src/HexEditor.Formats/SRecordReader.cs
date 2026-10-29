@@ -8,7 +8,8 @@ internal static class SRecordReader
 {
     private sealed record ParsedRecord(char Type, uint Address, byte[] Data, int LineNumber);
 
-    public static (IReadOnlyList<MemorySegment> Records, SRecordMetadata Metadata) Read(Stream input)
+    public static (IReadOnlyList<MemorySegment> Records, SRecordMetadata Metadata) Read(
+        Stream input, CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (!input.CanRead)
@@ -28,7 +29,9 @@ internal static class SRecordReader
 
         while (reader.ReadLine() is { } line)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             lineNumber++;
+            progress?.Report(new MemoryImageFileProgress("Parsing records", lineNumber));
             if (sawTermination)
             {
                 throw Error(lineNumber, "No records are allowed after the termination record.");
