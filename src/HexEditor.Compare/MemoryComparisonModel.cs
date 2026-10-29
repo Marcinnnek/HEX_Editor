@@ -58,6 +58,12 @@ public sealed class MemoryComparisonModel
 
     public bool TryNavigateToAddress(uint address, out int rowIndex)
     {
+        if (!IsInSelectedAddressRange(address))
+        {
+            rowIndex = -1;
+            return false;
+        }
+
         _navigationAddress = address;
         RebuildRows();
         return _rows.TryGetRowIndex(address, out rowIndex) && !_rows[rowIndex].IsGapMarker;

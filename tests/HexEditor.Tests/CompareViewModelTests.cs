@@ -183,6 +183,24 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void AddressRangeMode_NavigationRejectsAddressesBeyondInclusiveRangeEvenWithinVisibleRow()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7])]),
+            MemoryImage.Empty,
+            bytesPerRow: 8);
+
+        comparison.SetAddressRange(0x1000, 0x1005);
+        comparison.ViewMode = CompareViewMode.AddressRange;
+
+        Assert.IsTrue(comparison.TryNavigateToAddress(0x1000, out var lowerBoundaryRow));
+        Assert.AreEqual(0, lowerBoundaryRow);
+        Assert.IsTrue(comparison.TryNavigateToAddress(0x1005, out var upperBoundaryRow));
+        Assert.AreEqual(0, upperBoundaryRow);
+        Assert.IsFalse(comparison.TryNavigateToAddress(0x1007, out _));
+    }
+
+    [TestMethod]
     public void DifferenceNavigation_InAddressRangeDoesNotReturnOutsideDifferences()
     {
         var comparison = new CompareViewModel(
