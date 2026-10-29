@@ -94,7 +94,7 @@ public partial class MainWindow : Window
     private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 16;
     private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 32;
 
-    private void CompareImages_Click(object sender, RoutedEventArgs e)
+    private async void CompareImages_Click(object sender, RoutedEventArgs e)
     {
         var dialog = FirmwareImageDialog.CreateOpen("Select the first firmware image");
         if (dialog.ShowDialog(this) != true) return;
@@ -105,8 +105,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var imageA = _comparisonImageLoader.Load(pathA);
-            var imageB = _comparisonImageLoader.Load(pathB);
+            var (imageA, imageB) = await LoadComparisonImagesAsync(pathA, pathB);
             var nameA = System.IO.Path.GetFileName(pathA);
             var nameB = System.IO.Path.GetFileName(pathB);
             var view = new CompareView(new CompareWorkspaceTabViewModel(
@@ -116,13 +115,14 @@ public partial class MainWindow : Window
             WorkspaceTabs.Items.Add(tab);
             WorkspaceTabs.SelectedItem = tab;
         }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Compare"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
         {
             MessageBox.Show(this, exception.Message, "Unable to compare files", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    private void MergeImages_Click(object sender, RoutedEventArgs e)
+    private async void MergeImages_Click(object sender, RoutedEventArgs e)
     {
         var destinationDialog = FirmwareImageDialog.CreateOpen("Select the destination image");
         if (destinationDialog.ShowDialog(this) != true) return;
@@ -133,8 +133,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var imageA = _comparisonImageLoader.Load(destinationDialog.FileName);
-            var imageB = _comparisonImageLoader.Load(sourceDialog.FileName);
+            var (imageA, imageB) = await LoadComparisonImagesAsync(destinationDialog.FileName, sourceDialog.FileName);
             var dialog = new MergeWindow(imageA.Image, imageB.Image,
                 System.IO.Path.GetFileName(destinationDialog.FileName),
                 System.IO.Path.GetFileName(sourceDialog.FileName)) { Owner = this };
@@ -144,11 +143,25 @@ public partial class MainWindow : Window
             if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides, ConfirmCloseImage)) return;
             Title = ViewModel.WindowTitle;
         }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
         {
             MessageBox.Show(this, exception.Message, "Unable to merge images", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    private Task<(LoadedMemoryImage First, LoadedMemoryImage Second)> LoadComparisonImagesAsync(string firstPath, string secondPath) =>
+        RunFileOperationAsync(async (token, progress) =>
+        {
+            var first = await _comparisonImageLoader.LoadAsync(firstPath, token, AddProgressStage(progress, "Image 1 of 2"));
+            var second = await _comparisonImageLoader.LoadAsync(secondPath, token, AddProgressStage(progress, "Image 2 of 2"));
+            return (first, second);
+        });
+
+    private static IProgress<MemoryImageFileProgress> AddProgressStage(
+        IProgress<MemoryImageFileProgress> progress, string stage) =>
+        new Progress<MemoryImageFileProgress>(update =>
+            progress.Report(update with { Stage = $"{stage}: {update.Stage}" }));
 
     private void ViewModel_ImageChanged(HexEditor.Core.MemoryImage previousImage, HexEditor.Core.MemoryImage updatedImage)
     {
@@ -205,26 +218,11 @@ public partial class MainWindow : Window
 
     private async Task<bool> TrySaveAsAsync()
     {
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = "Save memory image as",
-            Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
-            FilterIndex = ViewModel.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
-            AddExtension = true,
-            OverwritePrompt = false
-        };
-        if (dialog.ShowDialog(this) != true) return false;
-        var format = dialog.FilterIndex == 2 ? MemoryImageExportFormat.SRecord : MemoryImageExportFormat.IntelHex;
-        var overwrite = false;
-        if (File.Exists(dialog.FileName))
-        {
-            var answer = MessageBox.Show(this, $"Replace the existing file?\n\n{dialog.FileName}", "Confirm overwrite", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (answer != MessageBoxResult.Yes) return false;
-            overwrite = true;
-        }
+        if (!TryGetSaveAsSelection(out var selection)) return false;
         try
         {
-            await RunFileOperationAsync((token, progress) => _files.SaveAsAsync(dialog.FileName, format, overwrite, token, progress));
+            await RunFileOperationAsync((token, progress) => _files.SaveAsAsync(selection.Path, selection.Format, selection.Overwrite,
+                token, progress));
             Title = ViewModel.WindowTitle;
             return true;
         }
@@ -238,26 +236,10 @@ public partial class MainWindow : Window
 
     private bool TrySaveAs()
     {
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = "Save memory image as",
-            Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
-            FilterIndex = ViewModel.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
-            AddExtension = true,
-            OverwritePrompt = false
-        };
-        if (dialog.ShowDialog(this) != true) return false;
-        var format = dialog.FilterIndex == 2 ? MemoryImageExportFormat.SRecord : MemoryImageExportFormat.IntelHex;
-        var overwrite = false;
-        if (File.Exists(dialog.FileName))
-        {
-            var answer = MessageBox.Show(this, $"Replace the existing file?\n\n{dialog.FileName}", "Confirm overwrite", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            if (answer != MessageBoxResult.Yes) return false;
-            overwrite = true;
-        }
+        if (!TryGetSaveAsSelection(out var selection)) return false;
         try
         {
-            _files.SaveAs(dialog.FileName, format, overwrite);
+            _files.SaveAs(selection.Path, selection.Format, selection.Overwrite);
             Title = ViewModel.WindowTitle;
             return true;
         }
@@ -267,6 +249,34 @@ public partial class MainWindow : Window
             return false;
         }
     }
+
+    private bool TryGetSaveAsSelection(out SaveAsSelection selection)
+    {
+        selection = default;
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Save memory image as",
+            Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
+            FilterIndex = ViewModel.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
+            AddExtension = true,
+            OverwritePrompt = false
+        };
+        if (dialog.ShowDialog(this) != true) return false;
+
+        var overwrite = false;
+        if (File.Exists(dialog.FileName))
+        {
+            var answer = MessageBox.Show(this, $"Replace the existing file?\n\n{dialog.FileName}", "Confirm overwrite", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            if (answer != MessageBoxResult.Yes) return false;
+            overwrite = true;
+        }
+
+        selection = new SaveAsSelection(dialog.FileName,
+            dialog.FilterIndex == 2 ? MemoryImageExportFormat.SRecord : MemoryImageExportFormat.IntelHex, overwrite);
+        return true;
+    }
+
+    private readonly record struct SaveAsSelection(string Path, MemoryImageExportFormat Format, bool Overwrite);
 
     private void CloseImage_Click(object sender, RoutedEventArgs e)
     {
