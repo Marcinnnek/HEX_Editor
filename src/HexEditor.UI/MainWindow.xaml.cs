@@ -43,12 +43,7 @@ public partial class MainWindow : Window
 
     private void CompareImages_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Select the first firmware image",
-            Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot|All files (*.*)|*.*",
-            CheckFileExists = true
-        };
+        var dialog = FirmwareImageDialog.CreateOpen("Select the first firmware image");
         if (dialog.ShowDialog(this) != true) return;
         var pathA = dialog.FileName;
         dialog.Title = "Select the second firmware image";
@@ -72,20 +67,11 @@ public partial class MainWindow : Window
 
     private void MergeImages_Click(object sender, RoutedEventArgs e)
     {
-        var destinationDialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Select the destination image",
-            Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot|All files (*.*)|*.*",
-            CheckFileExists = true
-        };
+        var destinationDialog = FirmwareImageDialog.CreateOpen("Select the destination image");
         if (destinationDialog.ShowDialog(this) != true) return;
-        var sourceDialog = new Microsoft.Win32.OpenFileDialog
-        {
-            Title = "Select the source image to merge",
-            Filter = destinationDialog.Filter,
-            CheckFileExists = true,
-            InitialDirectory = System.IO.Path.GetDirectoryName(destinationDialog.FileName)
-        };
+        var sourceDialog = FirmwareImageDialog.CreateOpen(
+            "Select the source image to merge",
+            System.IO.Path.GetDirectoryName(destinationDialog.FileName));
         if (sourceDialog.ShowDialog(this) != true) return;
 
         try
