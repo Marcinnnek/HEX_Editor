@@ -184,4 +184,59 @@ public sealed class MemoryImageFileServiceTests
         Assert.AreEqual(2, exception.LineNumber);
         StringAssert.Contains(exception.Reason, "32-bit address range");
     }
+
+    [TestMethod]
+    public void Export_RoundTripsSparseImagesForBothFormatsAndEveryPayloadSize()
+    {
+        var source = MemoryImage.FromSegments(
+        [
+            new MemorySegment(0x0000FFFC, Enumerable.Range(0, 70).Select(value => (byte)value).ToArray()),
+            new MemorySegment(0xA0000000, [0x11, 0x22, 0x33]),
+            new MemorySegment(0xFFFFFFFF, [0x5A])
+        ]);
+        var service = new MemoryImageFileService();
+
+        foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+        {
+            foreach (var payloadSize in new[] { 8, 16, 32 })
+            {
+                using var exported = new MemoryStream();
+                service.Export(source, format, payloadSize, exported);
+                var serialized = Encoding.ASCII.GetString(exported.ToArray());
+                var dataPayloads = serialized.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(line => GetDataRecordPayloadLength(line, format))
+                    .Where(length => length is not null)
+                    .Select(length => length!.Value)
+                    .ToArray();
+                Assert.IsTrue(dataPayloads.All(length => length <= payloadSize), $"{format}, {payloadSize} bytes");
+                Assert.IsTrue(dataPayloads.Contains(payloadSize), $"{format}, {payloadSize} bytes");
+                exported.Position = 0;
+
+                var imported = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+                Assert.HasCount(source.Segments.Count, imported.Segments);
+                for (var index = 0; index < source.Segments.Count; index++)
+                {
+                    Assert.AreEqual(source.Segments[index].StartAddress, imported.Segments[index].StartAddress);
+                    CollectionAssert.AreEqual(
+                        source.Segments[index].Data.ToArray(),
+                        imported.Segments[index].Data.ToArray(),
+                        $"{format}, {payloadSize} bytes");
+                }
+
+                Assert.IsFalse(imported.TryGetByte(0x00010042, out _));
+                Assert.IsFalse(imported.TryGetByte(0xA0000003, out _));
+            }
+        }
+    }
+
+    private static int? GetDataRecordPayloadLength(string line, MemoryImageExportFormat format)
+    {
+        if (format == MemoryImageExportFormat.IntelHex)
+        {
+            return line[7..9] == "00" ? Convert.ToByte(line[1..3], 16) : null;
+        }
+
+        var addressBytes = line[1] switch { '1' => 2, '2' => 3, '3' => 4, _ => 0 };
+        return addressBytes == 0 ? null : Convert.ToByte(line[2..4], 16) - addressBytes - 1;
+    }
 }

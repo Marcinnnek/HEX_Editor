@@ -2,6 +2,43 @@ namespace HexEditor.Formats;
 
 public sealed class MemoryImageFileService
 {
+    public void Export(
+        HexEditor.Core.MemoryImage image,
+        MemoryImageExportFormat format,
+        int maxDataBytesPerRecord,
+        Stream output)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        ArgumentNullException.ThrowIfNull(output);
+        if (!output.CanWrite)
+        {
+            throw new ArgumentException("The output stream must be writable.", nameof(output));
+        }
+
+        if (!Enum.IsDefined(format))
+        {
+            throw new ArgumentOutOfRangeException(nameof(format), format, "Choose Intel HEX or Motorola S-Record output.");
+        }
+
+        if (maxDataBytesPerRecord is not (8 or 16 or 32))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxDataBytesPerRecord),
+                maxDataBytesPerRecord,
+                "The maximum record payload must be 8, 16, or 32 bytes.");
+        }
+
+        switch (format)
+        {
+            case MemoryImageExportFormat.IntelHex:
+                IntelHexWriter.Write(image, maxDataBytesPerRecord, output);
+                break;
+            case MemoryImageExportFormat.SRecord:
+                SRecordWriter.Write(image, maxDataBytesPerRecord, output);
+                break;
+        }
+    }
+
     public MemoryImageImportPreview PrepareImport(
         Stream input,
         HexEditor.Core.MemoryImage? existingImage = null,
