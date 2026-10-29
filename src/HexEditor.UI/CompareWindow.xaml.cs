@@ -9,10 +9,14 @@ namespace HexEditor.UI;
 public partial class CompareWindow : Window
 {
     private bool _syncingScroll;
+    private MemoryImage _fileA;
+    private MemoryImage _fileB;
 
     public CompareWindow(MemoryImage fileA, MemoryImage fileB, string nameA = "File A", string nameB = "File B")
     {
         InitializeComponent();
+        _fileA = fileA;
+        _fileB = fileB;
         ViewModel = new CompareViewModel(fileA, fileB);
         RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
@@ -23,6 +27,16 @@ public partial class CompareWindow : Window
     public CompareViewModel ViewModel { get; }
     public int[] RowWidths { get; }
     public CompareViewMode[] ViewModes { get; }
+
+    public void RefreshImage(MemoryImage previousImage, MemoryImage updatedImage)
+    {
+        var updateA = ReferenceEquals(_fileA, previousImage);
+        var updateB = ReferenceEquals(_fileB, previousImage);
+        if (!updateA && !updateB) return;
+        if (updateA) _fileA = updatedImage;
+        if (updateB) _fileB = updatedImage;
+        ViewModel.Refresh(_fileA, _fileB);
+    }
 
     private void Ascii_Changed(object sender, RoutedEventArgs e)
     {

@@ -18,10 +18,13 @@ namespace HexEditor.UI;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly List<CompareWindow> _comparisonWindows = [];
+
     public MainWindow()
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
+        ViewModel.ImageChanged += ViewModel_ImageChanged;
         DataContext = this;
         Closing += MainWindow_Closing;
     }
@@ -44,9 +47,12 @@ public partial class MainWindow : Window
 
         try
         {
-            var fileA = LoadImage(pathA);
-            var fileB = LoadImage(pathB);
-            new CompareWindow(fileA, fileB, System.IO.Path.GetFileName(pathA), System.IO.Path.GetFileName(pathB)) { Owner = this }.Show();
+            var imageA = LoadImageForMerge(pathA);
+            var imageB = LoadImageForMerge(pathB);
+            var window = new CompareWindow(imageA.Image, imageB.Image, System.IO.Path.GetFileName(pathA), System.IO.Path.GetFileName(pathB)) { Owner = this };
+            _comparisonWindows.Add(window);
+            window.Closed += (_, _) => _comparisonWindows.Remove(window);
+            window.Show();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
         {
@@ -54,13 +60,72 @@ public partial class MainWindow : Window
         }
     }
 
-    private static HexEditor.Core.MemoryImage LoadImage(string path)
+    private LoadedMemoryImage LoadImageForMerge(string path)
     {
+        if (PathsEqual(ViewModel.SourcePath, path))
+            return new LoadedMemoryImage(ViewModel.CurrentImage, ViewModel.SourcePath!, ViewModel.SourceFormat);
+
         var service = new MemoryImageFileService();
         using var stream = File.OpenRead(path);
         var preview = service.PrepareImport(stream, HexEditor.Core.MemoryImage.Empty, path);
-        return preview.Apply(OverlapDecision.OverwriteIncoming)?.Image ?? HexEditor.Core.MemoryImage.Empty;
+        var imported = preview.Apply(OverlapDecision.OverwriteIncoming) ?? throw new InvalidOperationException("The selected image could not be imported.");
+        var format = imported.InputFormat == "Intel HEX" ? MemoryImageExportFormat.IntelHex : MemoryImageExportFormat.SRecord;
+        return new LoadedMemoryImage(imported.Image, path, format);
     }
+
+    private void MergeImages_Click(object sender, RoutedEventArgs e)
+    {
+        var destinationDialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Select the destination image",
+            Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot|All files (*.*)|*.*",
+            CheckFileExists = true
+        };
+        if (destinationDialog.ShowDialog(this) != true) return;
+        var sourceDialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Select the source image to merge",
+            Filter = destinationDialog.Filter,
+            CheckFileExists = true,
+            InitialDirectory = System.IO.Path.GetDirectoryName(destinationDialog.FileName)
+        };
+        if (sourceDialog.ShowDialog(this) != true) return;
+
+        try
+        {
+            var imageA = LoadImageForMerge(destinationDialog.FileName);
+            var imageB = LoadImageForMerge(sourceDialog.FileName);
+            var dialog = new MergeWindow(imageA.Image, imageB.Image,
+                System.IO.Path.GetFileName(destinationDialog.FileName),
+                System.IO.Path.GetFileName(sourceDialog.FileName)) { Owner = this };
+            if (dialog.ShowDialog() != true) return;
+
+            var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
+            if (!ReferenceEquals(ViewModel.CurrentImage, destination.Image))
+            {
+                if (!ConfirmCloseImage()) return;
+                ViewModel.LoadImage(destination.Image, destination.Path, destination.Format);
+            }
+
+            ViewModel.ApplyMerge(dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides);
+            Title = ViewModel.WindowTitle;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to merge images", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void ViewModel_ImageChanged(HexEditor.Core.MemoryImage previousImage, HexEditor.Core.MemoryImage updatedImage)
+    {
+        foreach (var comparison in _comparisonWindows.ToArray())
+            comparison.RefreshImage(previousImage, updatedImage);
+    }
+
+    private static bool PathsEqual(string? first, string second) =>
+        !string.IsNullOrWhiteSpace(first) && string.Equals(System.IO.Path.GetFullPath(first), System.IO.Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
+
+    private sealed record LoadedMemoryImage(HexEditor.Core.MemoryImage Image, string? Path, MemoryImageExportFormat? Format);
 
     private void OpenImage_Click(object sender, RoutedEventArgs e)
     {
