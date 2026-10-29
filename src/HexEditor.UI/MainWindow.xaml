@@ -10,6 +10,7 @@
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <WrapPanel Margin="0,0,0,6" VerticalAlignment="Center">
                 <Button Content="Open HEX / S-Record" Padding="10,5" Click="OpenImage_Click" Margin="0,0,6,0" />
+                <Button Content="Compare images" Padding="10,5" Click="CompareImages_Click" Margin="0,0,6,0" />
                 <Button Content="Save" Padding="10,5" Click="Save_Click" Margin="0,0,6,0" />
                 <Button Content="Save As" Padding="10,5" Click="SaveAs_Click" Margin="0,0,6,0" />
                 <Button Content="Close Image" Padding="10,5" Click="CloseImage_Click" Margin="0,0,6,0" />
