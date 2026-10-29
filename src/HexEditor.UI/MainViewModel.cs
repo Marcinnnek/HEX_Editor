@@ -453,30 +453,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return MemoryImage.FromSegments(segments);
     }
 
-    private static MemoryImage BuildImage(IEnumerable<KeyValuePair<uint, byte>> values)
-    {
-        var ordered = values.OrderBy(pair => pair.Key).ToArray();
-        if (ordered.Length == 0) return MemoryImage.Empty;
-        var segments = new List<MemorySegment>();
-        var start = ordered[0].Key;
-        var prior = start;
-        var data = new List<byte> { ordered[0].Value };
-        for (var i = 1; i < ordered.Length; i++)
-        {
-            var pair = ordered[i];
-            if ((ulong)prior + 1 == pair.Key) data.Add(pair.Value);
-            else
-            {
-                segments.Add(new MemorySegment(start, data.ToArray()));
-                start = pair.Key;
-                data = [pair.Value];
-            }
-            prior = pair.Key;
-        }
-        segments.Add(new MemorySegment(start, data.ToArray()));
-        return MemoryImage.FromSegments(segments);
-    }
-
     private static bool ImagesEqual(MemoryImage left, MemoryImage right)
     {
         if (left.Segments.Count != right.Segments.Count) return false;
