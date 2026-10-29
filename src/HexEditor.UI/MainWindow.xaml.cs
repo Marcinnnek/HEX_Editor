@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Globalization;
+using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.Tools;
 
@@ -468,6 +469,69 @@ public partial class MainWindow : Window
         }
 
         return uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
+    }
+
+    private void RelocateSegment_Click(object sender, RoutedEventArgs e)
+    {
+        if (SegmentsGrid.SelectedIndex < 0)
+        {
+            MessageBox.Show(this, "Select an occupied segment to relocate.", "No segment selected",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var text = AddressInput.Text.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[2..];
+        }
+
+        if (!uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var destination))
+        {
+            MessageBox.Show(this, "Enter the destination base as an absolute 32-bit hexadecimal address in the Address field.",
+                "Invalid destination", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var preview = ViewModel.PrepareRelocation(SegmentsGrid.SelectedIndex, destination);
+            var decision = RelocationOverlapDecision.Overwrite;
+            if (preview.Overlaps.Count > 0)
+            {
+                var identicalCount = preview.Overlaps.Count(overlap => overlap.ValuesAreIdentical);
+                var differentCount = preview.Overlaps.Count - identicalCount;
+                var addresses = string.Join(", ", preview.Overlaps.Take(8).Select(overlap => $"0x{overlap.Address:X8}"));
+                if (preview.Overlaps.Count > 8)
+                {
+                    addresses += $", and {preview.Overlaps.Count - 8:N0} more";
+                }
+
+                var message = $"The destination overlaps {preview.Overlaps.Count:N0} occupied byte(s) " +
+                              $"({identicalCount:N0} identical, {differentCount:N0} different).\n\n" +
+                              $"Affected addresses: {addresses}\n\n" +
+                              "Yes: overwrite destination bytes with the relocated segment\n" +
+                              "No: keep existing destination bytes\n" +
+                              "Cancel: cancel relocation";
+                var choice = MessageBox.Show(this, message, "Overlapping destination data",
+                    MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+                decision = choice switch
+                {
+                    MessageBoxResult.Yes => RelocationOverlapDecision.Overwrite,
+                    MessageBoxResult.No => RelocationOverlapDecision.KeepExisting,
+                    _ => RelocationOverlapDecision.Cancel
+                };
+            }
+
+            if (ViewModel.ApplyRelocation(preview, decision) && ViewModel.TryNavigateToAddress(destination, out var rowIndex))
+            {
+                SelectRow(rowIndex);
+            }
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            MessageBox.Show(this, exception.Message, "Invalid relocation", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
