@@ -149,10 +149,10 @@
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock>
-                <Run Text="Address: " /><Run Text="{Binding ViewModel.EditorStatus.CurrentAddressText}" />
-                <Run Text="    Selection: " /><Run Text="{Binding ViewModel.EditorStatus.SelectionLength}" /><Run Text=" byte(s)" />
-                <Run Text="    Format: " /><Run Text="{Binding ViewModel.EditorStatus.ImageFormatText}" />
-                <Run Text="    State: " /><Run Text="{Binding ViewModel.EditorStatus.ModifiedStateText}" />
+                <Run Text="Address: " /><Run Text="{Binding ViewModel.EditorStatus.CurrentAddressText, Mode=OneWay}" />
+                <Run Text="    Selection: " /><Run Text="{Binding ViewModel.EditorStatus.SelectionLength, Mode=OneWay}" /><Run Text=" byte(s)" />
+                <Run Text="    Format: " /><Run Text="{Binding ViewModel.EditorStatus.ImageFormatText, Mode=OneWay}" />
+                <Run Text="    State: " /><Run Text="{Binding ViewModel.EditorStatus.ModifiedStateText, Mode=OneWay}" />
             </TextBlock>
             <TextBlock Margin="0,3,0,0" Text="{Binding ViewModel.StatusMessage}" />
         </StackPanel>
