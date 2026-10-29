@@ -26,6 +26,69 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void SRecordHeader_IsPreservedInMetadataAndRoundTripsWithMemoryBytes()
+    {
+        const string sRecord = "S0061234484558CE\nS1051234AABB4F\nS5030001FB\nS9030000FC\n";
+        var service = new MemoryImageFileService();
+        using var source = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+
+        var imported = service.PrepareImport(source).Apply(OverlapDecision.OverwriteIncoming)!;
+        var metadata = (SRecordMetadata)imported.FormatMetadata!;
+        Assert.AreEqual((ushort)0x1234, metadata.HeaderAddress);
+        CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, metadata.HeaderData!.ToArray());
+        Assert.AreEqual(1, metadata.DataRecordCount);
+        Assert.IsTrue(imported.Image.TryGetByte(0x1234, out var first));
+        Assert.AreEqual((byte)0xAA, first);
+        Assert.IsTrue(imported.Image.TryGetByte(0x1235, out var second));
+        Assert.AreEqual((byte)0xBB, second);
+
+        using var exported = new MemoryStream();
+        service.Export(imported.Image, MemoryImageExportFormat.SRecord, 8, exported, metadata);
+        var serialized = Encoding.ASCII.GetString(exported.ToArray());
+        var records = serialized.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries);
+        Assert.AreEqual("S0061234484558CE", records[0]);
+        Assert.AreEqual("S5030001FB", records[^2]);
+        exported.Position = 0;
+
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}.s19");
+        try
+        {
+            service.SaveAtomically(imported.Image, path, MemoryImageExportFormat.SRecord, 8, overwriteExisting: false, formatMetadata: metadata);
+            var savedRecords = File.ReadAllLines(path);
+            Assert.AreEqual("S0061234484558CE", savedRecords[0]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+
+        var roundTripped = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!;
+        var roundTripMetadata = (SRecordMetadata)roundTripped.FormatMetadata!;
+        Assert.AreEqual((ushort)0x1234, roundTripMetadata.HeaderAddress);
+        CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, roundTripMetadata.HeaderData!.ToArray());
+        Assert.AreEqual(1, roundTripMetadata.DataRecordCount);
+        Assert.IsTrue(roundTripped.Image.TryGetByte(0x1234, out var roundTripFirst));
+        Assert.AreEqual((byte)0xAA, roundTripFirst);
+        Assert.IsTrue(roundTripped.Image.TryGetByte(0x1235, out var roundTripSecond));
+        Assert.AreEqual((byte)0xBB, roundTripSecond);
+    }
+
+    [TestMethod]
+    public void SRecordWithoutHeader_DoesNotGainOneWhenExported()
+    {
+        const string sRecord = "S1051234AABB4F\nS9030000FC\n";
+        var service = new MemoryImageFileService();
+        using var source = new MemoryStream(Encoding.ASCII.GetBytes(sRecord));
+        var imported = service.PrepareImport(source).Apply(OverlapDecision.OverwriteIncoming)!;
+
+        using var exported = new MemoryStream();
+        service.Export(imported.Image, MemoryImageExportFormat.SRecord, 8, exported, imported.FormatMetadata);
+
+        var serialized = Encoding.ASCII.GetString(exported.ToArray());
+        Assert.IsFalse(serialized.Contains("S0", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
     public void Import_IdenticalInternalAndExistingOverlapsAreSummarizedAndKeptOnRequest()
     {
         const string sRecord = "S1051234AABB4F\nS1041235BBF9\nS9030000FC\n";

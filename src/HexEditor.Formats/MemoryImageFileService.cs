@@ -129,7 +129,7 @@ public sealed class MemoryImageFileService
                 IntelHexWriter.Write(image, maxDataBytesPerRecord, output, GetIntelMetadata(formatMetadata));
                 break;
             case MemoryImageExportFormat.SRecord:
-                SRecordWriter.Write(image, maxDataBytesPerRecord, output, GetExecutionStartAddress(formatMetadata));
+                SRecordWriter.Write(image, maxDataBytesPerRecord, output, GetSRecordMetadata(formatMetadata));
                 break;
         }
     }
@@ -141,7 +141,9 @@ public sealed class MemoryImageFileService
         {
             MemoryImageExportFormat.IntelHex when metadata is IntelHexMetadata intel => intel,
             MemoryImageExportFormat.IntelHex => startAddress is { } start ? new IntelHexMetadata(start, null, null) : new IntelHexMetadata(null, null, null),
-            MemoryImageExportFormat.SRecord => new SRecordMetadata(startAddress, dataRecordCount),
+            MemoryImageExportFormat.SRecord => metadata is SRecordMetadata sRecord
+                ? new SRecordMetadata(startAddress, dataRecordCount, sRecord.HeaderAddress, sRecord.HeaderData?.ToArray())
+                : new SRecordMetadata(startAddress, dataRecordCount),
             _ => throw new ArgumentOutOfRangeException(nameof(format))
         };
     }
@@ -159,6 +161,12 @@ public sealed class MemoryImageFileService
         IntelHexMetadata { StartSegmentCodeSegment: { } code, StartSegmentInstructionPointer: { } pointer } => checked(((uint)code << 4) + pointer),
         SRecordMetadata { StartAddress: { } start } => start,
         _ => null
+    };
+
+    private static SRecordMetadata GetSRecordMetadata(object? metadata) => metadata switch
+    {
+        SRecordMetadata sRecord => sRecord,
+        _ => new SRecordMetadata(GetExecutionStartAddress(metadata), 0)
     };
 
     private void ExportSelectedImage(

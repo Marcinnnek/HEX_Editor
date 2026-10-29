@@ -431,7 +431,7 @@ public sealed class HexImageViewModelTests
     [TestMethod]
     public void SaveAs_RetainsExecutionAddressWhenSavingInSourceOrOtherFormat()
     {
-        const string records = ":0400000500001234B1\n:02001000AABB89\n:00000001FF\n";
+        const string records = "S0061234484558CE\nS1050010AABB85\nS9031234B6\n";
         var service = new MemoryImageFileService();
         using var input = new MemoryStream(Encoding.ASCII.GetBytes(records));
         var preview = service.PrepareImport(input);
@@ -446,6 +446,8 @@ public sealed class HexImageViewModelTests
             using var srec = File.OpenRead(srecPath);
             var importedSrec = service.PrepareImport(srec).Apply(OverlapDecision.OverwriteIncoming)!;
             Assert.AreEqual(0x1234u, ((SRecordMetadata)importedSrec.FormatMetadata!).StartAddress);
+            Assert.AreEqual((ushort)0x1234, ((SRecordMetadata)importedSrec.FormatMetadata!).HeaderAddress);
+            CollectionAssert.AreEqual(new byte[] { 0x48, 0x45, 0x58 }, ((SRecordMetadata)importedSrec.FormatMetadata!).HeaderData!);
 
             model.SaveAs(intelPath, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
             Assert.AreEqual(0x1234u, ((IntelHexMetadata)model.SourceFormatMetadata!).StartLinearAddress);
