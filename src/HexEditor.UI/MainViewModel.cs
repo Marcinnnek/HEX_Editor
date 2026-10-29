@@ -28,6 +28,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
     public int[] RowWidths { get; } = [8, 16, 32];
+    public int[] ExportPayloadSizes { get; } = [8, 16, 32];
+    public MemoryImageExportFormat[] ExportFormats { get; } = Enum.GetValues<MemoryImageExportFormat>();
 
     public MemoryImage CurrentImage => _currentImage;
     public bool IsModified => !ReferenceEquals(_currentImage, _savedImage);
@@ -280,6 +282,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
+
+    public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
+        _fileService.ExportSegments(_currentImage, segmentIndexes, format, maxDataBytesPerRecord, output);
+
+    public void ExportAddressRange(uint startAddress, uint endAddress, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
+        _fileService.ExportAddressRange(_currentImage, startAddress, endAddress, format, maxDataBytesPerRecord, output);
+
+    public void ReportExported(string fileName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        StatusMessage = $"Exported selected occupied bytes to {fileName}.";
+    }
 
     private void Commit(MemoryImage next)
     {

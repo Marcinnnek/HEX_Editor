@@ -397,6 +397,79 @@ public partial class MainWindow : Window
         SelectRow(rowIndex);
     }
 
+    private void ExportSegments_Click(object sender, RoutedEventArgs e)
+    {
+        var segmentIndexes = SegmentsGrid.SelectedItems
+            .Cast<MemorySegmentRow>()
+            .Select(ViewModel.Segments.IndexOf)
+            .ToArray();
+        ExportToFile((format, payloadSize, output) => ViewModel.ExportSegments(segmentIndexes, format, payloadSize, output));
+    }
+
+    private void ExportRange_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryParseExportAddress(ExportRangeStartInput.Text, out var startAddress) ||
+            !TryParseExportAddress(ExportRangeEndInput.Text, out var endAddress))
+        {
+            MessageBox.Show(this, "Enter both range bounds as 32-bit hexadecimal addresses (for example, 0x08000000).",
+                "Invalid export range", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        ExportToFile((format, payloadSize, output) =>
+            ViewModel.ExportAddressRange(startAddress, endAddress, format, payloadSize, output));
+    }
+
+    private void ExportToFile(Action<MemoryImageExportFormat, int, Stream> export)
+    {
+        if (ExportFormatInput.SelectedItem is not MemoryImageExportFormat format ||
+            ExportPayloadInput.SelectedItem is not int payloadSize)
+        {
+            MessageBox.Show(this, "Choose an output format and a record payload size of 8, 16, or 32 bytes.",
+                "Export options required", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var isIntelHex = format == MemoryImageExportFormat.IntelHex;
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export selected memory data",
+            Filter = isIntelHex
+                ? "Intel HEX (*.hex)|*.hex|All files (*.*)|*.*"
+                : "Motorola S-Record (*.srec)|*.srec|All files (*.*)|*.*",
+            DefaultExt = isIntelHex ? ".hex" : ".srec",
+            AddExtension = true,
+            OverwritePrompt = true
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            using var output = File.Create(dialog.FileName);
+            export(format, payloadSize, output);
+            ViewModel.ReportExported(System.IO.Path.GetFileName(dialog.FileName));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to export selected data", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static bool TryParseExportAddress(string value, out uint address)
+    {
+        var text = value.Trim();
+        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+        {
+            text = text[2..];
+        }
+
+        return uint.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out address);
+    }
+
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (SegmentsGrid.SelectedIndex >= 0 &&

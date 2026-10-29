@@ -75,6 +75,18 @@
             </WrapPanel>
             <TextBlock Text="{Binding ViewModel.ChecksumSummary}" Margin="0,4,0,0" FontWeight="SemiBold" />
             <TextBlock Text="{Binding ViewModel.ChecksumResult.Parameters}" />
+            <WrapPanel VerticalAlignment="Center" Margin="0,0,0,6">
+                <TextBlock Text="Export as" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <ComboBox x:Name="ExportFormatInput" Width="150" ItemsSource="{Binding ViewModel.ExportFormats}" SelectedIndex="0" />
+                <TextBlock Text="Max record bytes" VerticalAlignment="Center" Margin="12,0,6,0" />
+                <ComboBox x:Name="ExportPayloadInput" Width="64" ItemsSource="{Binding ViewModel.ExportPayloadSizes}" SelectedIndex="1" />
+                <Button Content="Export selected segments" Padding="10,4" Margin="12,0,0,0" Click="ExportSegments_Click" />
+                <TextBlock Text="or range" VerticalAlignment="Center" Margin="12,0,6,0" />
+                <TextBox x:Name="ExportRangeStartInput" Width="90" ToolTip="Start address (hex)" VerticalContentAlignment="Center" />
+                <TextBlock Text="to" VerticalAlignment="Center" Margin="6,0" />
+                <TextBox x:Name="ExportRangeEndInput" Width="90" ToolTip="End address (hex)" VerticalContentAlignment="Center" />
+                <Button Content="Export range" Padding="10,4" Margin="6,0,0,0" Click="ExportRange_Click" />
+            </WrapPanel>
         </StackPanel>
         <TextBlock DockPanel.Dock="Bottom" Margin="0,12,0,0" Text="{Binding ViewModel.StatusMessage}" />
         <Grid>
@@ -85,7 +97,7 @@
             </Grid.ColumnDefinitions>
             <DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                       AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                      HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="SegmentsGrid_SelectionChanged">
+                      HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
                     <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
