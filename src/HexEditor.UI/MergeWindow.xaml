@@ -3,7 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Preview and merge images" Height="700" Width="900" MinHeight="540" MinWidth="760"
         WindowStartupLocation="CenterOwner">
-    <DockPanel Margin="14">
+    <Grid>
+    <DockPanel x:Name="MergePanel" Margin="14">
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Preview result" Padding="12,6" Margin="0,0,8,0" Click="PreviewResult_Click" />
             <Button x:Name="ApplyButton" Content="Apply merge" Padding="12,6" Margin="0,0,8,0" IsDefault="True" IsEnabled="False" Click="Apply_Click" />
@@ -59,4 +60,11 @@
             </GroupBox>
         </Grid>
     </DockPanel>
+    <Grid x:Name="ComparisonPreviewPanel" Visibility="Collapsed">
+        <DockPanel>
+            <Button DockPanel.Dock="Top" Content="Back to merge choices" HorizontalAlignment="Left" Padding="10,5" Margin="12,12,0,8" Click="ReturnToMerge_Click" />
+            <ContentControl x:Name="ComparisonPreviewHost" />
+        </DockPanel>
+    </Grid>
+    </Grid>
 </Window>

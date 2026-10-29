@@ -1,15 +1,17 @@
 using System.Collections.Specialized;
 
-namespace HexEditor.UI;
+namespace HexEditor.Compare;
 
 internal readonly record struct SparseRowSpan(ulong StartAddress, ulong EndAddress, bool IsGap = false);
+
+internal sealed record IndexedSparseRowSpan(ulong StartAddress, ulong EndAddress, bool IsGap, int StartIndex, int Count);
 
 internal readonly record struct SparseRowPosition(bool IsGap, ulong RowAddress, ulong GapStartAddress, ulong GapEndAddress);
 
 /// <summary>Indexes visible address spans and collapsed gaps without materializing each row.</summary>
 internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollectionChanged
 {
-    private IReadOnlyList<IndexedSpan> _spans;
+    private IReadOnlyList<IndexedSparseRowSpan> _spans;
     private readonly Func<SparseRowPosition, T> _createItem;
     private readonly uint _rowWidth;
     private int _count;
@@ -20,20 +22,7 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         _rowWidth = (uint)bytesPerRow;
         _createItem = createItem ?? throw new ArgumentNullException(nameof(createItem));
 
-        var indexed = new List<IndexedSpan>();
-        long nextIndex = 0;
-        foreach (var span in spans)
-        {
-            if (span.StartAddress > span.EndAddress || span.EndAddress > uint.MaxValue)
-                throw new ArgumentOutOfRangeException(nameof(spans), "Sparse row spans must be ordered valid addresses.");
-            var rowCount = span.IsGap ? 1L : checked((long)(((span.EndAddress - span.StartAddress) / _rowWidth) + 1));
-            indexed.Add(new IndexedSpan(span.StartAddress, span.EndAddress, span.IsGap,
-                checked((int)nextIndex), checked((int)rowCount)));
-            nextIndex += rowCount;
-        }
-
-        _spans = indexed;
-        _count = checked((int)nextIndex);
+        (_spans, _count) = SparseRowIndexBuilder.Build(spans, _rowWidth);
     }
 
     public override int Count => _count;
@@ -84,7 +73,7 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         return false;
     }
 
-    private void ExpandNavigationRow(IndexedSpan targetGap, ulong rowAddress)
+    private void ExpandNavigationRow(IndexedSparseRowSpan targetGap, ulong rowAddress)
     {
         var ranges = new List<SparseRowSpan>(_spans.Count + 2);
         foreach (var span in _spans)
@@ -102,22 +91,11 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
                 ranges.Add(new SparseRowSpan(rowAddress + _rowWidth, span.EndAddress, IsGap: true));
         }
 
-        var indexed = new List<IndexedSpan>(ranges.Count);
-        long nextIndex = 0;
-        foreach (var range in ranges)
-        {
-            var count = range.IsGap ? 1L : checked((long)(((range.EndAddress - range.StartAddress) / _rowWidth) + 1));
-            indexed.Add(new IndexedSpan(range.StartAddress, range.EndAddress, range.IsGap,
-                checked((int)nextIndex), checked((int)count)));
-            nextIndex += count;
-        }
-
-        _spans = indexed;
-        _count = checked((int)nextIndex);
+        (_spans, _count) = SparseRowIndexBuilder.Build(ranges, _rowWidth);
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
-    private IndexedSpan FindSpan(int index)
+    private IndexedSparseRowSpan FindSpan(int index)
     {
         var low = 0;
         var high = _spans.Count - 1;
@@ -133,5 +111,25 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         throw new InvalidOperationException("The row index is not represented by the sparse row map.");
     }
 
-    private sealed record IndexedSpan(ulong StartAddress, ulong EndAddress, bool IsGap, int StartIndex, int Count);
 }
+
+internal static class SparseRowIndexBuilder
+{
+    public static (IReadOnlyList<IndexedSparseRowSpan> Spans, int Count) Build(IEnumerable<SparseRowSpan> spans, uint rowWidth)
+    {
+        var indexed = new List<IndexedSparseRowSpan>();
+        long nextIndex = 0;
+        foreach (var span in spans)
+        {
+            if (span.StartAddress > span.EndAddress || span.EndAddress > uint.MaxValue)
+                throw new ArgumentOutOfRangeException(nameof(spans), "Sparse row spans must be ordered valid addresses.");
+            var rowCount = span.IsGap ? 1L : checked((long)(((span.EndAddress - span.StartAddress) / rowWidth) + 1));
+            indexed.Add(new IndexedSparseRowSpan(span.StartAddress, span.EndAddress, span.IsGap,
+                checked((int)nextIndex), checked((int)rowCount)));
+            nextIndex += rowCount;
+        }
+
+        return (indexed, checked((int)nextIndex));
+    }
+}
+

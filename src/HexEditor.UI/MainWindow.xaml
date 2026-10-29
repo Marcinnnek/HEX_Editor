@@ -100,25 +100,29 @@
             </TextBlock>
             <TextBlock Margin="0,3,0,0" Text="{Binding ViewModel.StatusMessage}" />
         </StackPanel>
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="230" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
-                      AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                      HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
-                    <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
-                    <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="65" />
-                </DataGrid.Columns>
-            </DataGrid>
-            <local:HexViewControl Grid.Column="2" x:Name="HexRowsView"
-                                  ItemsSource="{Binding ViewModel.ImageView.Rows}"
-                                  ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
-                                  AddressRangeSelected="HexView_AddressRangeSelected" />
-        </Grid>
+        <TabControl x:Name="WorkspaceTabs">
+            <TabItem Header="Editor">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="230" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
+                              AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                              HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
+                            <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
+                            <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="65" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <local:HexViewControl Grid.Column="2" x:Name="HexRowsView"
+                                          ItemsSource="{Binding ViewModel.ImageView.Rows}"
+                                          ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
+                                          AddressRangeSelected="HexView_AddressRangeSelected" />
+                </Grid>
+            </TabItem>
+        </TabControl>
     </DockPanel>
 </Window>

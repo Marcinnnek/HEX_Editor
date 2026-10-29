@@ -116,16 +116,23 @@ public partial class MergeWindow : Window
         {
             var merged = Preview.Resolve(DefaultChoice, RangeOverrides);
             if (merged is null) return;
-            new CompareWindow(DestinationImage, merged, $"{DestinationName} before", "Resolved merge")
-            {
-                Owner = this
-            }.ShowDialog();
+            ComparisonPreviewHost.Content = new CompareView(new CompareWorkspaceTabViewModel(
+                DestinationImage, merged, $"{DestinationName} before", "Resolved merge"));
+            MergePanel.Visibility = Visibility.Collapsed;
+            ComparisonPreviewPanel.Visibility = Visibility.Visible;
             ApplyButton.IsEnabled = true;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {
             MessageBox.Show(this, exception.Message, "Unable to preview merge", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void ReturnToMerge_Click(object sender, RoutedEventArgs e)
+    {
+        ComparisonPreviewHost.Content = null;
+        ComparisonPreviewPanel.Visibility = Visibility.Collapsed;
+        MergePanel.Visibility = Visibility.Visible;
     }
 
     private void Apply_Click(object sender, RoutedEventArgs e)

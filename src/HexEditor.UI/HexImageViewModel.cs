@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Text;
 using HexEditor.Core;
+using HexEditor.Compare;
 
 namespace HexEditor.UI;
 

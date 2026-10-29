@@ -20,7 +20,7 @@ namespace HexEditor.UI;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly List<CompareWindow> _comparisonWindows = [];
+    private readonly List<CompareView> _comparisonViews = [];
     private readonly ImageEditWorkflow _imageEdits;
     private readonly ChecksumWorkflow _checksums;
     private readonly ComparisonImageLoader _comparisonImageLoader;
@@ -54,10 +54,13 @@ public partial class MainWindow : Window
         {
             var imageA = _comparisonImageLoader.Load(pathA);
             var imageB = _comparisonImageLoader.Load(pathB);
-            var window = new CompareWindow(imageA.Image, imageB.Image, System.IO.Path.GetFileName(pathA), System.IO.Path.GetFileName(pathB)) { Owner = this };
-            _comparisonWindows.Add(window);
-            window.Closed += (_, _) => _comparisonWindows.Remove(window);
-            window.Show();
+            var nameA = System.IO.Path.GetFileName(pathA);
+            var nameB = System.IO.Path.GetFileName(pathB);
+            var view = new CompareView(new CompareWorkspaceTabViewModel(imageA.Image, imageB.Image, nameA, nameB));
+            _comparisonViews.Add(view);
+            var tab = new TabItem { Header = $"Compare: {nameA} ↔ {nameB}", Content = view };
+            WorkspaceTabs.Items.Add(tab);
+            WorkspaceTabs.SelectedItem = tab;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
         {
@@ -95,7 +98,7 @@ public partial class MainWindow : Window
 
     private void ViewModel_ImageChanged(HexEditor.Core.MemoryImage previousImage, HexEditor.Core.MemoryImage updatedImage)
     {
-        foreach (var comparison in _comparisonWindows.ToArray())
+        foreach (var comparison in _comparisonViews.ToArray())
             comparison.RefreshImage(previousImage, updatedImage);
     }
 

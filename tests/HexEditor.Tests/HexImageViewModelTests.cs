@@ -72,6 +72,24 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void NavigatingIntoCollapsedGap_ReindexesRowsAndKeepsFollowingSegmentAddressable()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0xAA]),
+            new MemorySegment(0x90000000, [0xBB])]);
+        var editor = new HexImageViewModel(image, bytesPerRow: 16);
+
+        Assert.HasCount(3, editor.Rows);
+        Assert.IsTrue(editor.TryNavigateToAddress(0x50000000, out var expandedRowIndex));
+
+        Assert.AreEqual("50000000", editor.Rows[expandedRowIndex].Address);
+        Assert.HasCount(5, editor.Rows);
+        Assert.IsTrue(editor.TryNavigateToAddress(0x90000000, out var finalSegmentRowIndex));
+        Assert.AreEqual("90000000", editor.Rows[finalSegmentRowIndex].Address);
+        Assert.AreEqual(4, finalSegmentRowIndex);
+    }
+
+    [TestMethod]
     public void EditorStatus_ReportsSourceFormatAndModifiedState()
     {
         var model = new MainViewModel();

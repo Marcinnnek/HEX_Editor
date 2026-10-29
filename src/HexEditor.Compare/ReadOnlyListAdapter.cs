@@ -1,6 +1,6 @@
 using System.Collections;
 
-namespace HexEditor.UI;
+namespace HexEditor.Compare;
 
 /// <summary>Provides the common read-only IList plumbing for computed UI row collections.</summary>
 internal abstract class ReadOnlyListAdapter<T> : IList<T>
@@ -45,3 +45,4 @@ internal abstract class ReadOnlyListAdapter<T> : IList<T>
     public bool Remove(T item) => throw new NotSupportedException();
     public void RemoveAt(int index) => throw new NotSupportedException();
 }
+

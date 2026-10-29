@@ -1,4 +1,5 @@
 using HexEditor.Core;
+using HexEditor.Compare;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -22,6 +23,28 @@ public sealed class CompareViewModelTests
         Assert.AreEqual("11 22", row.FileA.HexData.Trim());
         Assert.IsTrue(row.FileB.HexData.Contains("11 33    55", StringComparison.Ordinal));
         Assert.AreEqual(CompareByteState.OnlyA, comparison.Rows[2].States[0]);
+    }
+
+    [TestMethod]
+    public void WorkspaceTab_ListsBlocksForBothImagesAndRefreshesThemAfterAnEdit()
+    {
+        var left = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x2000, [0x20])]);
+        var right = MemoryImage.FromSegments([new MemorySegment(0x3000, [0x30])]);
+        var workspace = new CompareWorkspaceTabViewModel(left, right, "left.hex", "right.s19");
+
+        Assert.AreEqual("left.hex", workspace.NameA);
+        Assert.AreEqual("right.s19", workspace.NameB);
+        Assert.HasCount(2, workspace.BlocksA);
+        Assert.AreEqual(0x2000u, workspace.BlocksA[1].StartAddress);
+        Assert.HasCount(1, workspace.BlocksB);
+        Assert.AreEqual(0x3000u, workspace.BlocksB[0].StartAddress);
+
+        var editedLeft = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x4000, [0x40])]);
+        workspace.RefreshImage(left, editedLeft);
+
+        Assert.HasCount(2, workspace.BlocksA);
+        Assert.AreEqual(0x4000u, workspace.BlocksA[1].StartAddress);
+        Assert.AreEqual(CompareByteState.OnlyA, workspace.Comparison.Rows[^1].States[0]);
     }
 
     [TestMethod]

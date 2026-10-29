@@ -1,0 +1,63 @@
+<UserControl x:Class="HexEditor.UI.CompareView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:HexEditor.UI">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Bottom" Margin="0,10,0,0" Text="{Binding ViewModel.ComparisonStatus}" FontWeight="SemiBold" />
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
+            <ComboBox x:Name="RowWidthBox" Width="70" ItemsSource="{Binding RowWidths}" SelectedItem="{Binding ViewModel.BytesPerRow}" />
+            <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ShowAscii}" VerticalAlignment="Center" Margin="14,0" />
+            <ComboBox x:Name="ViewModeBox" Width="150" ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewModel.ViewMode}" />
+            <TextBlock Text="Start" VerticalAlignment="Center" Margin="10,0,4,0" />
+            <TextBox x:Name="RangeStartBox" Width="92" Text="00000000" />
+            <TextBlock Text="End" VerticalAlignment="Center" Margin="8,0,4,0" />
+            <TextBox x:Name="RangeEndBox" Width="92" Text="FFFFFFFF" />
+            <Button Content="Apply range" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
+            <TextBox x:Name="AddressBox" Width="110" Margin="12,0,0,0" VerticalContentAlignment="Center" />
+            <Button Content="Go" Margin="4,0" Padding="8,3" Click="Go_Click" />
+            <Button Content="Previous difference" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
+            <Button Content="Next difference" Padding="8,3" Click="NextDifference_Click" />
+        </StackPanel>
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Grid Grid.Row="0" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <GroupBox Grid.Column="0" Header="{Binding Workspace.NameA}" MaxHeight="130">
+                <DataGrid x:Name="FileABlocks" ItemsSource="{Binding Workspace.BlocksA}"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="Block_SelectionChanged"
+                          MaxHeight="104" VerticalScrollBarVisibility="Auto">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Start" Binding="{Binding StartText}" Width="*"/>
+                        <DataGridTextColumn Header="End" Binding="{Binding EndText}" Width="*"/>
+                        <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="70"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                </GroupBox>
+                <GroupBox Grid.Column="2" Header="{Binding Workspace.NameB}" MaxHeight="130">
+                <DataGrid x:Name="FileBBlocks" ItemsSource="{Binding Workspace.BlocksB}"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                          HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="Block_SelectionChanged"
+                          MaxHeight="104" VerticalScrollBarVisibility="Auto">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Start" Binding="{Binding StartText}" Width="*"/>
+                        <DataGridTextColumn Header="End" Binding="{Binding EndText}" Width="*"/>
+                        <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="70"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                </GroupBox>
+            </Grid>
+            <local:HexViewControl x:Name="FileAView" Grid.Row="1" Grid.Column="0"
+                                  ItemsSource="{Binding ViewModel.FileARows}"
+                                  ShowAscii="{Binding ViewModel.ShowAscii}"
+                                  AddressRangeSelected="ByteAddressSelected" />
+            <GridSplitter Grid.Row="1" Grid.Column="1" Width="8" HorizontalAlignment="Stretch" />
+            <local:HexViewControl x:Name="FileBView" Grid.Row="1" Grid.Column="2"
+                                  ItemsSource="{Binding ViewModel.FileBRows}"
+                                  ShowAscii="{Binding ViewModel.ShowAscii}"
+                                  AddressRangeSelected="ByteAddressSelected" />
+        </Grid>
+    </DockPanel>
+</UserControl>
