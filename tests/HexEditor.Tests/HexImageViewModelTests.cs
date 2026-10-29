@@ -57,6 +57,101 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void MergePreview_CombinesNonOverlappingBytesAndSummarizesEveryOverlap()
+    {
+        var destination = MemoryImage.FromSegments([new MemorySegment(0x1000, [0xA1, 0x00, 0xF0])]);
+        var source = MemoryImage.FromSegments([new MemorySegment(0x1001, [0x00, 0xF1, 0x80])]);
+        var model = new MainViewModel();
+        model.LoadImage(destination, null, null);
+
+        var preview = model.PreviewMerge(source);
+
+        Assert.HasCount(1, preview.Overlaps);
+        Assert.AreEqual(0x1001u, preview.Overlaps[0].StartAddress);
+        Assert.AreEqual(0x1002u, preview.Overlaps[0].EndAddress);
+        Assert.AreEqual(2L, preview.Overlaps[0].TotalByteCount);
+        Assert.AreEqual(1L, preview.Overlaps[0].IdenticalByteCount);
+        Assert.AreEqual(1L, preview.Overlaps[0].DifferentByteCount);
+
+        var keepDestination = preview.Resolve(MemoryImageMergeChoice.KeepDestination)!;
+        Assert.IsTrue(keepDestination.TryGetByte(0x1000, out var before));
+        Assert.AreEqual((byte)0xA1, before);
+        Assert.IsTrue(keepDestination.TryGetByte(0x1001, out var identical));
+        Assert.AreEqual((byte)0x00, identical);
+        Assert.IsTrue(keepDestination.TryGetByte(0x1002, out var conflicting));
+        Assert.AreEqual((byte)0xF0, conflicting);
+        Assert.IsTrue(keepDestination.TryGetByte(0x1003, out var after));
+        Assert.AreEqual((byte)0x80, after);
+
+        var keepSource = preview.Resolve(MemoryImageMergeChoice.KeepSource)!;
+        Assert.IsTrue(keepSource.TryGetByte(0x1002, out var sourceValue));
+        Assert.AreEqual((byte)0xF1, sourceValue);
+    }
+
+    [TestMethod]
+    public void MergePreview_AppliesDefaultChoiceAndAddressRangeOverrides()
+    {
+        var destination = MemoryImage.FromSegments([new MemorySegment(0x2000, [0x10, 0x20, 0x30, 0x40])]);
+        var source = MemoryImage.FromSegments([new MemorySegment(0x2000, [0xA0, 0xB0, 0xC0, 0xD0])]);
+        var preview = new MemoryImageMergePreview(destination, source);
+
+        var merged = preview.Resolve(
+            MemoryImageMergeChoice.KeepDestination,
+            [new MemoryImageMergeRangeOverride(0x2001, 0x2002, MemoryImageMergeChoice.KeepSource)])!;
+
+        CollectionAssert.AreEqual(new byte[] { 0x10, 0xB0, 0xC0, 0x40 }, merged.Segments.Single().Data.ToArray());
+    }
+
+    [TestMethod]
+    public void ApplyingMerge_CanCancelAndCreatesOneUndoableEditThatRefreshesSegments()
+    {
+        var destination = MemoryImage.FromSegments([
+            new MemorySegment(0x10, [0x11]),
+            new MemorySegment(0x20, [0x22])]);
+        var source = MemoryImage.FromSegments([
+            new MemorySegment(0x10, [0xAA]),
+            new MemorySegment(0x30, [0x33])]);
+        var model = new MainViewModel();
+        model.LoadImage(destination, null, null);
+        var preview = model.PreviewMerge(source);
+
+        model.ApplyMerge(preview, null);
+        Assert.AreSame(destination, model.CurrentImage);
+        Assert.IsFalse(model.CanUndo);
+        Assert.HasCount(2, model.Segments);
+
+        model.ApplyMerge(preview, MemoryImageMergeChoice.KeepSource);
+        Assert.IsTrue(model.IsModified);
+        Assert.IsTrue(model.CanUndo);
+        Assert.HasCount(3, model.Segments);
+        Assert.AreEqual("00000010", model.Segments[0].StartAddress);
+        Assert.AreEqual("00000010", model.Segments[0].EndAddress);
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x10, out var mergedByte));
+        Assert.AreEqual((byte)0xAA, mergedByte);
+
+        Assert.IsTrue(model.Undo());
+        Assert.AreSame(destination, model.CurrentImage);
+        Assert.HasCount(2, model.Segments);
+        Assert.IsTrue(model.Redo());
+        Assert.HasCount(3, model.Segments);
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x30, out var addedByte));
+        Assert.AreEqual((byte)0x33, addedByte);
+    }
+
+    [TestMethod]
+    public void ApplyingMerge_RejectsPreviewWhenDestinationChangedAfterReview()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0x11])]), null, null);
+        var preview = model.PreviewMerge(MemoryImage.FromSegments([new MemorySegment(0x10, [0x22])]));
+        model.EditByte(0x10, 0x33, OverlapDecision.OverwriteIncoming);
+
+        Assert.Throws<InvalidOperationException>(() => model.ApplyMerge(preview, MemoryImageMergeChoice.KeepSource));
+        Assert.IsTrue(model.CurrentImage.TryGetByte(0x10, out var retained));
+        Assert.AreEqual((byte)0x33, retained);
+    }
+
+    [TestMethod]
     public void FillAndDelete_ChangeOccupancyWithoutShiftingLaterAddresses()
     {
         var model = new MainViewModel();

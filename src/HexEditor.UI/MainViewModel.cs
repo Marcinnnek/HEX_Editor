@@ -34,6 +34,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event Action<MemoryImage, MemoryImage>? ImageChanged;
 
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
     public int[] RowWidths { get; } = [8, 16, 32];
@@ -81,6 +82,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(preview);
         var hadExistingImage = _currentImage.Segments.Count > 0;
+        var previousImage = _currentImage;
         var imported = preview.Apply(decision);
         if (imported is null) return;
 
@@ -98,6 +100,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshTitle();
         StatusMessage = DescribeImage(imported.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
         Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
+        NotifyImageChanged(previousImage);
     }
 
     public void LoadImage(MemoryImage image, string? sourcePath, MemoryImageExportFormat? format)
@@ -133,6 +136,20 @@ public sealed class MainViewModel : INotifyPropertyChanged
             throw new InvalidOperationException("An explicit overlap decision is required for occupied addresses.");
         var next = preview.Apply(overlapDecision);
         if (next is not null) Commit(next);
+    }
+
+    public MemoryImageMergePreview PreviewMerge(MemoryImage source) => new(_currentImage, source);
+
+    public void ApplyMerge(
+        MemoryImageMergePreview preview,
+        MemoryImageMergeChoice? defaultChoice,
+        IEnumerable<MemoryImageMergeRangeOverride>? rangeOverrides = null)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        if (!ReferenceEquals(preview.Destination, _currentImage))
+            throw new InvalidOperationException("The destination image changed after the merge preview was created. Preview the merge again before applying it.");
+        var merged = preview.Resolve(defaultChoice, rangeOverrides);
+        if (merged is not null) Commit(merged);
     }
 
     public InsertPreview PreviewInsert(uint address, IReadOnlyList<byte> bytes)
@@ -248,24 +265,28 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool Undo()
     {
         if (!_undo.TryPop(out var previous)) return false;
+        var changedImage = _currentImage;
         _redo.Push(_currentImage);
         UpdateChecksumStale(_currentImage, previous);
         _currentImage = previous;
         RefreshImage();
         RefreshModifiedTitle();
         Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        NotifyImageChanged(changedImage);
         return true;
     }
 
     public bool Redo()
     {
         if (!_redo.TryPop(out var next)) return false;
+        var changedImage = _currentImage;
         _undo.Push(_currentImage);
         UpdateChecksumStale(_currentImage, next);
         _currentImage = next;
         RefreshImage();
         RefreshModifiedTitle();
         Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        NotifyImageChanged(changedImage);
         return true;
     }
 
@@ -323,6 +344,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void Commit(MemoryImage next)
     {
         if (ImagesEqual(_currentImage, next)) return;
+        var previousImage = _currentImage;
         UpdateChecksumStale(_currentImage, next);
         _undo.Push(_currentImage);
         _redo.Clear();
@@ -331,6 +353,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshModifiedTitle();
         StatusMessage = "Image modified. Save to write changes to disk.";
         Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        NotifyImageChanged(previousImage);
+    }
+
+    private void NotifyImageChanged(MemoryImage previousImage)
+    {
+        if (!ReferenceEquals(previousImage, _currentImage)) ImageChanged?.Invoke(previousImage, _currentImage);
     }
 
     private void UpdateChecksumStale(MemoryImage before, MemoryImage after)
