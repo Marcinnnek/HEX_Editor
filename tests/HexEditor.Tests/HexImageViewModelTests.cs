@@ -43,6 +43,30 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void EditorAndComparison_UseTheSameSparseRowNavigationAndGapLayout()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x1001, [0xAA, 0xBB]),
+            new MemorySegment(0x1020, [0xCC])]);
+        var editor = new HexImageViewModel(image, bytesPerRow: 8);
+        var comparison = new CompareViewModel(image, image, bytesPerRow: 8);
+
+        Assert.HasCount(editor.Rows.Count, comparison.Rows);
+        for (var i = 0; i < editor.Rows.Count; i++)
+        {
+            Assert.AreEqual(editor.Rows[i].IsGapMarker, comparison.Rows[i].IsGapMarker);
+            Assert.AreEqual(editor.Rows[i].Address, comparison.Rows[i].Address);
+        }
+
+        foreach (var address in new uint[] { 0x1001, 0x1002, 0x1010, 0x1020 })
+        {
+            Assert.IsTrue(editor.TryNavigateToAddress(address, out var editorIndex));
+            Assert.IsTrue(comparison.TryNavigateToAddress(address, out var comparisonIndex));
+            Assert.AreEqual(editorIndex, comparisonIndex);
+        }
+    }
+
+    [TestMethod]
     public void EditorStatus_ReportsSourceFormatAndModifiedState()
     {
         var model = new MainViewModel();

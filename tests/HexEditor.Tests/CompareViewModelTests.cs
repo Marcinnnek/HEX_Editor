@@ -67,6 +67,37 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void AddressRangeMode_HidesBytesOutsidePartialBoundaryRows()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6, 0xB7])]),
+            bytesPerRow: 8);
+
+        comparison.SetAddressRange(0x1003, 0x1005);
+        comparison.ViewMode = CompareViewMode.AddressRange;
+
+        Assert.HasCount(1, comparison.Rows);
+        Assert.AreEqual("00001000", comparison.Rows[0].Address);
+        var row = comparison.Rows[0];
+        for (var offset = 0; offset < 8; offset++)
+        {
+            var inRange = offset is >= 3 and <= 5;
+            Assert.AreEqual(inRange ? CompareByteState.Different : CompareByteState.Equal, row.States[offset]);
+            Assert.AreEqual(inRange ? (0xA0 + offset).ToString("X2") : string.Empty, row.FileA.Cells[offset].Hex);
+            Assert.AreEqual(inRange ? (uint?)(0x1000 + offset) : null, row.FileA.Cells[offset].Address);
+            Assert.AreEqual(inRange ? (0xB0 + offset).ToString("X2") : string.Empty, row.FileB.Cells[offset].Hex);
+            Assert.AreEqual(inRange ? "." : " ", row.FileA.Cells[offset].Ascii);
+            Assert.AreEqual(inRange ? "Different" : string.Empty, comparison.FileARows[0].Cells[offset].Highlight);
+        }
+
+        Assert.IsNull(row.FileA.Cells[2].Address);
+        Assert.IsNull(row.FileA.Cells[6].Address);
+        Assert.IsTrue(comparison.TryNavigateToAddress(0x1003, out var rowIndex));
+        Assert.AreEqual(0, rowIndex);
+    }
+
+    [TestMethod]
     public void ComparisonStatus_ReportsEqualityAndDifferenceCountsAndRefreshes()
     {
         var comparison = new CompareViewModel(
