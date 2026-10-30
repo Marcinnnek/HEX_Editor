@@ -13,10 +13,12 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
     private uint? _findMatchStart;
     private uint? _findMatchEnd;
     private SparseRowList<HexViewRow> _rows;
+    private readonly EditorDocument? _document;
 
-    public HexImageViewModel(MemoryImage image, int bytesPerRow = 16, bool showAscii = true)
+    public HexImageViewModel(MemoryImage image, int bytesPerRow = 16, bool showAscii = true, EditorDocument? document = null)
     {
         Image = image ?? throw new ArgumentNullException(nameof(image));
+        _document = document;
         ValidateRowWidth(bytesPerRow);
         _bytesPerRow = bytesPerRow;
         _showAscii = showAscii;
@@ -112,7 +114,8 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
             var byteAddress = address <= uint.MaxValue ? (uint?)address : null;
             var isFindMatch = byteAddress is uint current && _findMatchStart is uint matchStart &&
                 current >= matchStart && current <= _findMatchEnd!.Value;
-            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), byteAddress, ByteHighlightState.None, isFindMatch);
+            var isEdited = byteAddress is uint editedAddress && value is not null && _document?.IsEditedByte(editedAddress) == true;
+            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), byteAddress, ByteHighlightState.None, isFindMatch, isEdited);
         }
         return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null) { Cells = cells };
     }
@@ -172,4 +175,4 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
 
 public enum ByteHighlightState { None, Different, OnlyInPanel, OnlyOther, OnlyInA, OnlyInB }
 
-public sealed record HexByteCell(string Hex, string Ascii, uint? Address, ByteHighlightState Highlight, bool IsFindMatch = false);
+public sealed record HexByteCell(string Hex, string Ascii, uint? Address, ByteHighlightState Highlight, bool IsFindMatch = false, bool IsEdited = false);

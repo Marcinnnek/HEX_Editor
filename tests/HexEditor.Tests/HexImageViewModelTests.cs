@@ -43,6 +43,42 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void EditedByteHighlightTracksCurrentOccupiedValuesAgainstLastSavedImage()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0x10, 0x20])]), null, null);
+        var document = workspace.Document;
+        workspace.EditByte(0x10, 0x11, OverlapDecision.OverwriteIncoming);
+        workspace.EditByte(0x12, 0x30, OverlapDecision.OverwriteIncoming);
+
+        Assert.IsTrue(document.IsEditedByte(0x10));
+        Assert.IsTrue(document.IsEditedByte(0x12));
+        Assert.IsFalse(document.IsEditedByte(0x11));
+        Assert.IsFalse(document.IsEditedByte(0x13));
+        Assert.IsTrue(workspace.Undo());
+        Assert.IsFalse(document.IsEditedByte(0x12));
+        Assert.IsTrue(document.IsEditedByte(0x10));
+        Assert.IsTrue(workspace.Undo());
+        Assert.IsFalse(document.IsEditedByte(0x10));
+
+        workspace.EditByte(0x10, 0x33, OverlapDecision.OverwriteIncoming);
+        var editedCell = new HexImageViewModel(document.CurrentImage, bytesPerRow: 8, document: document)
+            .Rows.Single(row => !row.IsGapMarker).Cells.Single(cell => cell.Address == 0x10);
+        Assert.IsTrue(editedCell.IsEdited);
+        Assert.IsTrue(workspace.Undo());
+        Assert.IsFalse(document.IsEditedByte(0x10));
+
+        workspace.EditByte(0x10, 0x44, OverlapDecision.OverwriteIncoming);
+        var savedPath = Path.Combine(Path.GetTempPath(), $"hex-editor-edited-{Guid.NewGuid():N}.hex");
+        try
+        {
+            workspace.SaveAs(savedPath, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
+            Assert.IsFalse(document.IsEditedByte(0x10));
+        }
+        finally { if (File.Exists(savedPath)) File.Delete(savedPath); }
+    }
+
+    [TestMethod]
     public void Editor_RendersLogicalRangeAtBoth32BitEndsAndKeepsEditsUndoable()
     {
         var workspace = new EditorDocumentWorkspace();
