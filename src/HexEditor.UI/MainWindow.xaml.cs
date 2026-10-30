@@ -110,6 +110,9 @@ public partial class MainWindow : Window
             var nameB = System.IO.Path.GetFileName(pathB);
             var view = new CompareView(new CompareWorkspaceTabViewModel(
                 imageA.Image, imageB.Image, nameA, nameB, imageA.Path, imageB.Path));
+            view.StatusRequested += ViewModel.ReportCompareInteraction;
+            view.BaseRowActivated += address =>
+                ViewModel.ReportCompareInteraction($"Base row at 0x{address:X8} selected.");
             _comparisonViews.Add(view);
             var tab = new TabItem { Header = $"Compare: {nameA} ↔ {nameB}", Content = view };
             WorkspaceTabs.Items.Add(tab);

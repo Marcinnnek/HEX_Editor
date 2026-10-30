@@ -28,6 +28,27 @@ public sealed class CompareWorkspaceTabViewModel
     public ObservableCollection<CompareMemoryBlockRow> BlocksA { get; }
     public ObservableCollection<CompareMemoryBlockRow> BlocksB { get; }
 
+    public CompareRowActivation ActivateRow(ComparePanelSide side, int rowIndex, uint? hitAddress)
+    {
+        if (side == ComparePanelSide.Reference)
+            return new CompareRowActivation(CompareRowActivationKind.ReferenceReadOnly);
+
+        if (side != ComparePanelSide.Base || (uint)rowIndex >= (uint)Comparison.FileARows.Count)
+            return new CompareRowActivation(CompareRowActivationKind.Ignored);
+
+        var row = Comparison.FileARows[rowIndex];
+        if (row.IsGapMarker) return new CompareRowActivation(CompareRowActivationKind.Ignored);
+
+        var address = hitAddress ?? row.Cells.FirstOrDefault(cell =>
+            cell.Address is uint candidate && Comparison.FileA.TryGetByte(candidate, out _))?.Address;
+        if (address is not uint selected ||
+            !row.Cells.Any(cell => cell.Address == selected) ||
+            !Comparison.FileA.TryGetByte(selected, out _))
+            return new CompareRowActivation(CompareRowActivationKind.Ignored);
+
+        return new CompareRowActivation(CompareRowActivationKind.EditableRow, selected);
+    }
+
     private MemoryImage _fileA;
     private MemoryImage _fileB;
     private readonly string? _pathA;
@@ -82,4 +103,13 @@ public sealed record CompareMemoryBlockRow(uint StartAddress, uint EndAddress, i
 {
     public string StartText => StartAddress.ToString("X8");
     public string EndText => EndAddress.ToString("X8");
+}
+
+public enum ComparePanelSide { Base, Reference }
+public enum CompareRowActivationKind { Ignored, ReferenceReadOnly, EditableRow }
+public sealed record CompareRowActivation(CompareRowActivationKind Kind, uint? Address = null)
+{
+    public string? StatusMessage => Kind == CompareRowActivationKind.ReferenceReadOnly
+        ? "The reference image is read-only."
+        : null;
 }
