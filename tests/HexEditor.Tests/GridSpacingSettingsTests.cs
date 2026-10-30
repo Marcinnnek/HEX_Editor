@@ -57,6 +57,18 @@ public sealed class GridSpacingSettingsTests
     }
 
     [TestMethod]
+    public void ComparisonHighlightMatchesTheSelectedAsciiByteWithoutMovingItsHitArea()
+    {
+        var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 3);
+
+        Assert.AreEqual(new Rect(10, 0, 10, 20), layout.GetHighlightBounds(1, isAscii: true));
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(15, 10), 3, isAscii: true, out var byteIndex));
+        Assert.AreEqual(1, byteIndex);
+        Assert.AreEqual(new Rect(25, 0, 20, 20), layout.GetHighlightBounds(1, isAscii: false));
+        Assert.IsFalse(layout.TryGetByteIndexAt(new Point(22, 10), 3, isAscii: false, out _));
+    }
+
+    [TestMethod]
     public void ByteGridLayoutMeasuresRowsAndHitTestsUsingTheSameByteBounds()
     {
         var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 3);
