@@ -58,6 +58,14 @@ public sealed class GridSpacingSettings
 /// <summary>Calculates the rendered and highlighted bounds of a byte in a HEX row.</summary>
 public readonly record struct ByteGridLayout(double CharacterWidth, double LineHeight, int HorizontalSpacing, int VerticalSpacing)
 {
+    public Size GetRowSize(int count, bool isAscii)
+    {
+        if (count <= 0) return new Size(0, LineHeight + VerticalSpacing);
+        var byteWidth = CharacterWidth * (isAscii ? 1 : 2);
+        var spacing = isAscii ? 0 : HorizontalSpacing;
+        return new Size(count * byteWidth + (count - 1) * spacing, LineHeight + VerticalSpacing);
+    }
+
     public Rect GetByteBounds(int index, bool isAscii)
     {
         var width = CharacterWidth * (isAscii ? 1 : 2);
@@ -65,5 +73,23 @@ public readonly record struct ByteGridLayout(double CharacterWidth, double LineH
         return new Rect(index * stride, 0, width, LineHeight + VerticalSpacing);
     }
 
-    public Rect GetHighlightBounds(int index) => new(index * (CharacterWidth * 2 + HorizontalSpacing), 0, CharacterWidth * 2, LineHeight);
+    public bool TryGetByteIndexAt(Point point, int count, bool isAscii, out int index)
+    {
+        index = default;
+        if (count <= 0 || point.X < 0 || point.Y < 0) return false;
+        var byteWidth = CharacterWidth * (isAscii ? 1 : 2);
+        var stride = byteWidth + (isAscii ? 0 : HorizontalSpacing);
+        if (byteWidth <= 0 || stride <= 0 || point.Y >= LineHeight + VerticalSpacing || point.X >= GetRowSize(count, isAscii).Width) return false;
+        var candidate = (int)(point.X / stride);
+        if ((uint)candidate >= (uint)count || !GetByteBounds(candidate, isAscii).Contains(point)) return false;
+        index = candidate;
+        return true;
+    }
+
+    public Rect GetHighlightBounds(int index)
+    {
+        var bounds = GetByteBounds(index, isAscii: false);
+        bounds.Height = LineHeight;
+        return bounds;
+    }
 }

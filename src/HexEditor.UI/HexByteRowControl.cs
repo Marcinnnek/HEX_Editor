@@ -48,12 +48,8 @@ public sealed class HexByteRowControl : Control
         var row = Row;
         if (row is null || row.IsGapMarker || point.X < 0 || point.Y < 0) return false;
         EnsureMetrics();
-        var byteWidth = _characterWidth * (IsAscii ? 1 : 2);
-        var stride = byteWidth + (IsAscii ? 0 : GridSpacingSettings.Current.HorizontalByteSpacing);
-        if (byteWidth <= 0 || point.Y >= _lineHeight + GridSpacingSettings.Current.VerticalRowSpacing || point.X >= row.Cells.Count * stride) return false;
-        if (!IsAscii && point.X % stride >= byteWidth) return false;
-        var index = (int)(point.X / stride);
-        if ((uint)index >= (uint)row.Cells.Count || row.Cells[index].Address is not uint selected) return false;
+        var layout = CreateLayout();
+        if (!layout.TryGetByteIndexAt(point, row.Cells.Count, IsAscii, out var index) || row.Cells[index].Address is not uint selected) return false;
         address = selected;
         return true;
     }
@@ -62,10 +58,7 @@ public sealed class HexByteRowControl : Control
     {
         EnsureMetrics();
         var count = Row?.Cells.Count ?? 0;
-        var width = _characterWidth * (IsAscii ? 1 : 2);
-        var spacing = IsAscii ? 0 : GridSpacingSettings.Current.HorizontalByteSpacing;
-        return new Size(count == 0 ? 0 : count * width + (count - 1) * spacing,
-            _lineHeight + GridSpacingSettings.Current.VerticalRowSpacing);
+        return CreateLayout().GetRowSize(count, IsAscii);
     }
 
     protected override void OnRender(DrawingContext drawingContext)
@@ -75,10 +68,9 @@ public sealed class HexByteRowControl : Control
         if (row is null || row.IsGapMarker) return;
         EnsureMetrics();
 
-        var byteWidth = _characterWidth * (IsAscii ? 1 : 2);
-        var stride = byteWidth + (IsAscii ? 0 : GridSpacingSettings.Current.HorizontalByteSpacing);
+        var layout = CreateLayout();
         drawingContext.DrawRectangle(Brushes.Transparent, null,
-            new Rect(0, 0, row.Cells.Count == 0 ? 0 : row.Cells.Count * byteWidth + (row.Cells.Count - 1) * (stride - byteWidth), _lineHeight));
+            new Rect(0, 0, layout.GetRowSize(row.Cells.Count, IsAscii).Width, _lineHeight));
         for (var index = 0; index < row.Cells.Count; index++)
         {
             var brush = row.Cells[index].Highlight switch
@@ -89,13 +81,13 @@ public sealed class HexByteRowControl : Control
                 _ => null
             };
             if (brush is not null)
-                drawingContext.DrawRectangle(brush, null, new Rect(index * stride, 0, byteWidth, _lineHeight));
+                drawingContext.DrawRectangle(brush, null, layout.GetHighlightBounds(index));
         }
 
         for (var index = 0; index < row.Cells.Count; index++)
         {
             var text = IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex;
-            drawingContext.DrawText(Format(text), new Point(index * stride, 0));
+            drawingContext.DrawText(Format(text), layout.GetByteBounds(index, IsAscii).TopLeft);
         }
     }
 
@@ -120,6 +112,12 @@ public sealed class HexByteRowControl : Control
         _characterWidth = sample.WidthIncludingTrailingWhitespace;
         _lineHeight = sample.Height;
     }
+
+    private ByteGridLayout CreateLayout() => new(
+        _characterWidth,
+        _lineHeight,
+        GridSpacingSettings.Current.HorizontalByteSpacing,
+        GridSpacingSettings.Current.VerticalRowSpacing);
 
     private void Control_Loaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged += SpacingChanged;
     private void Control_Unloaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
