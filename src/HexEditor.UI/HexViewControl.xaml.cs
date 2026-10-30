@@ -52,6 +52,31 @@ public partial class HexViewControl : UserControl
         HexGrid.ScrollIntoView(HexGrid.Items[rowIndex]);
     }
 
+    public void ScrollToMatch(int rowIndex)
+    {
+        if ((uint)rowIndex >= (uint)HexGrid.Items.Count) return;
+        HexGrid.ScrollIntoView(HexGrid.Items[rowIndex]);
+        HexGrid.UpdateLayout();
+
+        var scrollViewer = FindScrollViewer(HexGrid);
+        if (scrollViewer is null) return;
+        scrollViewer.ScrollToHorizontalOffset(0);
+        // DataGrid item scrolling leaves a sliver of the prior row at an exact item offset.
+        scrollViewer.ScrollToVerticalOffset(rowIndex + 1);
+        HexGrid.UpdateLayout();
+    }
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject parent)
+    {
+        for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+            if (child is ScrollViewer viewer) return viewer;
+            if (FindScrollViewer(child) is { } descendant) return descendant;
+        }
+        return null;
+    }
+
     private static void OnShowAsciiChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
     {
         if (owner is HexViewControl control)
