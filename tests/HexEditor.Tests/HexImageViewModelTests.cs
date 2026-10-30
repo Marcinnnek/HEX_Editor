@@ -251,7 +251,7 @@ public sealed class HexImageViewModelTests
         var model = new MainViewModel();
         model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11, 0x22, 0x33, 0x44, 0x55])]), null, null);
 
-        model.FillRange(0x1001, 0x1006, [0xAA, 0xBB]);
+        model.FillRange(0x1001, 0x1006, [0xAA, 0xBB], FillPolicy.OverwriteExisting);
         CollectionAssert.AreEqual(new byte[] { 0x11, 0xAA, 0xBB, 0xAA, 0xBB, 0xAA, 0xBB },
             model.CurrentImage.Segments.Single().Data.ToArray());
         model.DeleteRange(0x1002, 0x1004);
@@ -262,6 +262,37 @@ public sealed class HexImageViewModelTests
         Assert.AreEqual(0x1005u, model.CurrentImage.Segments[1].StartAddress);
         Assert.IsTrue(model.CurrentImage.TryGetByte(0x1005, out var later));
         Assert.AreEqual((byte)0xAA, later);
+    }
+
+    [TestMethod]
+    public void FillRange_KeepsOccupiedBytesAndAnchorsPatternAtRangeStart()
+    {
+        var model = new MainViewModel();
+        model.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xA0, 0xA1, 0xA2, 0xA3])]), null, null);
+
+        model.FillRange(0x0F, 0x14, [0x10, 0x20]);
+
+        for (uint address = 0x0F; address <= 0x14; address++)
+        {
+            Assert.IsTrue(model.CurrentImage.TryGetByte(address, out var value));
+            var expected = address is >= 0x10 and <= 0x13
+                ? (byte)(0xA0 + address - 0x10)
+                : (address % 2 == 1 ? (byte)0x10 : (byte)0x20);
+            Assert.AreEqual(expected, value, $"Unexpected fill at {address:X8}.");
+        }
+        Assert.IsTrue(model.Undo());
+        Assert.IsFalse(model.CurrentImage.TryGetByte(0x0F, out _));
+    }
+
+    [TestMethod]
+    public void FillAllRegion_UsesLowestAndHighestOccupiedAddressesAndIsNullForEmptyImage()
+    {
+        var model = new MainViewModel();
+        Assert.IsNull(model.GetFillAllRegion());
+        model.LoadImage(MemoryImage.FromSegments([
+            new MemorySegment(0x10, [0xAA]), new MemorySegment(0x20, [0xBB])]), null, null);
+
+        Assert.AreEqual((0x10u, 0x20u), model.GetFillAllRegion());
     }
 
     [TestMethod]

@@ -227,7 +227,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void PasteAt(uint address, OverlapDecision? overlapDecision = null) => Editing.PasteAt(address, overlapDecision);
     public int GetPasteOverlapCount(uint address) => Editing.GetPasteOverlapCount(address);
     public void DeleteRange(uint startAddress, uint endAddress) => Editing.DeleteRange(startAddress, endAddress);
-    public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern) => Editing.FillRange(startAddress, endAddress, pattern);
+    public (uint Start, uint End)? GetFillAllRegion()
+    {
+        if (ActiveImage.Segments.Count == 0) return null;
+        return (ActiveImage.Segments.Min(segment => segment.StartAddress), ActiveImage.Segments.Max(segment => segment.EndAddress));
+    }
+    public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
+        FillPolicy policy = FillPolicy.KeepExisting) => Editing.FillRange(startAddress, endAddress, pattern, policy);
 
     public ChecksumCalculationResult CalculateChecksum(ChecksumRequest request)
     {
