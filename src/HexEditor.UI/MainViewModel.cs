@@ -18,6 +18,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private EditorDocument? _activeComparisonDocument;
     private CompareWorkspaceTabViewModel? _activeComparisonWorkspace;
     private int _selectedSegmentIndex = -1;
+    private bool _isOpenReplacementLoading;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -53,12 +54,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MemoryImage ActiveImage => ActiveDocument.CurrentImage;
     public bool ActiveHasImage => ActiveImage.OccupiedByteCount > 0;
     public bool ActiveIsEditor => _activeComparison is null;
-    public bool ActiveCanSave => !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) && ActiveDocument.SourceFormat is not null;
-    public bool ActiveCanSaveAs => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath);
-    public bool ActiveCanCloseImage => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) || ActiveDocument.IsModified;
+    public bool IsOpenReplacementLoading => _isOpenReplacementLoading;
+    public bool CanEdit => !_isOpenReplacementLoading;
+    public bool CanStartOpenCompareOrMerge => !_isOpenReplacementLoading;
+    public bool ActiveCanSave => CanEdit && !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) && ActiveDocument.SourceFormat is not null;
+    public bool ActiveCanSaveAs => CanEdit && (ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath));
+    public bool ActiveCanCloseImage => CanEdit && (ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) || ActiveDocument.IsModified);
     public bool ActiveHasSelection => _activeComparison is null && EditorStatus.SelectionLength > 0;
-    public bool ActiveCanPaste => _activeComparison is null && ActiveHasSelection && Editing.HasClipboard;
-    public bool ActiveCanRelocate => _activeComparison is null &&
+    public bool ActiveCanPaste => CanEdit && _activeComparison is null && ActiveHasSelection && Editing.HasClipboard;
+    public bool ActiveCanRelocate => CanEdit && _activeComparison is null &&
         (uint)_selectedSegmentIndex < (uint)ActiveImage.Blocks.Count;
     public int SelectedSegmentIndex
     {
@@ -154,8 +158,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool IsModified => Workspace.Document.IsModified;
     public bool CanUndo => Workspace.Document.CanUndo;
     public bool CanRedo => Workspace.Document.CanRedo;
-    public bool ActiveCanUndo => ActiveDocument.CanUndo;
-    public bool ActiveCanRedo => ActiveDocument.CanRedo;
+    public bool ActiveCanUndo => CanEdit && ActiveDocument.CanUndo;
+    public bool ActiveCanRedo => CanEdit && ActiveDocument.CanRedo;
     public string? SourcePath => Workspace.Document.SourcePath;
     public MemoryImageExportFormat? SourceFormat => Workspace.Document.SourceFormat;
     public MemoryImageFormatMetadata? SourceFormatMetadata => Workspace.Document.SourceFormatMetadata;
@@ -174,6 +178,22 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public Task<MemoryImageImportPreview> PrepareOpenAsync(string path, CancellationToken cancellationToken,
         IProgress<MemoryImageFileProgress>? progress)
         => Workspace.PrepareOpenAsync(path, cancellationToken, progress);
+
+    /// <summary>Prepares an Editor replacement while publishing a read-only loading state to the workspace UI.</summary>
+    public async Task<MemoryImageImportPreview> PrepareOpenReplacementAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress)
+    {
+        if (_isOpenReplacementLoading) throw new InvalidOperationException("An Editor replacement is already loading.");
+        SetOpenReplacementLoading(true);
+        try
+        {
+            return await PrepareOpenAsync(path, cancellationToken, progress);
+        }
+        finally
+        {
+            SetOpenReplacementLoading(false);
+        }
+    }
 
     public void ApplyImport(MemoryImageImportPreview preview, OverlapDecision decision)
     {
@@ -327,6 +347,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void RefreshActiveCommandState() => Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo), nameof(ActiveHasImage),
         nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate),
         nameof(ActiveHasSelection), nameof(ActiveCanPaste));
+
+    private void SetOpenReplacementLoading(bool loading)
+    {
+        if (_isOpenReplacementLoading == loading) return;
+        _isOpenReplacementLoading = loading;
+        Raise(nameof(IsOpenReplacementLoading), nameof(CanEdit), nameof(CanStartOpenCompareOrMerge),
+            nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanUndo),
+            nameof(ActiveCanRedo), nameof(ActiveCanPaste), nameof(ActiveCanRelocate));
+    }
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) => Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
     public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) => Editing.ApplyRelocation(preview, decision);

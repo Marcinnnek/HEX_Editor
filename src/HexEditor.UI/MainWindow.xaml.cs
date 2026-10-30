@@ -98,6 +98,7 @@ public partial class MainWindow : Window
 
     private void EditorRow_DoubleClick(object sender, MouseButtonEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         if (e.OriginalSource is not DependencyObject source) return;
         var gridRow = FindVisualAncestor<DataGridRow>(source);
         var byteRow = FindVisualAncestor<HexByteRowControl>(source);
@@ -127,7 +128,8 @@ public partial class MainWindow : Window
         _diagnostics.RecordError(operation, exception, status.CurrentAddress, end);
     }
 
-    private async Task<T> RunFileOperationAsync<T>(Func<CancellationToken, IProgress<MemoryImageFileProgress>, Task<T>> operation)
+    private async Task<T> RunFileOperationAsync<T>(Func<CancellationToken, IProgress<MemoryImageFileProgress>, Task<T>> operation,
+        IProgress<MemoryImageFileProgress>? progressObserver = null)
     {
         if (_fileOperationCancellation is not null) throw new InvalidOperationException("A file operation is already running.");
         using var cancellation = new CancellationTokenSource();
@@ -135,19 +137,25 @@ public partial class MainWindow : Window
         FileOperationPanel.Visibility = Visibility.Visible;
         FileOperationProgress.IsIndeterminate = true;
         FileOperationText.Text = "Working...";
-        var progress = new Progress<MemoryImageFileProgress>(update =>
+        var progress = new InlineProgress<MemoryImageFileProgress>(update =>
         {
-            var unit = update.Stage.Contains("fill", StringComparison.OrdinalIgnoreCase) ? "addresses" : "bytes";
-            FileOperationText.Text = update.Total is { } total
-                ? $"{update.Stage}: {update.Completed:N0} / {total:N0} {unit}"
-                : $"{update.Stage}: {update.Completed:N0}";
-            FileOperationProgress.IsIndeterminate = update.Total is null or 0;
-            if (update.Total is > 0)
+            progressObserver?.Report(update);
+            void UpdateProgress()
             {
-                FileOperationProgress.Minimum = 0;
-                FileOperationProgress.Maximum = update.Total.Value;
-                FileOperationProgress.Value = Math.Min(update.Completed, update.Total.Value);
+                var unit = update.Stage.Contains("fill", StringComparison.OrdinalIgnoreCase) ? "addresses" : "bytes";
+                FileOperationText.Text = update.Total is { } total
+                    ? $"{update.Stage}: {update.Completed:N0} / {total:N0} {unit}"
+                    : $"{update.Stage}: {update.Completed:N0}";
+                FileOperationProgress.IsIndeterminate = update.Total is null or 0;
+                if (update.Total is > 0)
+                {
+                    FileOperationProgress.Minimum = 0;
+                    FileOperationProgress.Maximum = update.Total.Value;
+                    FileOperationProgress.Value = Math.Min(update.Completed, update.Total.Value);
+                }
             }
+            if (Dispatcher.CheckAccess()) UpdateProgress();
+            else Dispatcher.BeginInvoke(new Action(UpdateProgress));
         });
         try
         {
@@ -187,6 +195,7 @@ public partial class MainWindow : Window
 
     private async void CompareImages_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanStartOpenCompareOrMerge) return;
         try
         {
             var baseDocument = (WorkspaceTabs.SelectedContent as CompareView)?.Workspace.BaseDocument;
@@ -211,6 +220,7 @@ public partial class MainWindow : Window
             };
             view.BaseRowActivated += (rowStartAddress, address) =>
             {
+                if (!ViewModel.CanEdit) return;
                 if (comparison.BaseDocument is not { } baseDocument) return;
                 try
                 {
@@ -241,6 +251,7 @@ public partial class MainWindow : Window
 
     private async void MergeImages_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanStartOpenCompareOrMerge) return;
         try
         {
             var editorDocument = ViewModel.Workspace.Document;
@@ -321,8 +332,14 @@ public partial class MainWindow : Window
         new Progress<MemoryImageFileProgress>(update =>
             progress.Report(update with { Stage = $"{stage}: {update.Stage}" }));
 
+    /// <summary>Loads a replacement through the window's visible progress and cancellation controls.</summary>
+    public Task<MemoryImageImportPreview> LoadOpenReplacementAsync(string path,
+        IProgress<MemoryImageFileProgress>? progressObserver = null) =>
+        RunFileOperationAsync((token, progress) => ViewModel.PrepareOpenReplacementAsync(path, token, progress), progressObserver);
+
     private async void OpenImage_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanStartOpenCompareOrMerge) return;
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
             Title = "Open HEX or S-Record file",
@@ -340,7 +357,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var preview = await RunFileOperationAsync((token, progress) => _files.PrepareOpenAsync(dialog.FileName, token, progress));
+            var preview = await LoadOpenReplacementAsync(dialog.FileName);
             ViewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
             CloseDocumentViews(replacedDocument);
             ViewModel.ActivateEditor();
@@ -356,6 +373,7 @@ public partial class MainWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         var document = ActiveDocument;
         try
         {
@@ -374,6 +392,7 @@ public partial class MainWindow : Window
 
     private async void SaveAs_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         await TrySaveAsAsync(ActiveDocument);
     }
 
@@ -513,6 +532,7 @@ public partial class MainWindow : Window
 
     private void CloseCompareView(TabItem tab)
     {
+        if (!ViewModel.CanEdit) return;
         if (tab.Content is not CompareView view || view.Workspace.BaseDocument is not { } document) return;
         if (ViewModel.Workspace.IsLastView(document, view.Workspace) && !ConfirmCloseImage(document)) return;
         ViewModel.Workspace.CloseView(view.Workspace);
@@ -532,6 +552,7 @@ public partial class MainWindow : Window
 
     private void CloseImage_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         var document = ActiveDocument;
         if (!ConfirmCloseImage(document)) return;
         CloseDocumentViews(document);
@@ -552,18 +573,21 @@ public partial class MainWindow : Window
 
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         ViewModel.Undo();
         if (ReferenceEquals(ActiveDocument, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         ViewModel.Redo();
         if (ReferenceEquals(ActiveDocument, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void EditInsert_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         try
         {
             var (start, end) = GetSelectionDefaults();
@@ -581,6 +605,7 @@ public partial class MainWindow : Window
 
     private async void Fill_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         try
         {
             var (start, end) = GetSelectionDefaults();
@@ -600,6 +625,7 @@ public partial class MainWindow : Window
 
     private void CalculateChecksum_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         try
         {
             var dialog = new ChecksumDialog(ViewModel, AskOverlap) { Owner = this };
@@ -613,12 +639,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Copy_Click(object sender, RoutedEventArgs e) => RunSelectedRangeEdit((start, end) => _imageEdits.Copy(start, end));
-    private void Cut_Click(object sender, RoutedEventArgs e) => RunSelectedRangeEdit((start, end) => _imageEdits.Cut(start, end));
-    private void Delete_Click(object sender, RoutedEventArgs e) => RunSelectedRangeEdit((start, end) => _imageEdits.Delete(start, end));
+    private void Copy_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanEdit) RunSelectedRangeEdit((start, end) => _imageEdits.Copy(start, end)); }
+    private void Cut_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanEdit) RunSelectedRangeEdit((start, end) => _imageEdits.Cut(start, end)); }
+    private void Delete_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanEdit) RunSelectedRangeEdit((start, end) => _imageEdits.Delete(start, end)); }
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         try
         {
             var (address, _) = GetSelectionDefaults();
@@ -634,6 +661,7 @@ public partial class MainWindow : Window
 
     private void RunRangeEdit(Action action)
     {
+        if (!ViewModel.CanEdit) return;
         try { action(); Title = ViewModel.WindowTitle; }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
@@ -1032,6 +1060,7 @@ public partial class MainWindow : Window
 
     private void RelocateSegment_Click(object sender, RoutedEventArgs e)
     {
+        if (!ViewModel.CanEdit) return;
         var rangeIndex = SegmentsGrid.SelectedIndex;
         if ((uint)rangeIndex >= (uint)ViewModel.CurrentImage.Blocks.Count)
         {
@@ -1139,6 +1168,7 @@ public partial class MainWindow : Window
 
     private void RunSelectedRangeEdit(Action<uint, uint> action)
     {
+        if (!ViewModel.CanEdit) return;
         var (start, end) = GetSelectionDefaults();
         var dialog = new RangeEditDialog(RangeEditDialogKind.SelectRange, start, end) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Result is not { } range) return;

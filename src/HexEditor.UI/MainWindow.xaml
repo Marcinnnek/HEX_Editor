@@ -19,9 +19,9 @@
     <DockPanel Margin="12">
         <Menu DockPanel.Dock="Top" Margin="0,0,0,8">
             <ui:MenuItem Header="_File">
-                <ui:MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" InputGestureText="Ctrl+O" />
+                <ui:MenuItem x:Name="OpenMenuItem" Header="Open HEX / S-Record..." Click="OpenImage_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" InputGestureText="Ctrl+O" />
                 <Separator />
-                <ui:MenuItem Header="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" InputGestureText="Ctrl+S" />
+                <ui:MenuItem x:Name="SaveMenuItem" Header="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" InputGestureText="Ctrl+S" />
                 <ui:MenuItem Header="Save As..." Click="SaveAs_Click" IsEnabled="{Binding ViewModel.ActiveCanSaveAs}" InputGestureText="Ctrl+Shift+S" />
                 <ui:MenuItem Header="Close Image" Click="CloseImage_Click" IsEnabled="{Binding ViewModel.ActiveCanCloseImage}" InputGestureText="Ctrl+W" />
                 <Separator />
@@ -29,7 +29,7 @@
                 <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
                 <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
-            <ui:MenuItem Header="_Edit">
+            <ui:MenuItem x:Name="EditMenuItem" Header="_Edit" IsEnabled="{Binding ViewModel.CanEdit}">
                 <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" InputGestureText="Ctrl+Z" />
                 <ui:MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" InputGestureText="Ctrl+Y" />
                 <Separator />
@@ -50,13 +50,13 @@
                 <ui:MenuItem Header="Find bytes..." Click="FindBytes_Click" InputGestureText="Ctrl+F" />
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
-            <ui:MenuItem Header="_Compare">
+            <ui:MenuItem x:Name="CompareMenuItem" Header="_Compare" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}">
                 <ui:MenuItem Header="Compare images..." Click="CompareImages_Click" />
             </ui:MenuItem>
-            <ui:MenuItem Header="_Merge">
+            <ui:MenuItem x:Name="MergeMenuItem" Header="_Merge" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}">
                 <ui:MenuItem Header="Merge images..." Click="MergeImages_Click" />
             </ui:MenuItem>
-            <ui:MenuItem Header="_Tools">
+            <ui:MenuItem Header="_Tools" IsEnabled="{Binding ViewModel.CanEdit}">
                 <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
                 <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
             </ui:MenuItem>
@@ -79,12 +79,12 @@
             </Border>
             <ToolBarTray DockPanel.Dock="Top" x:Name="PrimaryToolBarTray" SizeChanged="PrimaryToolBarTray_SizeChanged" IsLocked="True" ToolTip="Primary commands">
                 <ToolBar x:Name="FileToolBar" ToolTip="File">
-                    <ui:Button Content="Open" Click="OpenImage_Click" ToolTip="Open HEX / S-Record (Ctrl+O)" />
+                    <ui:Button Content="Open" Click="OpenImage_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" ToolTip="Open HEX / S-Record (Ctrl+O)" />
                     <ui:Button Content="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" ToolTip="Save active base (Ctrl+S)" />
                 </ToolBar>
                 <ToolBar x:Name="CompareToolBar" ToolTip="Compare / Merge">
-                    <ui:Button Content="Compare" Click="CompareImages_Click" />
-                    <ui:Button Content="Merge" Click="MergeImages_Click" />
+                    <ui:Button Content="Compare" Click="CompareImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
+                    <ui:Button Content="Merge" Click="MergeImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
                 </ToolBar>
                 <ToolBar x:Name="HistoryToolBar" ToolTip="History">
                     <ui:Button Content="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />

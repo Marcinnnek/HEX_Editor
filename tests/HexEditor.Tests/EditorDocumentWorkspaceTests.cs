@@ -319,6 +319,53 @@ public sealed class EditorDocumentWorkspaceTests
     }
 
     [TestMethod]
+    public async Task ReplacingEditorFromAnIndependentCompareClosesOnlyViewsBasedOnTheReplacedDocument()
+    {
+        var viewModel = new MainViewModel();
+        var workspace = viewModel.Workspace;
+        var oldImage = MemoryImage.FromSegments([new MemorySegment(0x10, [0xA1])]);
+        viewModel.LoadImage(oldImage, "old.hex", MemoryImageExportFormat.IntelHex);
+        var replacedDocument = workspace.Document;
+        var dependent = new CompareWorkspaceTabViewModel(oldImage,
+            MemoryImage.FromSegments([new MemorySegment(0x10, [0xB1])]), "old.hex", "ref.hex", baseDocument: replacedDocument);
+
+        var independentOwner = new EditorDocumentWorkspace();
+        independentOwner.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x20, [0xC1])]),
+            "independent.hex", MemoryImageExportFormat.IntelHex, isModified: true);
+        var independentDocument = independentOwner.Document;
+        independentDocument.Editing.EditByte(0x20, 0xC2, OverlapDecision.OverwriteIncoming);
+        var independent = new CompareWorkspaceTabViewModel(independentDocument.CurrentImage,
+            MemoryImage.FromSegments([new MemorySegment(0x20, [0xD1])]), "independent.hex", "ref-2.hex",
+            baseDocument: independentDocument);
+        workspace.RegisterComparisonView(dependent);
+        workspace.RegisterComparisonView(independent);
+        viewModel.ActivateComparison(independent);
+
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-open-compare-{Guid.NewGuid():N}.hex");
+        File.WriteAllText(path, ":01003000EEE1\n:00000001FF\n");
+        try
+        {
+            var preview = await viewModel.PrepareOpenReplacementAsync(path, CancellationToken.None, null);
+            viewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+            var closed = workspace.CloseImage(replacedDocument);
+            viewModel.ActivateEditor();
+
+            Assert.IsFalse(viewModel.IsOpenReplacementLoading);
+            Assert.AreNotSame(replacedDocument, workspace.Document);
+            Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x30, out var openedByte));
+            Assert.AreEqual((byte)0xEE, openedByte);
+            CollectionAssert.AreEqual(new[] { dependent }, closed.ToArray());
+            CollectionAssert.AreEqual(new[] { independent }, workspace.ComparisonViews.ToArray());
+            Assert.AreSame(independentDocument, independent.BaseDocument);
+            Assert.IsTrue(independentDocument.IsModified, "An independent Compare base keeps its unsaved edits.");
+            Assert.IsTrue(replacedDocument.CurrentImage.TryGetByte(0x10, out var oldByte));
+            Assert.AreEqual((byte)0xA1, oldByte);
+            Assert.IsTrue(viewModel.ActiveIsEditor);
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    [TestMethod]
     public void DirtyEditableDocumentsAreReturnedOnceInEditorThenCompareOrder()
     {
         var workspace = new EditorDocumentWorkspace();
