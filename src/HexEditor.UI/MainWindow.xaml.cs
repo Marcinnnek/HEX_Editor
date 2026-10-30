@@ -14,14 +14,20 @@ using System.Threading.Tasks;
 using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.Tools;
+using Wpf.Ui.Appearance;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
+using WindowBackdropType = Wpf.Ui.Controls.WindowBackdropType;
+using MessageBox = HexEditor.UI.ThemedMessageBox;
 
 namespace HexEditor.UI;
 
 /// <summary>
 /// Interaction logic for MainWindow.xaml
 /// </summary>
-public partial class MainWindow : Window
+public partial class MainWindow : FluentWindow
 {
+    private readonly AppearanceSettings _appearanceSettings = new();
+    private bool _watchingSystemTheme;
     private readonly List<CompareView> _comparisonViews = [];
     private readonly ImageEditWorkflow _imageEdits;
     private readonly ChecksumWorkflow _checksums;
@@ -42,6 +48,54 @@ public partial class MainWindow : Window
         ViewModel.ImageChanged += ViewModel_ImageChanged;
         DataContext = this;
         Closing += MainWindow_Closing;
+        Loaded += (_, _) => ApplyAppearance();
+        ApplyAppearance();
+    }
+
+    private void AutomaticAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Automatic);
+    private void LightAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Light);
+    private void DarkAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Dark);
+
+    private void SetAppearance(AppearanceMode mode)
+    {
+        try
+        {
+            _appearanceSettings.SetMode(mode);
+            ApplyAppearance();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, exception.Message, "Unable to save appearance", MessageBoxButton.OK, MessageBoxImage.Error);
+            ApplyAppearance();
+        }
+    }
+
+    private void ApplyAppearance()
+    {
+        var mode = _appearanceSettings.Mode;
+        AutomaticAppearanceItem.IsChecked = mode == AppearanceMode.Automatic;
+        LightAppearanceItem.IsChecked = mode == AppearanceMode.Light;
+        DarkAppearanceItem.IsChecked = mode == AppearanceMode.Dark;
+
+        if (mode == AppearanceMode.Automatic)
+        {
+            ApplicationThemeManager.ApplySystemTheme();
+            if (IsLoaded && !_watchingSystemTheme)
+            {
+                SystemThemeWatcher.Watch(this, WindowBackdropType.None);
+                _watchingSystemTheme = true;
+            }
+        }
+        else
+        {
+            if (_watchingSystemTheme)
+            {
+                SystemThemeWatcher.UnWatch(this);
+                _watchingSystemTheme = false;
+            }
+            ApplicationThemeManager.Apply(mode == AppearanceMode.Light ? ApplicationTheme.Light : ApplicationTheme.Dark,
+                WindowBackdropType.None);
+        }
     }
 
     public MainViewModel ViewModel { get; }
