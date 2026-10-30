@@ -154,6 +154,7 @@
                     <ui:DataGrid Grid.Row="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                               HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
+                              MouseDoubleClick="SegmentsGrid_MouseDoubleClick"
                               MaxHeight="150" MinHeight="72" VerticalScrollBarVisibility="Auto">
                         <ui:DataGrid.Columns>
                             <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
