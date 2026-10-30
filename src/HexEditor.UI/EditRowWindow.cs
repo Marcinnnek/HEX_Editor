@@ -35,7 +35,7 @@ public sealed class EditRowWindow : Window
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
         var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         for (var i = 0; i < session.Cells.Count; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(74) });
-        AddLabelRow(grid, 0, "Address", cell => cell.AddressText);
+        AddLabelRow(grid, 0, "Offset", cell => cell.OffsetText);
         AddLabelRow(grid, 1, "Original HEX", cell => cell.Hex);
         AddLabelRow(grid, 2, "Original ASCII", cell => cell.Ascii);
         AddLabelRow(grid, 3, "Proposed HEX", cell => cell.Hex);
@@ -58,12 +58,12 @@ public sealed class EditRowWindow : Window
     private void SyncAscii(int index)
     {
         var text = _hex[index].Text;
-        if (text.Length == 2 && byte.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out var value))
+        if (text.Length is >= 1 and <= 2 && byte.TryParse(text, System.Globalization.NumberStyles.HexNumber, null, out var value))
         { _syncing = true; _ascii[index].Text = value is >= 0x20 and <= 0x7E ? ((char)value).ToString() : "."; _syncing = false; }
     }
     private void SyncHex(int index) { _syncing = true; _hex[index].Text = ((byte)_ascii[index].Text[0]).ToString("X2"); _syncing = false; }
 
-    private static TextBox CreateInput(string text, bool enabled) => new() { Text = text, IsEnabled = enabled, Width = 58, Margin = new Thickness(3), FontFamily = new FontFamily("Consolas") };
+    private static TextBox CreateInput(string text, bool enabled) => new() { Text = text, IsEnabled = enabled, MaxLength = text.Length == 1 ? 1 : 2, Width = 58, Margin = new Thickness(3), FontFamily = new FontFamily("Consolas") };
     private static void AddCell(Grid grid, int row, int col, UIElement element) { while (grid.RowDefinitions.Count <= row) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(element, row); Grid.SetColumn(element, col); grid.Children.Add(element); }
     private void AddLabelRow(Grid grid, int row, string header, Func<EditRowCell, string> value)
     {

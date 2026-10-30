@@ -26,7 +26,7 @@ public sealed class EditRowSession
             var address = (ulong)rowStartAddress + (uint)index;
             byte? value = address <= uint.MaxValue && _originalImage.TryGetByte((uint)address, out var found) ? found : null;
             if (value is byte occupied) _proposed[(uint)address] = occupied;
-            cells.Add(new EditRowCell(address <= uint.MaxValue ? (uint)address : null, value));
+            cells.Add(new EditRowCell(address <= uint.MaxValue ? (uint)address : null, value, index));
         }
         Cells = cells;
     }
@@ -43,7 +43,7 @@ public sealed class EditRowSession
     public bool SetHex(uint address, string text)
     {
         if (!CanEdit(address)) return false;
-        if (text is null || text.Length != 2 || !byte.TryParse(text, System.Globalization.NumberStyles.AllowHexSpecifier,
+        if (text is null || text.Length is < 1 or > 2 || !byte.TryParse(text, System.Globalization.NumberStyles.AllowHexSpecifier,
                 System.Globalization.CultureInfo.InvariantCulture, out var value))
         { _invalidAddresses.Add(address); return false; }
         _proposed[address] = value;
@@ -80,9 +80,10 @@ public sealed class EditRowSession
     private bool CanEdit(uint address) => !IsCompleted && Cells.Any(cell => cell.Address == address && cell.IsOccupied);
 }
 
-public sealed record EditRowCell(uint? Address, byte? OriginalValue)
+public sealed record EditRowCell(uint? Address, byte? OriginalValue, int Offset)
 {
     public bool IsOccupied => OriginalValue.HasValue;
+    public string OffsetText => Offset.ToString("X2");
     public string AddressText => Address?.ToString("X8") ?? "—";
     public string Hex => OriginalValue?.ToString("X2") ?? "  ";
     public string Ascii => OriginalValue is byte value ? value is >= 0x20 and <= 0x7E ? ((char)value).ToString() : "." : "";
