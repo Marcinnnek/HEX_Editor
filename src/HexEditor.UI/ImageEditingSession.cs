@@ -106,6 +106,8 @@ public sealed class ImageEditingSession
         var overlaps = GetPasteOverlapCount(address);
         if (overlaps > 0 && overlapDecision is null)
             throw new InvalidOperationException($"Paste overlaps {overlaps:N0} occupied byte(s); choose whether to keep or overwrite them.");
+        if (overlapDecision == OverlapDecision.Cancel) return;
+        EnsureWithinUserImageLimit(checked(_currentImage.OccupiedByteCount + _clipboard.Image.OccupiedByteCount - (ulong)overlaps));
         Commit(MemoryImageEdits.Overlay(_currentImage, BuildPasteImage(address), overlapDecision ?? OverlapDecision.OverwriteIncoming));
     }
 
@@ -147,6 +149,7 @@ public sealed class ImageEditingSession
         FillPolicy policy = FillPolicy.KeepExisting)
     {
         ValidateFill(startAddress, endAddress, pattern, policy);
+        EnsureWithinUserImageLimit(GetFilledOccupiedByteCount(startAddress, endAddress, policy));
         Commit(_currentImage.WithPatternRange(startAddress, endAddress, pattern.ToArray(), policy == FillPolicy.OverwriteExisting));
     }
 
@@ -156,6 +159,7 @@ public sealed class ImageEditingSession
     {
         ValidateFill(startAddress, endAddress, pattern, policy);
         var priorImage = _currentImage;
+        EnsureWithinUserImageLimit(GetFilledOccupiedByteCount(priorImage, startAddress, endAddress, policy));
         var fillPattern = pattern.ToArray();
         var addressCount = (long)((ulong)endAddress - startAddress + 1);
         cancellationToken.ThrowIfCancellationRequested();
@@ -180,6 +184,32 @@ public sealed class ImageEditingSession
         if (pattern.Count == 0) throw new ArgumentException("The fill pattern must contain at least one byte.", nameof(pattern));
         if (policy is not FillPolicy.KeepExisting and not FillPolicy.OverwriteExisting)
             throw new ArgumentOutOfRangeException(nameof(policy));
+    }
+
+    internal static void EnsureWithinUserImageLimit(ulong occupiedByteCount)
+    {
+        var limit = MemoryImageFileService.DefaultMaximumOccupiedByteCount;
+        if (occupiedByteCount > limit)
+            throw new InvalidOperationException($"The edit would exceed the limit of {limit.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} occupied bytes per image.");
+    }
+
+    private ulong GetFilledOccupiedByteCount(uint startAddress, uint endAddress, FillPolicy policy) =>
+        GetFilledOccupiedByteCount(_currentImage, startAddress, endAddress, policy);
+
+    private static ulong GetFilledOccupiedByteCount(MemoryImage image, uint startAddress, uint endAddress, FillPolicy policy)
+    {
+        ulong overlappingBytes = 0;
+        foreach (var range in image.Ranges)
+        {
+            var overlapStart = Math.Max((ulong)startAddress, range.StartAddress);
+            var overlapEnd = Math.Min((ulong)endAddress, range.EndAddress);
+            if (overlapStart <= overlapEnd) overlappingBytes = checked(overlappingBytes + overlapEnd - overlapStart + 1);
+        }
+
+        var requestedBytes = (ulong)endAddress - startAddress + 1;
+        return policy == FillPolicy.OverwriteExisting
+            ? checked(image.OccupiedByteCount - overlappingBytes + requestedBytes)
+            : checked(image.OccupiedByteCount + requestedBytes - overlappingBytes);
     }
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) =>
@@ -265,6 +295,10 @@ public sealed record InsertPreview(MemoryImage ExistingImage, IReadOnlyDictionar
             ? IncomingBytes
             : IncomingBytes.Where(pair => !ExistingImage.TryGetByte(pair.Key, out _))
                 .ToDictionary(pair => pair.Key, pair => pair.Value);
+        var newBytes = decision == OverlapDecision.OverwriteIncoming
+            ? applied.Count - OverlapCount
+            : applied.Count;
+        ImageEditingSession.EnsureWithinUserImageLimit(checked(ExistingImage.OccupiedByteCount + (ulong)newBytes));
         return ExistingImage.WithByteChanges(applied);
     }
 }
