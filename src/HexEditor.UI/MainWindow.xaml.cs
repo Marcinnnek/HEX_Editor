@@ -50,6 +50,7 @@ public partial class MainWindow : Window
         HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         DataContext = this;
         Closing += MainWindow_Closing;
+        ApplicationThemeManager.Changed += (theme, _) => AppearancePalette.Apply(theme == ApplicationTheme.Dark);
         Loaded += (_, _) => ApplyAppearance();
         ApplyAppearance();
     }
@@ -109,6 +110,7 @@ public partial class MainWindow : Window
             ApplicationThemeManager.Apply(mode == AppearanceMode.Light ? ApplicationTheme.Light : ApplicationTheme.Dark,
                 WindowBackdropType.None);
         }
+        AppearancePalette.Apply(ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark);
     }
 
     public MainViewModel ViewModel { get; }

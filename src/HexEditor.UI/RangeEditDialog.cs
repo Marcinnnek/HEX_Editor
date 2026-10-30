@@ -14,11 +14,12 @@ internal sealed class RangeEditDialog : Window
     private readonly TextBox _start = new() { MinWidth = 150 };
     private readonly TextBox _end = new() { MinWidth = 150 };
     private readonly TextBox _pattern = new() { MinWidth = 220 };
-    private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap, Foreground = System.Windows.Media.Brushes.Firebrick };
+    private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
 
     public RangeEditDialog(RangeEditDialogKind kind, uint start, uint end)
     {
         _kind = kind;
+        _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
         Title = kind switch { RangeEditDialogKind.SelectRange => "Select Range", RangeEditDialogKind.Insert => "Edit / Insert", _ => "Fill Range" };
         Width = 390;
         SizeToContent = SizeToContent.Height;

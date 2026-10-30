@@ -49,7 +49,11 @@ public sealed class EditRowWindow : Window
             _hex[i].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetHex(cell.Address!.Value, _hex[index].Text)) SyncAscii(index); };
             _ascii[i].TextChanged += (_, _) => { if (_syncing) return; if (_ascii[index].Text.Length == 1 && _session.SetAscii(cell.Address!.Value, _ascii[index].Text)) SyncHex(index); };
             AddCell(grid, 3, i + 1, _hex[i]); AddCell(grid, 4, i + 1, _ascii[i]);
-            if (cell.Address == session.SelectedAddress) _hex[i].BorderBrush = _ascii[i].BorderBrush = Brushes.DodgerBlue;
+            if (cell.Address == session.SelectedAddress)
+            {
+                _hex[i].SetResourceReference(TextBox.BorderBrushProperty, "HexFocusBrush");
+                _ascii[i].SetResourceReference(TextBox.BorderBrushProperty, "HexFocusBrush");
+            }
         }
         scroll.Content = grid; root.Children.Add(scroll); Content = root;
         if (session.Cells.Any(cell => cell.Address == session.SelectedAddress)) _hex[session.Cells.ToList().FindIndex(cell => cell.Address == session.SelectedAddress)].Focus();

@@ -6,6 +6,31 @@ namespace HexEditor.Tests;
 public class AppearanceSettingsTests
 {
     [TestMethod]
+    public void Manual_appearance_override_controls_the_effective_theme_after_restart()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "hex-editor-appearance-" + Guid.NewGuid());
+        var path = Path.Combine(directory, "appearance.json");
+        try
+        {
+            var settings = new AppearanceSettings(path);
+            Assert.AreEqual(AppearanceMode.Light, settings.GetEffectiveTheme(false));
+            Assert.AreEqual(AppearanceMode.Dark, settings.GetEffectiveTheme(true));
+
+            settings.SetMode(AppearanceMode.Dark);
+            var restarted = new AppearanceSettings(path);
+            Assert.AreEqual(AppearanceMode.Dark, restarted.GetEffectiveTheme(false));
+            Assert.AreEqual(AppearanceMode.Dark, restarted.GetEffectiveTheme(true));
+
+            restarted.SetMode(AppearanceMode.Light);
+            Assert.AreEqual(AppearanceMode.Light, new AppearanceSettings(path).GetEffectiveTheme(true));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
+    [TestMethod]
     public void Appearance_choice_survives_restart_and_can_return_to_automatic()
     {
         var directory = Path.Combine(Path.GetTempPath(), "hex-editor-appearance-" + Guid.NewGuid());

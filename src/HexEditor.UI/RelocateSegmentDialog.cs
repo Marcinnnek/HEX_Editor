@@ -54,7 +54,7 @@ public sealed class RelocateSegmentDialog : Window
             return true;
         }
 
-        _preview.Foreground = Brushes.Firebrick;
+        _preview.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
         _preview.Text = "Enter a valid 32-bit address with room for the entire segment.";
         return false;
     }
@@ -64,12 +64,12 @@ public sealed class RelocateSegmentDialog : Window
         if (HexAddressParser.TryParse(_destination.Text, out var destination) && _byteCount > 0 &&
             (ulong)destination + (uint)_byteCount - 1 <= uint.MaxValue)
         {
-            _preview.Foreground = SystemColors.ControlTextBrush;
+            _preview.SetResourceReference(TextBlock.ForegroundProperty, "HexTextBrush");
             _preview.Text = $"New range: 0x{destination:X8}–0x{destination + (uint)_byteCount - 1:X8}";
         }
         else
         {
-            _preview.Foreground = Brushes.Firebrick;
+            _preview.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
             _preview.Text = "Enter a valid 32-bit address with room for the entire segment.";
         }
     }

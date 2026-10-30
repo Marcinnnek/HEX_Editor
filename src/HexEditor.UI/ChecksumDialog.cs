@@ -27,12 +27,13 @@ public sealed class ChecksumDialog : Window
     private readonly TextBox _finalXor = new() { Text = "0", Width = 100 };
     private readonly TextBox _writeAddress = new() { Text = "00000000", Width = 130 };
     private readonly TextBlock _result = new() { Text = "Calculate to inspect the result.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 4) };
-    private readonly TextBlock _error = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
 
     public ChecksumDialog(MainViewModel viewModel, Func<int, string, OverlapDecision> chooseOverlap)
     {
         _viewModel = viewModel;
         _chooseOverlap = chooseOverlap;
+        _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
         Title = "Calculate checksum / CRC";
         Width = 510;
         SizeToContent = SizeToContent.Height;
@@ -111,12 +112,12 @@ public sealed class ChecksumDialog : Window
             if (collisions > 0 && _chooseOverlap(collisions, "checksum write") == OverlapDecision.Cancel) return;
             var decision = collisions > 0 ? OverlapDecision.OverwriteIncoming : (OverlapDecision?)null;
             _viewModel.WriteChecksumResult(address, decision);
-            _error.Foreground = SystemColors.ControlTextBrush;
+            _error.SetResourceReference(TextBlock.ForegroundProperty, "HexTextBrush");
             _error.Text = "Checksum bytes written as one undoable edit.";
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
         {
-            _error.Foreground = Brushes.Firebrick;
+            _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
             _error.Text = exception.Message;
         }
     }

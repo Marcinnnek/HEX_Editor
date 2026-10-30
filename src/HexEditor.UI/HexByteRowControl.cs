@@ -8,9 +8,6 @@ namespace HexEditor.UI;
 /// <summary>Draws a row of byte text and highlights without a visual element per byte.</summary>
 public sealed class HexByteRowControl : Control
 {
-    private static readonly Brush DifferentBrush = CreateBrush(0xD0, 0x38, 0x38);
-    private static readonly Brush OnlyInPanelBrush = CreateBrush(0xD0, 0x85, 0x14);
-    private static readonly Brush OnlyOtherBrush = CreateBrush(0x70, 0x70, 0x70);
     private double _characterWidth;
     private double _lineHeight;
     private double _pixelsPerDip;
@@ -76,9 +73,9 @@ public sealed class HexByteRowControl : Control
         {
             var brush = row.Cells[index].Highlight switch
             {
-                "Different" => DifferentBrush,
-                "OnlyInPanel" => OnlyInPanelBrush,
-                "OnlyOther" => OnlyOtherBrush,
+                "Different" => TryFindResource("HexDifferentBrush") as Brush,
+                "OnlyInPanel" => TryFindResource("HexOnlyInPanelBrush") as Brush,
+                "OnlyOther" => TryFindResource("HexOnlyOtherBrush") as Brush,
                 _ => null
             };
             if (brush is not null)
@@ -95,6 +92,7 @@ public sealed class HexByteRowControl : Control
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
+        if (e.Property == ForegroundProperty) InvalidateVisual();
         if (e.Property == FontFamilyProperty || e.Property == FontSizeProperty || e.Property == FontStyleProperty ||
             e.Property == FontWeightProperty || e.Property == FontStretchProperty)
         {
@@ -120,8 +118,19 @@ public sealed class HexByteRowControl : Control
         GridSpacingSettings.Current.HorizontalByteSpacing,
         GridSpacingSettings.Current.VerticalRowSpacing);
 
-    private void Control_Loaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged += SpacingChanged;
-    private void Control_Unloaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
+    private void Control_Loaded(object sender, RoutedEventArgs e)
+    {
+        GridSpacingSettings.SpacingChanged += SpacingChanged;
+        AppearancePalette.Changed += PaletteChanged;
+    }
+
+    private void Control_Unloaded(object sender, RoutedEventArgs e)
+    {
+        GridSpacingSettings.SpacingChanged -= SpacingChanged;
+        AppearancePalette.Changed -= PaletteChanged;
+    }
+
+    private void PaletteChanged() => InvalidateVisual();
 
     private void SpacingChanged() => Dispatcher.BeginInvoke(() =>
     {
@@ -133,10 +142,4 @@ public sealed class HexByteRowControl : Control
         text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
         new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize, Foreground, _pixelsPerDip);
 
-    private static Brush CreateBrush(byte red, byte green, byte blue)
-    {
-        var brush = new SolidColorBrush(Color.FromArgb(0x55, red, green, blue));
-        brush.Freeze();
-        return brush;
-    }
 }

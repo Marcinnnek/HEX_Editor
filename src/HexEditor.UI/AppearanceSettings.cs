@@ -24,6 +24,10 @@ public sealed class AppearanceSettings
     public string FilePath { get; }
     public AppearanceMode Mode { get; private set; }
 
+    public AppearanceMode GetEffectiveTheme(bool windowsIsDark) => Mode == AppearanceMode.Automatic
+        ? windowsIsDark ? AppearanceMode.Dark : AppearanceMode.Light
+        : Mode;
+
     public void SetMode(AppearanceMode mode)
     {
         if (!Enum.IsDefined(mode)) throw new ArgumentOutOfRangeException(nameof(mode));
