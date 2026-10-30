@@ -27,6 +27,7 @@ namespace HexEditor.UI;
 public partial class MainWindow : FluentWindow
 {
     private readonly AppearanceSettings _appearanceSettings = new();
+    private readonly UserDataDiagnostics _diagnostics = new();
     private bool _watchingSystemTheme;
     private readonly ImageEditWorkflow _imageEdits;
     private readonly ChecksumWorkflow _checksums;
@@ -64,6 +65,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
+            RecordError("Save appearance", exception);
             MessageBox.Show(this, exception.Message, "Unable to save appearance", MessageBoxButton.OK, MessageBoxImage.Error);
             ApplyAppearance();
         }
@@ -118,6 +120,16 @@ public partial class MainWindow : FluentWindow
         for (var current = source; current is not null; current = VisualTreeHelper.GetParent(current))
             if (current is T match) return match;
         return null;
+    }
+
+    private void RecordError(string operation, Exception exception)
+    {
+        var status = ViewModel.EditorStatus;
+        var end = status.CurrentAddress is { } start && status.SelectionLength > 1 &&
+                  (ulong)start + (ulong)status.SelectionLength - 1 <= uint.MaxValue
+            ? (uint?)(start + (uint)status.SelectionLength - 1)
+            : null;
+        _diagnostics.RecordError(operation, exception, status.CurrentAddress, end);
     }
 
     private async Task<T> RunFileOperationAsync<T>(Func<CancellationToken, IProgress<MemoryImageFileProgress>, Task<T>> operation)
@@ -199,6 +211,7 @@ public partial class MainWindow : FluentWindow
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Compare"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
         {
+            RecordError("Compare", exception);
             MessageBox.Show(this, exception.Message, "Unable to compare files", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -227,6 +240,7 @@ public partial class MainWindow : FluentWindow
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
         {
+            RecordError("Merge", exception);
             MessageBox.Show(this, exception.Message, "Unable to merge images", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -267,6 +281,7 @@ public partial class MainWindow : FluentWindow
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Open"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
         {
+            RecordError("Open", exception);
             MessageBox.Show(this, exception.Message, "Unable to open file", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -282,6 +297,7 @@ public partial class MainWindow : FluentWindow
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
+            RecordError("Save", exception);
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -304,6 +320,7 @@ public partial class MainWindow : FluentWindow
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); return false; }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
+            RecordError("Save as", exception);
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
@@ -320,6 +337,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
         {
+            RecordError("Save as", exception);
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
@@ -383,6 +401,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
+            RecordError("Insert", exception);
             ShowEditError(exception);
         }
     }
@@ -396,6 +415,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
+            RecordError("Fill", exception);
             ShowEditError(exception);
         }
     }
@@ -409,6 +429,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
         {
+            RecordError("Calculate checksum", exception);
             MessageBox.Show(this, exception.Message, "Unable to calculate checksum", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -466,6 +487,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
         {
+            RecordError("Write checksum", exception);
             MessageBox.Show(this, exception.Message, "Unable to write checksum", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
@@ -484,6 +506,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
+            RecordError("Paste", exception);
             ShowEditError(exception);
         }
     }
@@ -491,7 +514,11 @@ public partial class MainWindow : FluentWindow
     private void RunRangeEdit(Action action)
     {
         try { action(); Title = ViewModel.WindowTitle; }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException) { ShowEditError(exception); }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
+        {
+            RecordError("Edit selection", exception);
+            ShowEditError(exception);
+        }
     }
 
     private OverlapDecision AskOverlap(int count, string operation)
@@ -569,6 +596,7 @@ public partial class MainWindow : FluentWindow
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
+            RecordError("Save before close", exception);
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
@@ -666,6 +694,7 @@ public partial class MainWindow : FluentWindow
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Export"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
+            RecordError("Export", exception);
             MessageBox.Show(this, exception.Message, "Unable to export selected data", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
