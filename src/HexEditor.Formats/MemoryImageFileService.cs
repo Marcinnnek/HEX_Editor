@@ -2,6 +2,16 @@ namespace HexEditor.Formats;
 
 public sealed class MemoryImageFileService
 {
+    public const ulong DefaultMaximumOccupiedByteCount = 100_000_000;
+    private readonly ulong _maximumOccupiedByteCount;
+
+    public MemoryImageFileService(ulong maximumOccupiedByteCount = DefaultMaximumOccupiedByteCount)
+    {
+        if (maximumOccupiedByteCount == 0)
+            throw new ArgumentOutOfRangeException(nameof(maximumOccupiedByteCount), "The occupied-byte limit must be greater than zero.");
+        _maximumOccupiedByteCount = maximumOccupiedByteCount;
+    }
+
     public void ExportAddressRange(
         HexEditor.Core.MemoryImage image,
         uint startAddress,
@@ -49,12 +59,14 @@ public sealed class MemoryImageFileService
             throw new InvalidOperationException("Select at least one occupied segment to export.");
 
         var selectedRanges = new List<HexEditor.Core.MemoryImageRange>(indexes.Length);
+        var blocks = image.Blocks;
         foreach (var index in indexes)
         {
-            if ((uint)index >= (uint)image.Ranges.Count)
+            if ((uint)index >= (uint)blocks.Count)
                 throw new ArgumentOutOfRangeException(nameof(segmentIndexes), index,
-                    $"Segment index {index} is outside the available range 0-{image.Ranges.Count - 1}.");
-            selectedRanges.Add(image.Ranges[index]);
+                    $"Block index {index} is outside the available range 0-{blocks.Count - 1}.");
+            var block = blocks[index];
+            selectedRanges.AddRange(image.Ranges.Where(range => range.StartAddress >= block.StartAddress && range.EndAddress <= block.EndAddress));
         }
 
         var selectedByteCount = selectedRanges.Aggregate(0UL, (count, range) => checked(count + range.ByteCount));
@@ -293,7 +305,8 @@ public sealed class MemoryImageFileService
                 records,
                 format,
                 sourcePath,
-                metadata);
+                metadata,
+                _maximumOccupiedByteCount);
         }
         finally
         {

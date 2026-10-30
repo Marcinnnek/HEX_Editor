@@ -136,9 +136,10 @@ public sealed class ImageEditingSession
 
     public void DeleteSegment(int segmentIndex)
     {
-        if ((uint)segmentIndex >= (uint)_currentImage.Ranges.Count)
+        var blocks = _currentImage.Blocks;
+        if ((uint)segmentIndex >= (uint)blocks.Count)
             throw new ArgumentOutOfRangeException(nameof(segmentIndex));
-        var range = _currentImage.Ranges[segmentIndex];
+        var range = blocks[segmentIndex];
         Commit(_currentImage.WithoutRange(range.StartAddress, range.EndAddress));
     }
 

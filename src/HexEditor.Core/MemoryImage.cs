@@ -4,11 +4,13 @@ public sealed class MemoryImage
 {
     private readonly IReadOnlyList<MemorySegment> _segments;
     private readonly IReadOnlyList<MemoryImageRange> _ranges;
+    private readonly IReadOnlyList<LogicalMemoryBlock> _blocks;
 
     private MemoryImage(IReadOnlyList<MemorySegment> segments, IReadOnlyList<MemoryImageRange>? ranges = null)
     {
         _segments = Array.AsReadOnly(segments.ToArray());
         _ranges = Array.AsReadOnly((ranges ?? segments.Select(MemoryImageRange.FromSegment).ToArray()).ToArray());
+        _blocks = Array.AsReadOnly(CreateBlocks(_ranges));
         OccupiedByteCount = _ranges.Aggregate(0UL, (count, range) => checked(count + range.ByteCount));
     }
 
@@ -16,6 +18,24 @@ public sealed class MemoryImage
 
     /// <summary>Occupied byte ranges, including ranges too large to materialize as a <see cref="MemorySegment"/>.</summary>
     public IReadOnlyList<MemoryImageRange> Ranges => _ranges;
+
+    /// <summary>Maximal contiguous occupied address ranges, independent of backing range boundaries.</summary>
+    public IReadOnlyList<LogicalMemoryBlock> Blocks => _blocks;
+
+    private static LogicalMemoryBlock[] CreateBlocks(IReadOnlyList<MemoryImageRange> ranges)
+    {
+        var blocks = new List<LogicalMemoryBlock>();
+        foreach (var range in ranges)
+        {
+            if (blocks.Count > 0 && (ulong)blocks[^1].EndAddress + 1 == range.StartAddress)
+            {
+                var prior = blocks[^1];
+                blocks[^1] = prior with { EndAddress = range.EndAddress, ByteCount = prior.ByteCount + range.ByteCount };
+            }
+            else blocks.Add(new LogicalMemoryBlock(range.StartAddress, range.EndAddress, range.ByteCount));
+        }
+        return blocks.ToArray();
+    }
 
     /// <summary>The number of explicitly occupied bytes, which may be 2^32.</summary>
     public ulong OccupiedByteCount { get; }
@@ -258,23 +278,24 @@ public sealed class MemoryImage
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress)
     {
-        if ((uint)segmentIndex >= (uint)_segments.Count)
+        var blocks = Blocks;
+        if ((uint)segmentIndex >= (uint)blocks.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(segmentIndex));
         }
 
-        var source = _segments[segmentIndex];
-        var destinationEnd = (ulong)destinationBaseAddress + (uint)source.ByteCount - 1;
+        var source = blocks[segmentIndex];
+        var destinationEnd = (ulong)destinationBaseAddress + source.ByteCount - 1;
         if (destinationEnd > uint.MaxValue)
         {
             throw new ArgumentOutOfRangeException(nameof(destinationBaseAddress), "The relocated segment extends beyond the 32-bit address range.");
         }
 
         var overlaps = new List<RelocationOverlap>();
-        foreach (var segment in _segments.Where((_, index) => index != segmentIndex))
+        foreach (var range in _ranges.Where(range => range.EndAddress < source.StartAddress || range.StartAddress > source.EndAddress))
         {
-            var start = Math.Max((ulong)destinationBaseAddress, segment.StartAddress);
-            var end = Math.Min(destinationEnd, segment.EndAddress);
+            var start = Math.Max((ulong)destinationBaseAddress, range.StartAddress);
+            var end = Math.Min(destinationEnd, range.EndAddress);
             if (start > end)
             {
                 continue;
@@ -282,12 +303,14 @@ public sealed class MemoryImage
 
             for (var address = start; address <= end; address++)
             {
-                var incoming = source.Data.Span[(int)(address - destinationBaseAddress)];
-                _ = segment.TryGetByte((uint)address, out var existing);
+                TryGetByte((uint)(source.StartAddress + (address - destinationBaseAddress)), out var incoming);
+                _ = range.TryGetByte((uint)address, out var existing);
                 overlaps.Add(new RelocationOverlap((uint)address, existing, incoming));
             }
         }
 
-        return new MemoryRelocationPreview(this, segmentIndex, destinationBaseAddress, overlaps);
+        return new MemoryRelocationPreview(this, source, destinationBaseAddress, overlaps);
     }
 }
+
+public sealed record LogicalMemoryBlock(uint StartAddress, uint EndAddress, ulong ByteCount);

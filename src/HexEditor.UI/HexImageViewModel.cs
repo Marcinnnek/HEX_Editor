@@ -79,12 +79,12 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex)
     {
-        if ((uint)segmentIndex >= (uint)Image.Ranges.Count)
+        if ((uint)segmentIndex >= (uint)Image.Blocks.Count)
         {
             rowIndex = -1;
             return false;
         }
-        return TryNavigateToAddress(Image.Ranges[segmentIndex].StartAddress, out rowIndex);
+        return TryNavigateToAddress(Image.Blocks[segmentIndex].StartAddress, out rowIndex);
     }
 
     private void RebuildRows()

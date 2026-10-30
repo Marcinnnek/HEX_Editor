@@ -59,7 +59,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ActiveHasSelection => _activeComparison is null && EditorStatus.SelectionLength > 0;
     public bool ActiveCanPaste => _activeComparison is null && ActiveHasSelection && Editing.HasClipboard;
     public bool ActiveCanRelocate => _activeComparison is null &&
-        (uint)_selectedSegmentIndex < (uint)ActiveImage.Ranges.Count;
+        (uint)_selectedSegmentIndex < (uint)ActiveImage.Blocks.Count;
     public int SelectedSegmentIndex
     {
         get => _selectedSegmentIndex;
@@ -351,8 +351,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (clearSelection) EditorStatus.ClearSelection();
         ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii, Workspace.Document);
         Segments.Clear();
-        foreach (var (range, index) in CurrentImage.Ranges.Select((range, index) => (range, index)))
-            Segments.Add(new MemorySegmentRow(range.StartAddress.ToString("X8"), range.EndAddress.ToString("X8"), checked((long)range.ByteCount), index + 1));
+        foreach (var (block, index) in CurrentImage.Blocks.Select((block, index) => (block, index)))
+            Segments.Add(new MemorySegmentRow(block.StartAddress.ToString("X8"), block.EndAddress.ToString("X8"), checked((long)block.ByteCount), index));
     }
 
     private void RefreshEditorStatus() => EditorStatus.UpdateImageState(SourceFormat, IsModified);
@@ -372,7 +372,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string DescribeImage(string? format)
     {
-        return $"{CurrentImage.Ranges.Count:N0} segments, {CurrentImage.OccupiedByteCount:N0} bytes" + (format is null ? string.Empty : $" | {format}");
+        return $"{CurrentImage.Blocks.Count:N0} Blocks, {CurrentImage.OccupiedByteCount:N0} bytes" + (format is null ? string.Empty : $" | {format}");
     }
 
     private void Raise(params string[] names)

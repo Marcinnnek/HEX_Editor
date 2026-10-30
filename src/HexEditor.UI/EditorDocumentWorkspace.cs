@@ -234,7 +234,7 @@ public sealed class EditorDocumentWorkspace
     public int DeleteBlock(int segmentIndex)
     {
         Document.Editing.DeleteSegment(segmentIndex);
-        return Math.Min(segmentIndex, Document.CurrentImage.Ranges.Count - 1);
+        return Math.Min(segmentIndex, Document.CurrentImage.Blocks.Count - 1);
     }
     public void Save() => Document.Save();
     public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>

@@ -185,4 +185,43 @@ public sealed class MemoryImageRelocationTests
         Assert.AreEqual(0, workspace.DeleteBlock(1), "When deleting the last Block, selection should fall back to the previous one.");
         Assert.AreEqual(-1, workspace.DeleteBlock(0), "An empty Block list has no selection.");
     }
+
+    [TestMethod]
+    public void LogicalBlockSpansAdjacentBackingRangesAndRelocationMovesTheWholeBlock()
+    {
+        var image = MemoryImage.FromRanges([
+            MemoryImage.FromRepeatedRange(0x1000, 0x1000 + 600_000 - 1, 0xA1).Ranges[0],
+            MemoryImage.FromRepeatedRange(0x1000 + 600_000, 0x1000 + 1_200_000 - 1, 0xB2).Ranges[0],
+            MemoryImage.FromRepeatedRange(0x200000, 0x200000, 0xC3).Ranges[0]]);
+
+        Assert.HasCount(2, image.Blocks);
+        Assert.AreEqual(0x1000u, image.Blocks[0].StartAddress);
+        Assert.AreEqual(0x1000u + 1_200_000 - 1, image.Blocks[0].EndAddress);
+        Assert.AreEqual(1_200_000UL, image.Blocks[0].ByteCount);
+        var relocated = image.PrepareRelocation(0, 0x5000).Apply(RelocationOverlapDecision.Overwrite)!;
+        Assert.IsFalse(relocated.TryGetByte(0x1000, out _));
+        Assert.IsTrue(relocated.TryGetByte(0x5000, out var first));
+        Assert.AreEqual((byte)0xA1, first);
+        Assert.IsTrue(relocated.TryGetByte(0x5000 + 600_000, out var second));
+        Assert.AreEqual((byte)0xB2, second);
+        Assert.IsTrue(relocated.TryGetByte(0x200000, out _));
+    }
+
+    [TestMethod]
+    public void WorkspaceDeleteBlockRemovesAdjacentBackingRangesAsOneUndoableBlock()
+    {
+        var image = MemoryImage.FromRanges([
+            MemoryImage.FromRepeatedRange(0x1000, 0x1000 + 600_000 - 1, 0xA1).Ranges[0],
+            MemoryImage.FromRepeatedRange(0x1000 + 600_000, 0x1000 + 1_200_000 - 1, 0xB2).Ranges[0],
+            MemoryImage.FromRepeatedRange(0x200000, 0x200000, 0xC3).Ranges[0]]);
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(image, null, null);
+
+        Assert.AreEqual(0, workspace.DeleteBlock(0));
+        Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x1000, out _));
+        Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x1000 + 1_200_000 - 1, out _));
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x200000, out _));
+        Assert.IsTrue(workspace.Undo());
+        Assert.AreSame(image, workspace.Document.CurrentImage);
+    }
 }

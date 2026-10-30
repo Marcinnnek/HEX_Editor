@@ -1,3 +1,4 @@
+using System.Globalization;
 using HexEditor.Core;
 
 namespace HexEditor.Formats;
@@ -12,14 +13,15 @@ public sealed class MemoryImageImportPreview
         IEnumerable<MemorySegment> records,
         MemoryImageExportFormat detectedFormat,
         string? sourcePath,
-        MemoryImageFormatMetadata? metadata)
+        MemoryImageFormatMetadata? metadata,
+        ulong maximumOccupiedByteCount)
     {
         _existingImage = existingImage;
         _records = Array.AsReadOnly(records.ToArray());
         DetectedFormat = detectedFormat;
         SourcePath = sourcePath;
         FormatMetadata = metadata;
-        OverlapSummary = BuildOverlapSummary(existingImage, _records);
+        OverlapSummary = BuildOverlapSummary(existingImage, _records, maximumOccupiedByteCount);
     }
 
     public MemoryImageExportFormat DetectedFormat { get; }
@@ -58,11 +60,13 @@ public sealed class MemoryImageImportPreview
             FormatMetadata);
     }
 
-    private static OverlapSummary BuildOverlapSummary(MemoryImage existing, IReadOnlyList<MemorySegment> records)
+    private static OverlapSummary BuildOverlapSummary(MemoryImage existing, IReadOnlyList<MemorySegment> records,
+        ulong maximumOccupiedByteCount)
     {
         var ranges = new List<OverlapRange>();
         var run = new OverlapRun();
         var seenIncoming = new Dictionary<uint, byte>();
+        ulong uniqueIncomingCount = 0;
         var overlaps = new Dictionary<uint, (long Identical, long Different)>();
         foreach (var record in records)
         {
@@ -76,7 +80,14 @@ public sealed class MemoryImageImportPreview
                 }
                 else if (existing.TryGetByte(address, out var existingValue))
                 {
+                    uniqueIncomingCount++;
+                    EnsureWithinLimit(uniqueIncomingCount, maximumOccupiedByteCount);
                     AddOverlap(address, existingValue, value);
+                }
+                else
+                {
+                    uniqueIncomingCount++;
+                    EnsureWithinLimit(uniqueIncomingCount, maximumOccupiedByteCount);
                 }
                 seenIncoming[address] = value;
             }
@@ -92,6 +103,13 @@ public sealed class MemoryImageImportPreview
             overlaps[address] = previous == current
                 ? (counts.Identical + 1, counts.Different)
                 : (counts.Identical, counts.Different + 1);
+        }
+
+        static void EnsureWithinLimit(ulong count, ulong maximum)
+        {
+            if (count > maximum)
+                throw new MemoryImageImportException(
+                    $"Image exceeds the maximum of {maximum.ToString("N0", CultureInfo.InvariantCulture)} occupied bytes.");
         }
     }
 
