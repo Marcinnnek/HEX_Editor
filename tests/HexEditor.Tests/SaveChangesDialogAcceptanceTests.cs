@@ -31,6 +31,9 @@ public sealed class SaveChangesDialogAcceptanceTests
                     Left = -3000, Top = -3000, WindowStartupLocation = WindowStartupLocation.Manual,
                     ShowActivated = false, ShowInTaskbar = false
                 };
+                Assert.AreEqual(typeof(Window), typeof(SaveChangesDialog).BaseType,
+                    "The save prompt must use the standard WPF frame so its themed surface fills the window client area.");
+                Assert.AreEqual(WindowStyle.SingleBorderWindow, dialog.WindowStyle);
                 ApplicationAppearance.ApplyToWindow(dialog, mode);
                 var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
                 timer.Tick += (_, _) =>

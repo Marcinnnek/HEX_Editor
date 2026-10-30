@@ -2,12 +2,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace HexEditor.UI;
 
 /// <summary>Asks whether one named image should be saved before it is closed.</summary>
-public sealed class SaveChangesDialog : FluentWindow
+public sealed class SaveChangesDialog : Window
 {
     public SaveChangesDialog(Window? owner, string imageName)
     {
@@ -19,6 +18,7 @@ public sealed class SaveChangesDialog : FluentWindow
         MinWidth = 430;
         MaxWidth = 620;
         ShowInTaskbar = false;
+        WindowStyle = WindowStyle.SingleBorderWindow;
         ResizeMode = ResizeMode.NoResize;
         Choice = MessageBoxResult.Cancel;
 

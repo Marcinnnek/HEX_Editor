@@ -20,7 +20,7 @@ public sealed class EditRowWindow : Window
         Title = $"Edit Row — {_session.ImageName}";
         // A 37-DIP byte column keeps two HEX digits and one ASCII character readable.
         // The work-area cap leaves scrolling for narrow screens and high display scaling.
-        Width = Math.Min(112 + session.Cells.Count * 37 + 36, Math.Max(1, SystemParameters.WorkArea.Width - 24));
+        Width = Math.Min(120 + session.Cells.Count * 37 + 36, Math.Max(1, SystemParameters.WorkArea.Width - 24));
         MaxWidth = SystemParameters.WorkArea.Width;
         MaxHeight = SystemParameters.WorkArea.Height;
         SizeToContent = SizeToContent.Height;
@@ -35,9 +35,9 @@ public sealed class EditRowWindow : Window
             TextWrapping = TextWrapping.Wrap
         };
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Margin = new Thickness(6, 0, 0, 0), TabIndex = session.Cells.Count * 2 };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(6, 0, 0, 0), TabIndex = session.Cells.Count * 2 + 1 };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 10, 0) };
+        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Margin = new Thickness(10, 0, 0, 0), TabIndex = session.Cells.Count * 2 };
+        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(10, 0, 0, 0), TabIndex = session.Cells.Count * 2 + 1 };
         ok.Click += (_, _) => { if (_session.Commit()) { DialogResult = true; Close(); } else if (_session.IsValid) { DialogResult = true; Close(); } };
         cancel.Click += (_, _) => { _session.Cancel(); DialogResult = false; Close(); };
         buttons.Children.Add(ok); buttons.Children.Add(cancel); DockPanel.SetDock(buttons, Dock.Bottom); root.Children.Add(buttons);
