@@ -33,6 +33,8 @@ public partial class CompareView : UserControl
 
     public CompareWorkspaceTabViewModel Workspace { get; }
     public CompareViewModel ViewModel { get; }
+    public IReadOnlyList<int> SelectedBaseSegmentIndexes => FileABlocks.SelectedItems
+        .Cast<CompareMemoryBlockRow>().Select(row => Workspace.BlocksA.IndexOf(row)).Where(index => index >= 0).ToArray();
     public int[] RowWidths { get; }
     public CompareViewMode[] ViewModes { get; }
     public event Action<uint>? BaseRowActivated;

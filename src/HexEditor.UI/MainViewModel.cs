@@ -173,6 +173,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
         _fileService.ExportSegments(CurrentImage, segmentIndexes, format, maxDataBytesPerRecord, output, SourceFormatMetadata);
 
+    public void ExportImage(MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
+        _fileService.Export(CurrentImage, format, maxDataBytesPerRecord, output, SourceFormatMetadata);
+
     public void ExportAddressRange(uint startAddress, uint endAddress, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
         _fileService.ExportAddressRange(CurrentImage, startAddress, endAddress, format, maxDataBytesPerRecord, output, SourceFormatMetadata);
 

@@ -8,6 +8,25 @@ namespace HexEditor.Tests;
 public sealed class EditorDocumentWorkspaceTests
 {
     [TestMethod]
+    public void Export_image_writes_a_copy_without_changing_document_association_or_dirty_state()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "working.hex");
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20])]);
+        var viewModel = new MainViewModel();
+        viewModel.LoadImage(image, path, MemoryImageExportFormat.IntelHex);
+        viewModel.EditByte(0x1000, 0x11);
+
+        using var output = new MemoryStream();
+        viewModel.ExportImage(MemoryImageExportFormat.SRecord, 8, output);
+
+        Assert.AreEqual(path, viewModel.SourcePath);
+        Assert.IsTrue(viewModel.IsModified);
+        Assert.IsTrue(viewModel.CurrentImage.TryGetByte(0x1000, out var exportedValue));
+        Assert.AreEqual((byte)0x11, exportedValue);
+        Assert.IsTrue(output.Length > 0);
+    }
+
+    [TestMethod]
     public void EditUndoRedoAndSaveAsKeepTheSameDocument()
     {
         var workspace = new EditorDocumentWorkspace();
