@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace HexEditor.Core;
 
 public sealed class MemoryImage
@@ -28,44 +26,8 @@ public sealed class MemoryImage
     {
         ArgumentNullException.ThrowIfNull(segments);
 
-        var orderedSegments = segments.OrderBy(segment => segment.StartAddress).ToArray();
-        if (orderedSegments.Length == 0)
-        {
-            return Empty;
-        }
-
-        var normalizedSegments = new List<MemorySegment>();
-        var runStart = orderedSegments[0].StartAddress;
-        var runEnd = orderedSegments[0].EndAddress;
-        var runData = new ArrayBufferWriter<byte>(orderedSegments[0].ByteCount);
-        runData.Write(orderedSegments[0].Data.Span);
-
-        for (var index = 1; index < orderedSegments.Length; index++)
-        {
-            var next = orderedSegments[index];
-            if (next.StartAddress <= runEnd)
-            {
-                throw new ArgumentException(
-                    $"Memory segments overlap at address 0x{next.StartAddress:X8}.",
-                    nameof(segments));
-            }
-
-            if ((ulong)runEnd + 1 == next.StartAddress)
-            {
-                runData.Write(next.Data.Span);
-                runEnd = next.EndAddress;
-                continue;
-            }
-
-            normalizedSegments.Add(new MemorySegment(runStart, runData.WrittenSpan));
-            runStart = next.StartAddress;
-            runEnd = next.EndAddress;
-            runData = new ArrayBufferWriter<byte>(next.ByteCount);
-            runData.Write(next.Data.Span);
-        }
-
-        normalizedSegments.Add(new MemorySegment(runStart, runData.WrittenSpan));
-        return new MemoryImage(normalizedSegments);
+        var ranges = segments.OrderBy(segment => segment.StartAddress).Select(MemoryImageRange.FromSegment).ToArray();
+        return ranges.Length == 0 ? Empty : FromRanges(ranges);
     }
 
     /// <summary>Creates a logically occupied inclusive address range filled with one byte value.</summary>
@@ -111,6 +73,98 @@ public sealed class MemoryImage
                 remaining.Add(range.Slice(endAddress + 1, range.EndAddress));
         }
         return FromRanges(remaining);
+    }
+
+    /// <summary>Fills an inclusive address interval without materializing its bytes as one array.</summary>
+    public MemoryImage WithPatternRange(uint startAddress, uint endAddress, ReadOnlySpan<byte> pattern, bool overwriteExisting)
+    {
+        if (endAddress < startAddress) throw new ArgumentOutOfRangeException(nameof(endAddress));
+        if (pattern.IsEmpty) throw new ArgumentException("A fill pattern must not be empty.", nameof(pattern));
+        var patternMemory = (ReadOnlyMemory<byte>)pattern.ToArray();
+        var result = new List<MemoryImageRange>(_ranges.Count + 2);
+        if (overwriteExisting)
+        {
+            foreach (var range in _ranges)
+            {
+                if (range.EndAddress < startAddress || range.StartAddress > endAddress) result.Add(range);
+                else
+                {
+                    if (range.StartAddress < startAddress) result.Add(range.Slice(range.StartAddress, startAddress - 1));
+                    if (range.EndAddress > endAddress && endAddress < uint.MaxValue) result.Add(range.Slice(endAddress + 1, range.EndAddress));
+                }
+            }
+            result.Add(MemoryImageRange.Repeated(startAddress, endAddress, patternMemory));
+        }
+        else
+        {
+            ulong cursor = startAddress;
+            foreach (var range in _ranges)
+            {
+                if (range.EndAddress < startAddress || range.StartAddress > endAddress)
+                {
+                    result.Add(range);
+                    continue;
+                }
+                if (cursor < range.StartAddress)
+                    result.Add(CreateFillRange((uint)cursor, range.StartAddress - 1, startAddress, patternMemory));
+                result.Add(range);
+                cursor = Math.Max(cursor, (ulong)range.EndAddress + 1);
+            }
+            if (cursor <= endAddress) result.Add(CreateFillRange((uint)cursor, endAddress, startAddress, patternMemory));
+        }
+        return FromRanges(result);
+    }
+
+    private static MemoryImageRange CreateFillRange(uint start, uint end, uint fillStart, ReadOnlyMemory<byte> pattern) =>
+        MemoryImageRange.Repeated(start, end, pattern, ((ulong)start - fillStart) % (ulong)pattern.Length);
+
+    /// <summary>Overlays logical occupied ranges while preserving their bounded or repeated backing.</summary>
+    public MemoryImage WithRangesOverlay(IEnumerable<MemoryImageRange> incomingRanges, bool overwriteExisting)
+    {
+        ArgumentNullException.ThrowIfNull(incomingRanges);
+        var incoming = incomingRanges.OrderBy(range => range.StartAddress).ToArray();
+        for (var i = 1; i < incoming.Length; i++)
+            if (incoming[i].StartAddress <= incoming[i - 1].EndAddress)
+                throw new ArgumentException("Incoming memory ranges must not overlap.", nameof(incomingRanges));
+        if (incoming.Length == 0) return this;
+
+        var result = new List<MemoryImageRange>(_ranges.Count + incoming.Length);
+        if (!overwriteExisting)
+        {
+            result.AddRange(_ranges);
+            foreach (var added in incoming)
+            {
+                ulong cursor = added.StartAddress;
+                foreach (var occupied in _ranges)
+                {
+                    if (occupied.EndAddress < added.StartAddress) continue;
+                    if (occupied.StartAddress > added.EndAddress) break;
+                    if (cursor < occupied.StartAddress)
+                        result.Add(added.Slice((uint)cursor, occupied.StartAddress - 1));
+                    cursor = Math.Max(cursor, (ulong)occupied.EndAddress + 1);
+                    if (cursor > added.EndAddress) break;
+                }
+                if (cursor <= added.EndAddress) result.Add(added.Slice((uint)cursor, added.EndAddress));
+            }
+        }
+        else
+        {
+            foreach (var occupied in _ranges)
+            {
+                ulong cursor = occupied.StartAddress;
+                foreach (var added in incoming)
+                {
+                    if (added.EndAddress < occupied.StartAddress) continue;
+                    if (added.StartAddress > occupied.EndAddress) break;
+                    if (cursor < added.StartAddress) result.Add(occupied.Slice((uint)cursor, added.StartAddress - 1));
+                    cursor = Math.Max(cursor, (ulong)added.EndAddress + 1);
+                    if (cursor > occupied.EndAddress) break;
+                }
+                if (cursor <= occupied.EndAddress) result.Add(occupied.Slice((uint)cursor, occupied.EndAddress));
+            }
+            result.AddRange(incoming);
+        }
+        return FromRanges(result);
     }
 
     /// <summary>Returns an image with the specified occupied bytes added or replaced, preserving untouched logical ranges.</summary>

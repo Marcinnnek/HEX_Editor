@@ -82,19 +82,16 @@ public sealed class ImageEditingSession
     public long CopyRange(uint startAddress, uint endAddress)
     {
         ValidateRange(startAddress, endAddress);
-        var copied = _currentImage.Segments
-            .Where(segment => segment.EndAddress >= startAddress && segment.StartAddress <= endAddress)
-            .Select(segment =>
+        var copied = _currentImage.Ranges
+            .Where(range => range.EndAddress >= startAddress && range.StartAddress <= endAddress)
+            .Select(range =>
             {
-                var from = Math.Max(segment.StartAddress, startAddress);
-                var to = Math.Min(segment.EndAddress, endAddress);
-                var offset = checked((int)(from - segment.StartAddress));
-                var count = checked((int)((ulong)to - from + 1));
-                return new MemorySegment(checked((uint)((ulong)from - startAddress)), segment.Data.Span.Slice(offset, count));
-            })
-            .ToArray();
-        _clipboard = new EditClipboard(copied);
-        return copied.Sum(segment => (long)segment.ByteCount);
+                var from = Math.Max(range.StartAddress, startAddress);
+                var to = Math.Min(range.EndAddress, endAddress);
+                return range.Slice(from, to).Rebase(checked((uint)((ulong)from - startAddress)));
+            }).ToArray();
+        _clipboard = new EditClipboard(MemoryImage.FromRanges(copied));
+        return checked((long)_clipboard.Image.OccupiedByteCount);
     }
 
     public void CutRange(uint startAddress, uint endAddress)
@@ -112,17 +109,21 @@ public sealed class ImageEditingSession
         Commit(MemoryImageEdits.Overlay(_currentImage, BuildPasteImage(address), overlapDecision ?? OverlapDecision.OverwriteIncoming));
     }
 
-    public int GetPasteOverlapCount(uint address)
+    public long GetPasteOverlapCount(uint address)
     {
         if (_clipboard is null) throw new InvalidOperationException("Copy a byte range before pasting.");
-        var count = 0;
-        foreach (var segment in _clipboard.Segments)
+        long count = 0;
+        foreach (var range in _clipboard.Image.Ranges)
         {
-            var targetStart = (ulong)address + segment.StartAddress;
-            var targetEnd = targetStart + (ulong)segment.ByteCount - 1;
+            var targetStart = (ulong)address + range.StartAddress;
+            var targetEnd = targetStart + range.ByteCount - 1;
             if (targetEnd > uint.MaxValue) throw new ArgumentOutOfRangeException(nameof(address), "The pasted bytes extend beyond the 32-bit address range.");
-            for (var i = 0; i < segment.ByteCount; i++)
-                if (_currentImage.TryGetByte((uint)(targetStart + (uint)i), out _)) count++;
+            foreach (var existing in _currentImage.Ranges)
+            {
+                var overlapStart = Math.Max(targetStart, existing.StartAddress);
+                var overlapEnd = Math.Min(targetEnd, existing.EndAddress);
+                if (overlapStart <= overlapEnd) count = checked(count + (long)(overlapEnd - overlapStart + 1));
+            }
         }
         return count;
     }
@@ -151,16 +152,7 @@ public sealed class ImageEditingSession
             throw new ArgumentOutOfRangeException(nameof(policy));
         var length = (ulong)endAddress - startAddress + 1;
         if (length > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(endAddress), "The selected range is too large to represent as a memory segment.");
-        var filled = new byte[(int)length];
-        for (var offset = 0; offset < filled.Length; offset++) filled[offset] = pattern[offset % pattern.Count];
-        if (policy == FillPolicy.KeepExisting)
-        {
-            var existingAndGaps = MemoryImage.FromSegments([new MemorySegment(startAddress, filled)]);
-            Commit(MemoryImageSparseOverlay.Combine(_currentImage, existingAndGaps,
-                (_, hasExisting, existing, _, incoming) => hasExisting ? existing : incoming));
-            return;
-        }
-        Commit(MemoryImageEdits.Overlay(_currentImage, MemoryImage.FromSegments([new MemorySegment(startAddress, filled)]), OverlapDecision.OverwriteIncoming));
+        Commit(_currentImage.WithPatternRange(startAddress, endAddress, pattern.ToArray(), policy == FillPolicy.OverwriteExisting));
     }
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) =>
@@ -208,15 +200,16 @@ public sealed class ImageEditingSession
     private MemoryImage BuildPasteImage(uint address)
     {
         if (_clipboard is null) throw new InvalidOperationException("Copy a byte range before pasting.");
-        var segments = new List<MemorySegment>(_clipboard.Segments.Length);
-        foreach (var segment in _clipboard.Segments)
+        var ranges = new List<MemoryImageRange>(_clipboard.Image.Ranges.Count);
+        foreach (var range in _clipboard.Image.Ranges)
         {
-            var target = (ulong)address + segment.StartAddress;
-            if (target + (ulong)segment.ByteCount - 1 > uint.MaxValue)
+            var target = (ulong)address + range.StartAddress;
+            var end = target + range.ByteCount - 1;
+            if (end > uint.MaxValue)
                 throw new ArgumentOutOfRangeException(nameof(address), "The pasted bytes extend beyond the 32-bit address range.");
-            segments.Add(new MemorySegment((uint)target, segment.Data.Span));
+            ranges.Add(range.Rebase((uint)target));
         }
-        return MemoryImage.FromSegments(segments);
+        return MemoryImage.FromRanges(ranges);
     }
 
     private static bool ImagesEqual(MemoryImage left, MemoryImage right)
@@ -232,7 +225,7 @@ public sealed class ImageEditingSession
         if (endAddress < startAddress) throw new ArgumentOutOfRangeException(nameof(endAddress), "The range end must not precede its start.");
     }
 
-    private sealed record EditClipboard(MemorySegment[] Segments);
+    private sealed record EditClipboard(MemoryImage Image);
 }
 
 public sealed record InsertPreview(MemoryImage ExistingImage, IReadOnlyDictionary<uint, byte> IncomingBytes, int OverlapCount)
@@ -273,8 +266,6 @@ internal static class MemoryImageEdits
     public static MemoryImage Overlay(MemoryImage existing, MemoryImage incoming, OverlapDecision decision)
     {
         if (decision == OverlapDecision.Cancel) return existing;
-        return MemoryImageSparseOverlay.Combine(existing, incoming,
-            (_, hasExisting, existingValue, hasIncoming, incomingValue) =>
-                hasIncoming && (!hasExisting || decision == OverlapDecision.OverwriteIncoming) ? incomingValue : existingValue);
+        return existing.WithRangesOverlay(incoming.Ranges, decision == OverlapDecision.OverwriteIncoming);
     }
 }

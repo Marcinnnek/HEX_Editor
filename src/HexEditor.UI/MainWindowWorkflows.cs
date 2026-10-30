@@ -16,7 +16,7 @@ internal sealed class ImageEditWorkflow(MainViewModel viewModel)
         viewModel.Editing.InsertBytes(address, bytes, decision);
     }
 
-    public void Paste(uint address, Func<int, string, OverlapDecision> chooseOverlap)
+    public void Paste(uint address, Func<long, string, OverlapDecision> chooseOverlap)
     {
         var collisions = viewModel.Editing.GetPasteOverlapCount(address);
         viewModel.Editing.PasteAt(address, collisions == 0 ? OverlapDecision.OverwriteIncoming : chooseOverlap(collisions, "paste"));
@@ -95,7 +95,7 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
         ArgumentNullException.ThrowIfNull(baseOpened);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (baseDocument is null && viewModel.SourcePath is null && viewModel.CurrentImage.Segments.Count == 0)
+        if (baseDocument is null && viewModel.SourcePath is null && viewModel.CurrentImage.OccupiedByteCount == 0)
         {
             var basePath = chooseFile("Select the base firmware image", null);
             if (basePath is null) return null;
@@ -106,7 +106,7 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
         }
 
         var document = baseDocument ?? viewModel.Workspace.Document;
-        if (document.CurrentImage.Segments.Count == 0)
+        if (document.CurrentImage.OccupiedByteCount == 0)
             throw new InvalidOperationException("The selected base document has no occupied bytes.");
         var referencePath = chooseFile("Select the reference firmware image",
             document.SourcePath is null ? null : Path.GetDirectoryName(document.SourcePath));

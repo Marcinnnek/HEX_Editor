@@ -26,8 +26,8 @@ public sealed class MemoryImageRange
     internal static MemoryImageRange FromSegment(MemorySegment segment) =>
         new(segment.StartAddress, segment.EndAddress, segment.Data, default, false);
 
-    internal static MemoryImageRange Repeated(uint startAddress, uint endAddress, ReadOnlyMemory<byte> pattern) =>
-        new(startAddress, endAddress, default, pattern, true);
+    internal static MemoryImageRange Repeated(uint startAddress, uint endAddress, ReadOnlyMemory<byte> pattern, ulong patternOffset = 0) =>
+        new(startAddress, endAddress, default, pattern, true, patternOffset);
 
     public bool TryGetByte(uint address, out byte value)
     {
@@ -76,6 +76,13 @@ public sealed class MemoryImageRange
             ? new MemoryImageRange(startAddress, endAddress, default, _pattern, true, _patternOffset + offset)
             : new MemoryImageRange(startAddress, endAddress,
                 _data.Slice(checked((int)offset), checked((int)((ulong)endAddress - startAddress + 1))), default, false);
+    }
+
+    public MemoryImageRange Rebase(uint startAddress)
+    {
+        var endAddress = (ulong)startAddress + ByteCount - 1;
+        if (endAddress > uint.MaxValue) throw new ArgumentOutOfRangeException(nameof(startAddress));
+        return new MemoryImageRange(startAddress, (uint)endAddress, _data, _pattern, _isRepeated, _patternOffset);
     }
 
     public bool ContentEquals(MemoryImageRange other)

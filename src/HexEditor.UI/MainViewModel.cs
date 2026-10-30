@@ -226,7 +226,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Raise(nameof(ActiveCanPaste));
     }
     public void PasteAt(uint address, OverlapDecision? overlapDecision = null) => Editing.PasteAt(address, overlapDecision);
-    public int GetPasteOverlapCount(uint address) => Editing.GetPasteOverlapCount(address);
+    public long GetPasteOverlapCount(uint address) => Editing.GetPasteOverlapCount(address);
     public void DeleteRange(uint startAddress, uint endAddress) => Editing.DeleteRange(startAddress, endAddress);
     public (uint Start, uint End)? GetFillAllRegion()
     {
