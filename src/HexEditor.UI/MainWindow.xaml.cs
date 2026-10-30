@@ -960,8 +960,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        ApplySelection(matchStart, matchEnd);
         ViewModel.ImageView.SetFindMatch(matchStart, matchEnd);
+        ApplySelection(matchStart, matchEnd, scrollToMatch: true);
         SetFindStatus(window, $"Found at 0x{matchStart:X8}–0x{matchEnd:X8}.");
     }
 
@@ -1158,12 +1158,14 @@ public partial class MainWindow : Window
         return (_selectionStart ?? address, _selectionEnd ?? address);
     }
 
-    private void ApplySelection(uint start, uint end)
+    private void ApplySelection(uint start, uint end, bool scrollToMatch = false)
     {
         _selectionStart = start;
         _selectionEnd = end;
         ViewModel.EditorStatus.SetSelection(start, end);
-        if (ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) SelectRow(rowIndex);
+        if (!ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) return;
+        if (scrollToMatch) HexRowsView.ScrollToMatch(rowIndex);
+        else SelectRow(rowIndex);
     }
 
     private void RunSelectedRangeEdit(Action<uint, uint> action)
