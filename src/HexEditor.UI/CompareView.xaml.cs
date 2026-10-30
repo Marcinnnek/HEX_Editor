@@ -43,6 +43,13 @@ public partial class CompareView : UserControl
         Workspace.RefreshImage(previousImage, updatedImage);
     }
 
+    public bool NavigateToAddress(uint address)
+    {
+        if (!ViewModel.TryNavigateToAddress(address, out var rowIndex)) return false;
+        Navigate(address);
+        return rowIndex >= 0;
+    }
+
     private void Panel_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ClickCount != 2 || sender is not DataGrid grid) return;

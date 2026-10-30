@@ -9,6 +9,51 @@ namespace HexEditor.Tests;
 public sealed class CompareViewModelTests
 {
     [TestMethod]
+    public void ActiveTabViewSettings_RestoreIndependentlyAndSynchronizePrimaryControls()
+    {
+        var viewModel = new MainViewModel();
+        var first = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11])]), 8, false);
+        var second = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x2000, [0x20])]),
+            MemoryImage.FromSegments([new MemorySegment(0x2000, [0x21])]), 32, true);
+
+        viewModel.ActivateComparison(first);
+        Assert.AreEqual(8, viewModel.ActiveBytesPerRow);
+        Assert.IsFalse(viewModel.ActiveShowAscii);
+        viewModel.ActiveBytesPerRow = 16;
+        viewModel.ActiveShowAscii = true;
+        Assert.AreEqual(16, first.BytesPerRow);
+        Assert.IsTrue(first.ShowAscii);
+
+        viewModel.ActivateComparison(second);
+        Assert.AreEqual(32, viewModel.ActiveBytesPerRow);
+        Assert.IsTrue(viewModel.ActiveShowAscii);
+        second.BytesPerRow = 8;
+        second.ShowAscii = false;
+        Assert.AreEqual(8, viewModel.ActiveBytesPerRow);
+        Assert.IsFalse(viewModel.ActiveShowAscii);
+
+        viewModel.ActivateEditor();
+        Assert.AreEqual(16, viewModel.ActiveBytesPerRow);
+        Assert.IsTrue(viewModel.ActiveShowAscii);
+    }
+
+    [TestMethod]
+    public void CompareNavigation_UsesOneAbsoluteAddressForBothSparsePanels()
+    {
+        var workspace = new CompareWorkspaceTabViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1001, [0x10]), new MemorySegment(0x1010, [0x20])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1001, [0x11]), new MemorySegment(0x1020, [0x30])]),
+            "base.hex", "reference.hex");
+        Assert.IsTrue(workspace.Comparison.TryNavigateToAddress(0x1010, out var rowIndex));
+        Assert.AreEqual("00001010", workspace.Comparison.FileARows[rowIndex].Address);
+        Assert.AreEqual(workspace.Comparison.FileARows[rowIndex].Address, workspace.Comparison.FileBRows[rowIndex].Address);
+        Assert.IsTrue(workspace.Comparison.FileBRows[rowIndex].Cells.All(cell => cell.Address is null || cell.Address >= 0x1010));
+    }
+
+    [TestMethod]
     public void Comparison_AlignsSparseBytesByAddressAndClassifiesEachSide()
     {
         var fileA = MemoryImage.FromSegments([new MemorySegment(0x1001, [0x11, 0x22]), new MemorySegment(0x1010, [0x44])]);
