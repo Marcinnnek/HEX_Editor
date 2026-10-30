@@ -1,6 +1,8 @@
 using HexEditor.UI;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Threading;
 
 namespace HexEditor.Tests;
 
@@ -103,5 +105,69 @@ public sealed class PreferencesSessionTests
             if (child is T match) yield return match;
             foreach (var descendant in Children<T>(child)) yield return descendant;
         }
+    }
+
+    [TestMethod]
+    public void Preferences_dialog_cancel_and_close_discard_changes_while_save_stages_them()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var folder = Path.Combine(Path.GetTempPath(), "hex-editor-preferences-" + Guid.NewGuid());
+                try
+                {
+                    var appearancePath = Path.Combine(folder, "appearance.json");
+                    var spacingPath = Path.Combine(folder, "grid-spacing.json");
+                    var spacing = new GridSpacingSettings(spacingPath);
+                    using var appearance = new AppearanceSession(new AppearanceSettings(appearancePath),
+                        new FixedWindowsAppearance());
+
+                    Assert.IsFalse(ShowOffscreen(new PreferencesSession(appearance, spacing), "Cancel").GetValueOrDefault());
+                    Assert.IsFalse(ShowOffscreen(new PreferencesSession(appearance, spacing), "Close").GetValueOrDefault());
+                    Assert.AreEqual(AppearanceMode.Automatic, appearance.Mode);
+                    Assert.AreEqual(2, spacing.HorizontalByteSpacing);
+                    Assert.AreEqual(1, spacing.VerticalRowSpacing);
+                    Assert.AreEqual(AppearanceMode.Automatic, new AppearanceSettings(appearancePath).Mode);
+
+                    var saved = new PreferencesSession(appearance, spacing);
+                    Assert.IsTrue(ShowOffscreen(saved, "Save").GetValueOrDefault());
+                    Assert.AreEqual(AppearanceMode.Automatic, appearance.Mode);
+                    Assert.AreEqual(2, spacing.HorizontalByteSpacing);
+                    saved.Save();
+                    Assert.AreEqual(AppearanceMode.Dark, new AppearanceSettings(appearancePath).Mode);
+                    Assert.AreEqual(6, new GridSpacingSettings(spacingPath).HorizontalByteSpacing);
+                    Assert.AreEqual(3, new GridSpacingSettings(spacingPath).VerticalRowSpacing);
+                }
+                finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+            }
+            catch (Exception exception) { failure = exception; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
+    private static bool? ShowOffscreen(PreferencesSession choices, string action)
+    {
+        var window = new PreferencesWindow(choices)
+        {
+            Left = -3000, Top = -3000, WindowStartupLocation = WindowStartupLocation.Manual,
+            ShowActivated = false, ShowInTaskbar = false
+        };
+        window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            Children<RadioButton>(window).Single(radio => Equals(radio.Content, "Dark")).IsChecked = true;
+            var sliders = Children<Slider>(window).ToArray();
+            sliders[0].Value = 6;
+            sliders[1].Value = 3;
+            if (action == "Close") window.Close();
+            else Children<Wpf.Ui.Controls.Button>(window)
+                .Single(button => Equals(button.Content, action))
+                .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        });
+        return window.ShowDialog();
     }
 }
