@@ -18,7 +18,6 @@ public sealed class MemoryComparisonModel
     private uint _rangeEnd = uint.MaxValue;
     private uint? _navigationAddress;
     private SparseRowList<CompareViewRow> _rows;
-    private MemorySegment[] _occupiedSegments;
     private string _comparisonStatus = "No differences";
 
     public MemoryComparisonModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true,
@@ -29,7 +28,6 @@ public sealed class MemoryComparisonModel
         ValidateRowWidth(bytesPerRow);
         _bytesPerRow = bytesPerRow;
         _showAscii = showAscii;
-        _occupiedSegments = BuildOccupiedSegmentIndex(fileA, fileB);
         _rows = CreateRows();
         UpdateComparisonStatus(cancellationToken, progress);
     }
@@ -55,7 +53,6 @@ public sealed class MemoryComparisonModel
     {
         _fileA = fileA ?? throw new ArgumentNullException(nameof(fileA));
         _fileB = fileB ?? throw new ArgumentNullException(nameof(fileB));
-        _occupiedSegments = BuildOccupiedSegmentIndex(_fileA, _fileB);
         UpdateComparisonStatus(CancellationToken.None, null);
         RebuildRows();
     }
@@ -184,23 +181,17 @@ public sealed class MemoryComparisonModel
 
     private IEnumerable<uint> GetOccupiedAddresses()
     {
-        uint? last = null;
-        foreach (var segment in _occupiedSegments)
+        ulong? last = null;
+        foreach (var range in _fileA.Ranges.Concat(_fileB.Ranges).OrderBy(range => range.StartAddress))
         {
-            for (var offset = 0; offset < segment.ByteCount; offset++)
+            for (ulong address = range.StartAddress; address <= range.EndAddress; address++)
             {
-                var address = (uint)((ulong)segment.StartAddress + (uint)offset);
                 if (last is not null && address <= last.Value) continue;
                 last = address;
-                yield return address;
+                yield return (uint)address;
             }
         }
     }
-
-    private static MemorySegment[] BuildOccupiedSegmentIndex(MemoryImage fileA, MemoryImage fileB) =>
-        fileA.Segments.Concat(fileB.Segments)
-            .OrderBy(segment => segment.StartAddress)
-            .ToArray();
 
     private void RebuildRows()
     {
@@ -210,6 +201,15 @@ public sealed class MemoryComparisonModel
 
     private void UpdateComparisonStatus(CancellationToken cancellationToken, IProgress<ComparisonProgress>? progress)
     {
+        if (ImagesHaveSameRanges(_fileA, _fileB))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _comparisonStatus = "No differences";
+            progress?.Report(new ComparisonProgress("Comparison complete", (long)Math.Min(_fileA.OccupiedByteCount, long.MaxValue),
+                (long)Math.Min(_fileA.OccupiedByteCount, long.MaxValue)));
+            return;
+        }
+
         long different = 0;
         long onlyA = 0;
         long onlyB = 0;
@@ -236,6 +236,14 @@ public sealed class MemoryComparisonModel
         _comparisonStatus = total == 0
             ? "No differences"
             : $"{total:N0} differences ({different:N0} different, {onlyA:N0} only in File A, {onlyB:N0} only in File B)";
+    }
+
+    private static bool ImagesHaveSameRanges(MemoryImage left, MemoryImage right)
+    {
+        if (left.Ranges.Count != right.Ranges.Count) return false;
+        for (var index = 0; index < left.Ranges.Count; index++)
+            if (!left.Ranges[index].ContentEquals(right.Ranges[index])) return false;
+        return true;
     }
 
     private static void ValidateRowWidth(int width)
@@ -292,11 +300,11 @@ public sealed class MemoryComparisonModel
             return BuildSparseRanges(intervals, width, includeOneBlankRow: false, markLargeGaps: false);
         }
 
-        var intervalsToDisplay = _fileA.Segments.Concat(_fileB.Segments)
-            .Select(segment =>
+        var intervalsToDisplay = _fileA.Ranges.Concat(_fileB.Ranges)
+            .Select(range =>
             {
-                var start = (ulong)segment.StartAddress;
-                var end = (ulong)segment.EndAddress;
+                var start = (ulong)range.StartAddress;
+                var end = (ulong)range.EndAddress;
                 if (_viewMode == CompareViewMode.AddressRange)
                 {
                     start = Math.Max(start, _rangeStart);

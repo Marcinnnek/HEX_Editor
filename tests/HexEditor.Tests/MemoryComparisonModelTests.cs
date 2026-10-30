@@ -59,6 +59,53 @@ public sealed class MemoryComparisonModelTests
     }
 
     [TestMethod]
+    public void ComparisonModel_RangeImagesShowPanelsAndNavigateAtBothAddressBoundaries()
+    {
+        var left = MemoryImage.FromRanges([
+            MemoryImage.FromPatternRange(0, 1, new byte[] { 0x11, 0x22 }).Ranges[0],
+            MemoryImage.FromPatternRange(uint.MaxValue - 1, uint.MaxValue, new byte[] { 0x33, 0x44 }).Ranges[0]]);
+        var right = MemoryImage.FromRanges([
+            MemoryImage.FromPatternRange(0, 1, new byte[] { 0x11, 0x23 }).Ranges[0],
+            MemoryImage.FromPatternRange(uint.MaxValue - 1, uint.MaxValue, new byte[] { 0x33, 0x45 }).Ranges[0]]);
+
+        var comparison = new MemoryComparisonModel(left, right, bytesPerRow: 8);
+
+        Assert.AreEqual("2 differences (2 different, 0 only in File A, 0 only in File B)", comparison.ComparisonStatus);
+        Assert.IsTrue(comparison.TryFindNextDifference(0, out var first));
+        Assert.AreEqual(1u, first);
+        Assert.IsTrue(comparison.TryFindNextDifference(uint.MaxValue - 2, out var last));
+        Assert.AreEqual(uint.MaxValue, last);
+        Assert.IsTrue(comparison.TryNavigateToAddress(uint.MaxValue, out var rowIndex));
+        Assert.AreEqual("FFFFFFF8", comparison.Rows[rowIndex].Address);
+        Assert.AreEqual("44", comparison.Rows[rowIndex].FileA.Cells[7].Hex);
+    }
+
+    [TestMethod]
+    public void ComparisonModel_RangeAddressPresentOnOneSideIsCountedAndRendered()
+    {
+        var left = MemoryImage.FromPatternRange(uint.MaxValue, uint.MaxValue, new byte[] { 0xA5 });
+        var comparison = new MemoryComparisonModel(left, MemoryImage.Empty, bytesPerRow: 8);
+
+        Assert.AreEqual("1 differences (0 different, 1 only in File A, 0 only in File B)", comparison.ComparisonStatus);
+        Assert.AreEqual(CompareByteState.OnlyA, comparison.Rows[0].FileA.Cells[7].State);
+        Assert.AreEqual("A5", comparison.Rows[0].FileA.Cells[7].Hex);
+    }
+
+    [TestMethod]
+    public void ComparisonModel_IdenticalFullAddressRangesOpenWithoutScanningEveryByte()
+    {
+        var image = MemoryImage.FromPatternRange(0, uint.MaxValue, new byte[] { 0xA5, 0x5A });
+
+        var comparison = new MemoryComparisonModel(image, image, bytesPerRow: 8);
+
+        Assert.AreEqual("No differences", comparison.ComparisonStatus);
+        Assert.AreEqual(536870912, comparison.Rows.Count);
+        Assert.IsTrue(comparison.TryNavigateToAddress(uint.MaxValue, out var rowIndex));
+        Assert.AreEqual("FFFFFFF8", comparison.Rows[rowIndex].Address);
+        Assert.AreEqual("A5 5A A5 5A A5 5A A5 5A", comparison.Rows[rowIndex].FileA.HexData);
+    }
+
+    [TestMethod]
     public void ComparisonModel_TenMegabyteOpenAndVirtualRowAccessStayBounded()
     {
         const int imageSize = 10 * 1024 * 1024;
