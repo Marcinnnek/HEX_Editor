@@ -164,6 +164,9 @@ public partial class MainWindow : FluentWindow
             var nameB = System.IO.Path.GetFileName(pathB);
             var view = new CompareView(new CompareWorkspaceTabViewModel(
                 imageA.Image, imageB.Image, nameA, nameB, imageA.Path, imageB.Path));
+            view.StatusRequested += ViewModel.ReportCompareInteraction;
+            view.BaseRowActivated += address =>
+                ViewModel.ReportCompareInteraction($"Base row at 0x{address:X8} selected.");
             _comparisonViews.Add(view);
             var tab = new TabItem { Header = $"Compare: {nameA} ↔ {nameB}", Content = view };
             WorkspaceTabs.Items.Add(tab);
@@ -341,13 +344,13 @@ public partial class MainWindow : FluentWindow
 
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Editing.Undo();
+        ViewModel.Undo();
         Title = ViewModel.WindowTitle;
     }
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Editing.Redo();
+        ViewModel.Redo();
         Title = ViewModel.WindowTitle;
     }
 
@@ -370,7 +373,7 @@ public partial class MainWindow : FluentWindow
     {
         try
         {
-            ViewModel.Editing.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
+            ViewModel.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)

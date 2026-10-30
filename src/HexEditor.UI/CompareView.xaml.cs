@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using HexEditor.Core;
 using HexEditor.Compare;
@@ -23,16 +25,80 @@ public partial class CompareView : UserControl
         FileBView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
         FileAView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
         FileBView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
+        FileAView.ItemsGrid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+            new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
+        FileBView.ItemsGrid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+            new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
     }
 
     public CompareWorkspaceTabViewModel Workspace { get; }
     public CompareViewModel ViewModel { get; }
     public int[] RowWidths { get; }
     public CompareViewMode[] ViewModes { get; }
+    public event Action<uint>? BaseRowActivated;
+    public event Action<string>? StatusRequested;
 
     public void RefreshImage(MemoryImage previousImage, MemoryImage updatedImage)
     {
         Workspace.RefreshImage(previousImage, updatedImage);
+    }
+
+    private void Panel_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount != 2 || sender is not DataGrid grid) return;
+        e.Handled = true;
+
+        var side = ReferenceEquals(grid, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        var rowIndex = -1;
+        uint? address = null;
+        try
+        {
+            if (side == ComparePanelSide.Base)
+            {
+                var source = e.OriginalSource as DependencyObject;
+                var row = FindAncestor<DataGridRow>(source);
+                var cell = FindAncestor<DataGridCell>(source);
+                if (row?.Item is not HexViewRow || cell is null) return;
+                rowIndex = row.GetIndex();
+
+                if (!ReferenceEquals(cell.Column, grid.Columns[0]))
+                {
+                    var byteRow = FindAncestor<HexByteRowControl>(source);
+                    if (byteRow is null || !ReferenceEquals(byteRow.Row, row.Item) ||
+                        !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var hitAddress)) return;
+                    address = hitAddress;
+                }
+            }
+
+            var activation = Workspace.ActivateRow(side, rowIndex, address);
+            if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected)
+                BaseRowActivated?.Invoke(selected);
+            else if (activation.StatusMessage is { } message)
+                StatusRequested?.Invoke(message);
+        }
+        catch (Exception exception)
+        {
+            var context = address is uint selected ? $"0x{selected:X8}" : "unknown address";
+            Trace.TraceError($"Compare row activation failed: side={side}, rowIndex={rowIndex}, address={context}, " +
+                $"exception={exception.GetType().Name}, hresult=0x{exception.HResult:X8}");
+            try { StatusRequested?.Invoke($"Unable to activate Compare row at {context}."); }
+            catch (Exception notificationException)
+            {
+                Trace.TraceError($"Compare row failure notification failed: side={side}, address={context}, " +
+                    $"exception={notificationException.GetType().Name}, hresult=0x{notificationException.HResult:X8}");
+            }
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? source) where T : DependencyObject
+    {
+        for (var current = source; current is not null; current = current is Visual
+            ? VisualTreeHelper.GetParent(current)
+            : LogicalTreeHelper.GetParent(current))
+        {
+            if (current is T match) return match;
+        }
+        return null;
     }
 
     private void ApplyRange_Click(object sender, RoutedEventArgs e)

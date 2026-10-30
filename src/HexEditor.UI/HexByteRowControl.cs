@@ -44,10 +44,11 @@ public sealed class HexByteRowControl : Control
     {
         address = default;
         var row = Row;
-        if (row is null || row.IsGapMarker || point.X < 0) return false;
+        if (row is null || row.IsGapMarker || point.X < 0 || point.Y < 0) return false;
         EnsureMetrics();
         var cellWidth = _characterWidth * (IsAscii ? 1 : 3);
-        if (cellWidth <= 0) return false;
+        if (cellWidth <= 0 || point.Y >= _lineHeight || point.X >= row.Cells.Count * cellWidth) return false;
+        if (!IsAscii && point.X % cellWidth >= _characterWidth * 2) return false;
         var index = (int)(point.X / cellWidth);
         if ((uint)index >= (uint)row.Cells.Count || row.Cells[index].Address is not uint selected) return false;
         address = selected;
