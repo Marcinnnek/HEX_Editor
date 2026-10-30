@@ -45,6 +45,8 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     public bool TryFindPreviousDifference(uint address, out uint difference) => _comparison.TryFindPreviousDifference(address, out difference);
     public bool TryFindNextDifferenceFromSelection(uint? selectedAddress, out uint difference) => _comparison.TryFindNextDifferenceFromSelection(selectedAddress, out difference);
     public bool TryFindPreviousDifferenceFromSelection(uint? selectedAddress, out uint difference) => _comparison.TryFindPreviousDifferenceFromSelection(selectedAddress, out difference);
+    public bool TryFindNextDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, out uint difference) => _comparison.TryFindNextDifferenceFromAddress(selectedAddress, anchorAddress, out difference);
+    public bool TryFindPreviousDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, out uint difference) => _comparison.TryFindPreviousDifferenceFromAddress(selectedAddress, anchorAddress, out difference);
 
     private void SetComparisonProperty(Action update, string propertyName)
     {

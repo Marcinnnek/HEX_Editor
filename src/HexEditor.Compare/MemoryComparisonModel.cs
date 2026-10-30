@@ -90,6 +90,30 @@ public sealed class MemoryComparisonModel
                 ? SetNoDifference(out difference)
                 : TryFindPreviousDifference(selectedAddress.Value - 1, out difference);
 
+    public bool TryFindNextDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, out uint difference) =>
+        TryFindDifferenceFromAddress(selectedAddress, anchorAddress, forward: true, out difference);
+
+    public bool TryFindPreviousDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, out uint difference) =>
+        TryFindDifferenceFromAddress(selectedAddress, anchorAddress, forward: false, out difference);
+
+    private bool TryFindDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, bool forward, out uint difference)
+    {
+        var position = selectedAddress ?? anchorAddress;
+        if (position is null)
+            return forward
+                ? TryFindNextDifference(0, out difference)
+                : TryFindPreviousDifference(uint.MaxValue, out difference);
+
+        if (forward)
+        {
+            if (position.Value == uint.MaxValue) return SetNoDifference(out difference);
+            return TryFindNextDifference(position.Value + 1, out difference);
+        }
+
+        if (position.Value == 0) return SetNoDifference(out difference);
+        return TryFindPreviousDifference(position.Value - 1, out difference);
+    }
+
     private static bool SetNoDifference(out uint difference)
     {
         difference = 0;
