@@ -110,7 +110,8 @@ public partial class MainWindow : Window
             ApplicationThemeManager.Apply(mode == AppearanceMode.Light ? ApplicationTheme.Light : ApplicationTheme.Dark,
                 WindowBackdropType.None);
         }
-        AppearancePalette.Apply(ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark);
+        AppearancePalette.Apply(_appearanceSettings.GetEffectiveTheme(
+            ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark) == AppearanceMode.Dark);
     }
 
     public MainViewModel ViewModel { get; }
