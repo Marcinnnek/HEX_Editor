@@ -45,10 +45,11 @@ public sealed class EditorSegmentListLayoutTests
                     "The full one-line descriptions should remain reachable when the Editor is narrow.");
                 blocks.SelectedIndex = 1;
                 window.UpdateLayout();
-                var rowsScroll = Descendants<ScrollViewer>(window.FindName("HexRowsView") as DependencyObject ?? window)
+                var rowsView = (HexViewControl)window.FindName("HexRowsView");
+                var rowsScroll = Descendants<ScrollViewer>(rowsView)
                     .First(viewer => ScrollViewer.GetCanContentScroll(viewer));
-                Assert.IsGreaterThan(0, rowsScroll.VerticalOffset,
-                    "Selecting a Block should scroll the data view to its start address.");
+                Assert.IsTrue(rowsView.WindowRows.Any(row => row.Row.Address == "08002000"),
+                    "Selecting a Block should map its start address into the bounded visible rows.");
                 blocks.SelectAll();
                 Assert.AreEqual(2, blocks.SelectedItems.Count);
                 window.Close();

@@ -3,7 +3,94 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:HexEditor.UI"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
-    <ui:DataGrid x:Name="HexGrid" ItemsSource="{Binding ItemsSource, RelativeSource={RelativeSource AncestorType=UserControl}}"
+    <Grid x:Name="Root" Loaded="Control_Loaded">
+      <Grid x:Name="WindowedView" Visibility="Collapsed" SizeChanged="WindowedView_SizeChanged">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <ScrollViewer x:Name="WindowedScroll" Grid.RowSpan="2" Grid.Column="0"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                      CanContentScroll="True"
+                      FontFamily="Consolas"
+                      PreviewMouseWheel="WindowedScroll_PreviewMouseWheel">
+          <StackPanel>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="100"/><ColumnDefinition Width="Auto" MinWidth="360"/>
+                <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto" MinWidth="220">
+                  <ColumnDefinition.Style>
+                    <Style TargetType="ColumnDefinition">
+                      <Style.Triggers><DataTrigger Binding="{Binding ShowAscii, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Value="False">
+                        <Setter Property="Width" Value="0"/><Setter Property="MinWidth" Value="0"/>
+                      </DataTrigger></Style.Triggers>
+                    </Style>
+                  </ColumnDefinition.Style>
+                </ColumnDefinition>
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Column="0" Text="Address"/>
+              <TextBlock Grid.Column="1" Text="HEX Data"/>
+              <TextBlock x:Name="WindowedAsciiHeader" Grid.Column="2" Text="ASCII"/>
+            </Grid>
+            <ItemsControl x:Name="WindowedRows" ItemsSource="{Binding WindowRows, RelativeSource={RelativeSource AncestorType=UserControl}}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemContainerStyle>
+                <Style TargetType="ContentPresenter">
+                  <Setter Property="Margin" Value="{Binding RowGap, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/>
+                </Style>
+              </ItemsControl.ItemContainerStyle>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="100"/><ColumnDefinition Width="Auto" MinWidth="360"/>
+                      <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto" MinWidth="220">
+                        <ColumnDefinition.Style>
+                          <Style TargetType="ColumnDefinition">
+                            <Style.Triggers><DataTrigger Binding="{Binding ShowAscii, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Value="False">
+                              <Setter Property="Width" Value="0"/><Setter Property="MinWidth" Value="0"/>
+                            </DataTrigger></Style.Triggers>
+                          </Style>
+                        </ColumnDefinition.Style>
+                      </ColumnDefinition>
+                    </Grid.ColumnDefinitions>
+                    <local:HexRowAddressControl Grid.Column="0" Row="{Binding Row}"/>
+                    <local:HexByteRowControl Grid.Column="1" Row="{Binding Row}" MouseLeftButtonDown="ByteCell_Click"/>
+                    <local:HexByteRowControl x:Name="WindowedAscii" Grid.Column="2" Row="{Binding Row}" IsAscii="True" MouseLeftButtonDown="ByteCell_Click">
+                      <local:HexByteRowControl.Style>
+                        <Style TargetType="local:HexByteRowControl">
+                          <Setter Property="Visibility" Value="Visible"/>
+                          <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShowAscii, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Value="False">
+                              <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </local:HexByteRowControl.Style>
+                    </local:HexByteRowControl>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+        <ScrollBar x:Name="RowThumb" Grid.Column="1" Orientation="Vertical"
+                   Minimum="0" Maximum="0" ViewportSize="1" SmallChange="3" LargeChange="10"
+                   ValueChanged="RowThumb_ValueChanged">
+          <ScrollBar.Template>
+            <ControlTemplate TargetType="ScrollBar">
+              <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton><RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Focusable="False"/></Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb MinHeight="30" Background="#777">
+                    <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{TemplateBinding Background}" CornerRadius="4"/></ControlTemplate></Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton><RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Focusable="False"/></Track.IncreaseRepeatButton>
+              </Track>
+            </ControlTemplate>
+          </ScrollBar.Template>
+        </ScrollBar>
+      </Grid>
+      <ui:DataGrid x:Name="HexGrid"
               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
               SelectionUnit="Cell" SelectionMode="Extended"
               EnableRowVirtualization="True" EnableColumnVirtualization="True"
@@ -56,5 +143,6 @@
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
         </ui:DataGrid.Columns>
-    </ui:DataGrid>
+      </ui:DataGrid>
+    </Grid>
 </UserControl>

@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Markup;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -8,6 +10,9 @@ namespace HexEditor.UI;
 /// <summary>Draws a row of byte text and highlights without a visual element per byte.</summary>
 public sealed class HexByteRowControl : Control
 {
+    private const int MaxCachedRows = 256;
+    private static readonly Dictionary<RowDrawingKey, DrawingGroup> RowDrawingCache = [];
+    private static readonly Queue<RowDrawingKey> RowDrawingOrder = new();
     private double _characterWidth;
     private double _lineHeight;
     private double _pixelsPerDip;
@@ -21,7 +26,7 @@ public sealed class HexByteRowControl : Control
 
     public static readonly DependencyProperty RowProperty = DependencyProperty.Register(
         nameof(Row), typeof(HexViewRow), typeof(HexByteRowControl),
-        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnRowChanged));
 
     public static readonly DependencyProperty IsAsciiProperty = DependencyProperty.Register(
         nameof(IsAscii), typeof(bool), typeof(HexByteRowControl),
@@ -98,11 +103,7 @@ public sealed class HexByteRowControl : Control
             }
         }
 
-        for (var index = 0; index < row.Cells.Count; index++)
-        {
-            var text = IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex;
-            drawingContext.DrawText(Format(text), layout.GetByteBounds(index, IsAscii).TopLeft);
-        }
+        drawingContext.DrawDrawing(GetRowDrawing(row, layout));
     }
 
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)
@@ -154,8 +155,72 @@ public sealed class HexByteRowControl : Control
         InvalidateVisual();
     });
 
+    private static void OnRowChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
+    {
+        var oldRow = e.OldValue as HexViewRow;
+        var newRow = e.NewValue as HexViewRow;
+        if (oldRow?.Cells.Count != newRow?.Cells.Count || oldRow?.IsGapMarker != newRow?.IsGapMarker)
+            ((HexByteRowControl)owner).InvalidateMeasure();
+    }
+
     private FormattedText Format(string text) => new(
         text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
         new Typeface(FontFamily, FontStyle, FontWeight, FontStretch), FontSize, Foreground, _pixelsPerDip);
+
+    private DrawingGroup GetRowDrawing(HexViewRow row, ByteGridLayout layout)
+    {
+        var text = IsAscii ? row.Ascii ?? string.Empty : row.HexData;
+        var color = Foreground is SolidColorBrush solid ? solid.Color : Colors.Black;
+        var typeface = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch).ToString() ?? string.Empty;
+        var key = new RowDrawingKey(text, IsAscii, FontSize, typeface, color, _pixelsPerDip,
+            layout.CharacterWidth, layout.LineHeight, layout.HorizontalSpacing);
+        if (RowDrawingCache.TryGetValue(key, out var cached)) return cached;
+
+        var group = new DrawingGroup();
+        using (var context = group.Open())
+        {
+            var typefaceInfo = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
+            if (typefaceInfo.TryGetGlyphTypeface(out var glyphTypeface))
+            {
+                var characters = new List<char>(row.Cells.Count * (IsAscii ? 1 : 2));
+                var glyphs = new List<ushort>(characters.Capacity);
+                var advances = new List<double>(characters.Capacity);
+                for (var index = 0; index < row.Cells.Count; index++)
+                {
+                    var cellText = IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex;
+                    for (var charIndex = 0; charIndex < cellText.Length; charIndex++)
+                    {
+                        var character = cellText[charIndex];
+                        characters.Add(character);
+                        glyphs.Add(glyphTypeface.CharacterToGlyphMap.TryGetValue(character, out var glyph)
+                            ? glyph
+                            : glyphTypeface.CharacterToGlyphMap['?']);
+                        var isLastCellCharacter = index == row.Cells.Count - 1 && charIndex == cellText.Length - 1;
+                        var isByteSeparator = !IsAscii && charIndex == cellText.Length - 1 && !isLastCellCharacter;
+                        advances.Add(_characterWidth + (isByteSeparator ? layout.HorizontalSpacing : 0));
+                    }
+                }
+                var run = new GlyphRun(glyphTypeface, 0, false, FontSize, (float)_pixelsPerDip, glyphs,
+                    new Point(0, Format("0").Baseline), advances, null, characters, null, null, null,
+                    XmlLanguage.GetLanguage("en-US"));
+                context.DrawGlyphRun(Foreground, run);
+            }
+            else
+                for (var index = 0; index < row.Cells.Count; index++)
+                    context.DrawText(Format(IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex), layout.GetByteBounds(index, IsAscii).TopLeft);
+        }
+        group.Freeze();
+        if (RowDrawingCache.Count >= MaxCachedRows)
+        {
+            var expired = RowDrawingOrder.Dequeue();
+            RowDrawingCache.Remove(expired);
+        }
+        RowDrawingCache.Add(key, group);
+        RowDrawingOrder.Enqueue(key);
+        return group;
+    }
+
+    private readonly record struct RowDrawingKey(string Text, bool IsAscii, double FontSize, string Typeface,
+        Color Foreground, double PixelsPerDip, double CharacterWidth, double LineHeight, int HorizontalSpacing);
 
 }
