@@ -6,21 +6,22 @@ namespace HexEditor.Formats;
 
 internal static class IntelHexWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output, IntelHexMetadata? metadata,
+    public static void Write(IReadOnlyList<MemoryImageRange> ranges, ulong occupiedByteCount, int maxPayload, Stream output, IntelHexMetadata? metadata,
         CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
     {
         using var writer = new StreamWriter(output, Encoding.ASCII, 1024, leaveOpen: true);
         uint? currentUpperAddress = null;
         long writtenBytes = 0;
-        var totalBytes = image.Segments.Sum(segment => (long)segment.ByteCount);
+        var totalBytes = checked((long)occupiedByteCount);
+        var buffer = new byte[maxPayload];
 
-        foreach (var segment in image.Segments)
+        foreach (var range in ranges)
         {
-            var offset = 0;
-            while (offset < segment.ByteCount)
+            ulong offset = 0;
+            while (offset < range.ByteCount)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var address = (ulong)segment.StartAddress + (uint)offset;
+                var address = (ulong)range.StartAddress + offset;
                 var upperAddress = (ushort)(address >> 16);
                 if (currentUpperAddress != upperAddress)
                 {
@@ -35,11 +36,13 @@ internal static class IntelHexWriter
 
                 var lowAddress = (ushort)address;
                 var bytesBeforeBoundary = 0x10000 - lowAddress;
-                var count = Math.Min(maxPayload, Math.Min(bytesBeforeBoundary, segment.ByteCount - offset));
-                WriteRecord(writer, lowAddress, 0x00, segment.Data.Span.Slice(offset, count));
-                offset += count;
+                var count = (int)Math.Min((ulong)maxPayload, Math.Min((ulong)bytesBeforeBoundary, range.ByteCount - offset));
+                range.CopyTo(offset, buffer.AsSpan(0, count));
+                WriteRecord(writer, lowAddress, 0x00, buffer.AsSpan(0, count));
+                offset += (ulong)count;
                 writtenBytes += count;
                 progress?.Report(new MemoryImageFileProgress("Writing records", writtenBytes, totalBytes));
+                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 

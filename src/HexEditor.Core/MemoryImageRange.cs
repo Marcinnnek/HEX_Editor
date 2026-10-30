@@ -8,7 +8,8 @@ public sealed class MemoryImageRange
     private readonly bool _isRepeated;
     private readonly ulong _patternOffset;
 
-    private MemoryImageRange(uint startAddress, uint endAddress, ReadOnlyMemory<byte> data, ReadOnlyMemory<byte> pattern, bool isRepeated, ulong patternOffset = 0)
+    private MemoryImageRange(uint startAddress, uint endAddress, ReadOnlyMemory<byte> data, ReadOnlyMemory<byte> pattern,
+        bool isRepeated, ulong patternOffset = 0)
     {
         StartAddress = startAddress;
         EndAddress = endAddress;
@@ -19,9 +20,7 @@ public sealed class MemoryImageRange
     }
 
     public uint StartAddress { get; }
-
     public uint EndAddress { get; }
-
     public ulong ByteCount => (ulong)EndAddress - StartAddress + 1;
 
     internal static MemoryImageRange FromSegment(MemorySegment segment) =>
@@ -45,10 +44,43 @@ public sealed class MemoryImageRange
         return true;
     }
 
-    internal bool IsRepeated => _isRepeated;
+    /// <summary>Copies occupied bytes into a bounded caller-owned buffer.</summary>
+    public void CopyTo(ulong offset, Span<byte> destination)
+    {
+        if (offset > ByteCount || (ulong)destination.Length > ByteCount - offset)
+            throw new ArgumentOutOfRangeException(nameof(offset), "The requested bytes are outside this occupied range.");
+
+        if (!_isRepeated)
+        {
+            _data.Span.Slice(checked((int)offset), destination.Length).CopyTo(destination);
+            return;
+        }
+
+        var pattern = _pattern.Span;
+        var patternOffset = (int)((_patternOffset + offset) % (ulong)pattern.Length);
+        for (var index = 0; index < destination.Length; index++)
+        {
+            destination[index] = pattern[patternOffset++];
+            if (patternOffset == pattern.Length) patternOffset = 0;
+        }
+    }
+
+    /// <summary>Returns a view clipped to an inclusive subrange without materializing repeated data.</summary>
+    public MemoryImageRange Slice(uint startAddress, uint endAddress)
+    {
+        if (startAddress < StartAddress || endAddress > EndAddress || startAddress > endAddress)
+            throw new ArgumentOutOfRangeException(nameof(startAddress), "The requested subrange must be contained in this occupied range.");
+
+        var offset = (ulong)startAddress - StartAddress;
+        return _isRepeated
+            ? new MemoryImageRange(startAddress, endAddress, default, _pattern, true, _patternOffset + offset)
+            : new MemoryImageRange(startAddress, endAddress,
+                _data.Slice(checked((int)offset), checked((int)((ulong)endAddress - startAddress + 1))), default, false);
+    }
 
     public bool ContentEquals(MemoryImageRange other)
     {
+        ArgumentNullException.ThrowIfNull(other);
         if (StartAddress != other.StartAddress || EndAddress != other.EndAddress) return false;
         if (_isRepeated && other._isRepeated)
             return _patternOffset % (ulong)_pattern.Length == other._patternOffset % (ulong)other._pattern.Length &&
@@ -64,23 +96,13 @@ public sealed class MemoryImageRange
         return true;
     }
 
-    internal MemoryImageRange Slice(uint startAddress, uint endAddress)
-    {
-        if (startAddress < StartAddress || endAddress > EndAddress || endAddress < startAddress)
-            throw new ArgumentOutOfRangeException(nameof(startAddress));
-        var offset = (ulong)startAddress - StartAddress;
-        return _isRepeated
-            ? new MemoryImageRange(startAddress, endAddress, default, _pattern, true, _patternOffset + offset)
-            : new MemoryImageRange(startAddress, endAddress, _data.Slice((int)offset, checked((int)((ulong)endAddress - startAddress + 1))), default, false);
-    }
-
     internal MemorySegment? ToSmallSegment()
     {
         const ulong maximumMaterializedBytes = 1_048_576;
         if (ByteCount > maximumMaterializedBytes) return null;
         if (!_isRepeated) return new MemorySegment(StartAddress, _data.Span);
         var data = new byte[(int)ByteCount];
-        for (var i = 0; i < data.Length; i++) data[i] = _pattern.Span[(int)((_patternOffset + (ulong)i) % (ulong)_pattern.Length)];
+        CopyTo(0, data);
         return new MemorySegment(StartAddress, data);
     }
 }
