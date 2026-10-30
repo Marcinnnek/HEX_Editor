@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Globalization;
 using HexEditor.Core;
 using HexEditor.UI;
 
@@ -38,7 +39,7 @@ public sealed class CompareSegmentListLayoutTests
                 Assert.HasCount(2, dataPanels);
 
                 Assert.IsTrue(segmentLists.All(grid => !grid.CanUserSortColumns));
-                Assert.IsTrue(segmentLists.All(grid => grid.RowHeight == 20));
+                Assert.IsTrue(segmentLists.All(grid => grid.RowHeight == 21));
                 Assert.IsTrue(segmentLists.All(grid => grid.HorizontalScrollBarVisibility == ScrollBarVisibility.Auto));
                 foreach (var grid in segmentLists) AssertRenderedRowGap(grid);
                 Assert.IsTrue(workspace.BlocksA.All(row => row.ByteCountText == $"0x{row.ByteCount:X} = {row.ByteCount}"));
@@ -99,9 +100,12 @@ public sealed class CompareSegmentListLayoutTests
         var secondRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(1);
         var firstText = Descendants<TextBlock>(firstRow).First();
         var secondText = Descendants<TextBlock>(secondRow).First();
-        var firstBounds = firstText.TransformToAncestor(grid).TransformBounds(new Rect(firstText.RenderSize));
-        var secondBounds = secondText.TransformToAncestor(grid).TransformBounds(new Rect(secondText.RenderSize));
-        var gapInCharacterHeights = (secondBounds.Top - firstBounds.Bottom) / firstText.FontSize;
+        var firstBounds = firstRow.TransformToAncestor(grid).TransformBounds(new Rect(firstRow.RenderSize));
+        var secondBounds = secondRow.TransformToAncestor(grid).TransformBounds(new Rect(secondRow.RenderSize));
+        var lineHeight = new FormattedText(firstText.Text, CultureInfo.CurrentCulture, firstText.FlowDirection,
+            new Typeface(firstText.FontFamily, firstText.FontStyle, firstText.FontWeight, firstText.FontStretch),
+            firstText.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(firstText).PixelsPerDip).Height;
+        var gapInCharacterHeights = (secondBounds.Top - firstBounds.Top - lineHeight) / firstText.FontSize;
         Assert.IsTrue(gapInCharacterHeights is >= 0.35 and <= 0.65,
             $"Expected about half a character of visible text-to-text gap, got {gapInCharacterHeights:F2}.");
     }

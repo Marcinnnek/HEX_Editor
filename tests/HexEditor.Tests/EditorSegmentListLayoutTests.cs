@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Globalization;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -21,8 +22,7 @@ public sealed class EditorSegmentListLayoutTests
             var window = new MainWindow();
             window.ViewModel.Segments.Add(new MemorySegmentRow("00001000", "00001000", 1));
             window.ViewModel.Segments.Add(new MemorySegmentRow("00001010", "00001010", 1));
-            window.Measure(new Size(1100, 760));
-            window.Arrange(new Rect(0, 0, 1100, 760));
+            window.Show();
             window.UpdateLayout();
             var segmentGrid = (DataGrid)window.FindName("SegmentsGrid");
             alignment = segmentGrid.HorizontalAlignment;
@@ -40,7 +40,7 @@ public sealed class EditorSegmentListLayoutTests
         Assert.IsTrue(columnsAreAuto,
             "Segment columns should size to their displayed address and count content.");
         Assert.IsTrue(sortingDisabled, "Segment order should remain stable when a header is clicked.");
-        Assert.AreEqual(20d, rowHeight, "Compact segment rows should retain readable text and selection targets.");
+        Assert.AreEqual(21d, rowHeight, "Compact segment rows should retain readable text and selection targets.");
         Assert.IsTrue(renderedGap is >= 0.35 and <= 0.65,
             $"Expected about half a character of rendered text-to-text gap, got {renderedGap:F2}.");
     }
@@ -53,9 +53,12 @@ public sealed class EditorSegmentListLayoutTests
         Assert.IsNotNull(secondRow);
         var firstText = Descendants<TextBlock>(firstRow).First();
         var secondText = Descendants<TextBlock>(secondRow).First();
-        var firstBounds = firstText.TransformToAncestor(grid).TransformBounds(new Rect(firstText.RenderSize));
-        var secondBounds = secondText.TransformToAncestor(grid).TransformBounds(new Rect(secondText.RenderSize));
-        return (secondBounds.Top - firstBounds.Bottom) / firstText.FontSize;
+        var firstBounds = firstRow.TransformToAncestor(grid).TransformBounds(new Rect(firstRow.RenderSize));
+        var secondBounds = secondRow.TransformToAncestor(grid).TransformBounds(new Rect(secondRow.RenderSize));
+        var lineHeight = new FormattedText(firstText.Text, CultureInfo.CurrentCulture, firstText.FlowDirection,
+            new Typeface(firstText.FontFamily, firstText.FontStyle, firstText.FontWeight, firstText.FontStretch),
+            firstText.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(firstText).PixelsPerDip).Height;
+        return (secondBounds.Top - firstBounds.Top - lineHeight) / firstText.FontSize;
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject

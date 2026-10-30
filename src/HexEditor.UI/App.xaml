@@ -25,12 +25,6 @@
                     </Trigger>
                 </Style.Triggers>
             </Style>
-            <Style x:Key="SegmentListTextBlockStyle" TargetType="TextBlock">
-                <Setter Property="TextAlignment" Value="Left" />
-            </Style>
-            <Style x:Key="SegmentListCellStyle" TargetType="{x:Type DataGridCell}">
-                <Setter Property="Padding" Value="4,3" />
-            </Style>
             <Style TargetType="{x:Type Button}">
                 <Setter Property="Background" Value="{DynamicResource HexRaisedBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />

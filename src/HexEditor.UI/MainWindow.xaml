@@ -9,6 +9,13 @@
         Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640"
         WindowStyle="SingleBorderWindow" ResizeMode="CanResize"
         PreviewKeyDown="MainWindow_PreviewKeyDown">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="SegmentListStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
     <DockPanel Margin="12">
         <Menu DockPanel.Dock="Top" Margin="0,0,0,8">
             <ui:MenuItem Header="_File">
@@ -151,20 +158,14 @@
                     <ui:DataGrid Grid.Row="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                               HorizontalAlignment="Left"
                               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                              CanUserSortColumns="False" RowHeight="20" CellStyle="{StaticResource SegmentListCellStyle}"
+                              CanUserSortColumns="False" RowHeight="21" CellStyle="{DynamicResource SegmentListCellStyle}"
                               HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
                               MouseDoubleClick="SegmentsGrid_MouseDoubleClick"
                               MaxHeight="150" MinHeight="72" VerticalScrollBarVisibility="Auto">
                         <ui:DataGrid.Columns>
-                            <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="Auto">
-                                <DataGridTextColumn.ElementStyle><StaticResource ResourceKey="SegmentListTextBlockStyle" /></DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="Auto">
-                                <DataGridTextColumn.ElementStyle><StaticResource ResourceKey="SegmentListTextBlockStyle" /></DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCountText}" Width="Auto">
-                                <DataGridTextColumn.ElementStyle><StaticResource ResourceKey="SegmentListTextBlockStyle" /></DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
+                            <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
+                            <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCountText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
                         </ui:DataGrid.Columns>
                     </ui:DataGrid>
                     <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
