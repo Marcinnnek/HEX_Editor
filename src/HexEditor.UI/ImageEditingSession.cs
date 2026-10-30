@@ -3,6 +3,8 @@ using HexEditor.Formats;
 
 namespace HexEditor.UI;
 
+public enum FillPolicy { KeepExisting, OverwriteExisting }
+
 /// <summary>Owns the active image's edit operations, sparse clipboard, and undo/redo history.</summary>
 public sealed class ImageEditingSession
 {
@@ -154,15 +156,25 @@ public sealed class ImageEditingSession
         Commit(MemoryImage.FromSegments(_currentImage.Segments.Where((_, index) => index != segmentIndex)));
     }
 
-    public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern)
+    public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
+        FillPolicy policy = FillPolicy.KeepExisting)
     {
         ValidateRange(startAddress, endAddress);
         ArgumentNullException.ThrowIfNull(pattern);
         if (pattern.Count == 0) throw new ArgumentException("The fill pattern must contain at least one byte.", nameof(pattern));
+        if (policy is not FillPolicy.KeepExisting and not FillPolicy.OverwriteExisting)
+            throw new ArgumentOutOfRangeException(nameof(policy));
         var length = (ulong)endAddress - startAddress + 1;
         if (length > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(endAddress), "The selected range is too large to represent as a memory segment.");
         var filled = new byte[(int)length];
         for (var offset = 0; offset < filled.Length; offset++) filled[offset] = pattern[offset % pattern.Count];
+        if (policy == FillPolicy.KeepExisting)
+        {
+            var existingAndGaps = MemoryImage.FromSegments([new MemorySegment(startAddress, filled)]);
+            Commit(MemoryImageSparseOverlay.Combine(_currentImage, existingAndGaps,
+                (_, hasExisting, existing, _, incoming) => hasExisting ? existing : incoming));
+            return;
+        }
         Commit(MemoryImageEdits.Overlay(_currentImage, MemoryImage.FromSegments([new MemorySegment(startAddress, filled)]), OverlapDecision.OverwriteIncoming));
     }
 

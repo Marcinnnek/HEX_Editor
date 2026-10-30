@@ -557,9 +557,9 @@ public partial class MainWindow : Window
         try
         {
             var (start, end) = GetSelectionDefaults();
-            var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end) { Owner = this };
+            var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end, ViewModel.GetFillAllRegion()) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
-            ViewModel.FillRange(input.Start, input.End, input.Pattern!);
+            ViewModel.FillRange(input.Start, input.End, input.Pattern!, input.FillPolicy);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)

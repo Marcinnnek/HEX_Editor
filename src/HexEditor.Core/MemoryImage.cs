@@ -5,13 +5,22 @@ namespace HexEditor.Core;
 public sealed class MemoryImage
 {
     private readonly IReadOnlyList<MemorySegment> _segments;
+    private readonly IReadOnlyList<MemoryImageRange> _ranges;
 
-    private MemoryImage(IReadOnlyList<MemorySegment> segments)
+    private MemoryImage(IReadOnlyList<MemorySegment> segments, IReadOnlyList<MemoryImageRange>? ranges = null)
     {
         _segments = Array.AsReadOnly(segments.ToArray());
+        _ranges = Array.AsReadOnly((ranges ?? segments.Select(MemoryImageRange.FromSegment).ToArray()).ToArray());
+        OccupiedByteCount = _ranges.Aggregate(0UL, (count, range) => checked(count + range.ByteCount));
     }
 
     public IReadOnlyList<MemorySegment> Segments => _segments;
+
+    /// <summary>Occupied byte ranges, including ranges too large to materialize as a <see cref="MemorySegment"/>.</summary>
+    public IReadOnlyList<MemoryImageRange> Ranges => _ranges;
+
+    /// <summary>The number of explicitly occupied bytes, which may be 2^32.</summary>
+    public ulong OccupiedByteCount { get; }
 
     public static MemoryImage Empty { get; } = new(Array.Empty<MemorySegment>());
 
@@ -59,22 +68,41 @@ public sealed class MemoryImage
         return new MemoryImage(normalizedSegments);
     }
 
+    /// <summary>Creates a logically occupied inclusive address range filled with one byte value.</summary>
+    public static MemoryImage FromRepeatedRange(uint startAddress, uint endAddress, byte value)
+        => FromPatternRange(startAddress, endAddress, new[] { value });
+
+    /// <summary>Creates an inclusive occupied range whose bytes repeat the supplied pattern from its start.</summary>
+    public static MemoryImage FromPatternRange(uint startAddress, uint endAddress, ReadOnlySpan<byte> pattern)
+    {
+        if (endAddress < startAddress)
+        {
+            throw new ArgumentOutOfRangeException(nameof(endAddress), "The range end must not precede its start.");
+        }
+        if (pattern.IsEmpty)
+        {
+            throw new ArgumentException("A repeated range requires a non-empty byte pattern.", nameof(pattern));
+        }
+
+        return new MemoryImage(Array.Empty<MemorySegment>(), [MemoryImageRange.Repeated(startAddress, endAddress, pattern.ToArray())]);
+    }
+
     public bool TryGetByte(uint address, out byte value)
     {
         var low = 0;
-        var high = _segments.Count - 1;
+        var high = _ranges.Count - 1;
 
         while (low <= high)
         {
             var middle = low + ((high - low) / 2);
-            var segment = _segments[middle];
+            var range = _ranges[middle];
 
-            if (segment.TryGetByte(address, out value))
+            if (range.TryGetByte(address, out value))
             {
                 return true;
             }
 
-            if (address < segment.StartAddress)
+            if (address < range.StartAddress)
             {
                 high = middle - 1;
             }
