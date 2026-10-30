@@ -41,7 +41,7 @@ public sealed class PreferencesWindow : Window
         AddSetting(panel, "Horizontal space between bytes", horizontal);
         AddSetting(panel, "Vertical space between rows", vertical);
 
-        panel.Children.Add(new TextBlock { Text = "Comparison colors", FontSize = 18,
+        panel.Children.Add(new TextBlock { Text = "Highlight colors", FontSize = 18,
             FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 8) });
         var paletteSelector = new ComboBox { Name = "ComparisonPaletteSelector", Width = 150,
             HorizontalAlignment = HorizontalAlignment.Left, SelectedIndex = 0, Margin = new Thickness(0, 0, 0, 8) };
@@ -56,6 +56,7 @@ public sealed class PreferencesWindow : Window
         AddColorRow(panel, "Unequal bytes", ComparisonColorKind.Different);
         AddColorRow(panel, "Bytes only in A", ComparisonColorKind.OnlyInA);
         AddColorRow(panel, "Bytes only in B", ComparisonColorKind.OnlyInB);
+        AddColorRow(panel, "Edited bytes", ComparisonColorKind.EditedByte);
         var reset = new Wpf.Ui.Controls.Button { Content = "Reset palette", MinWidth = 100,
             HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
         reset.Click += (_, _) => { choices.ResetPalette(_palette); RefreshSwatches(); };

@@ -30,6 +30,12 @@ public sealed class EditorDocument : INotifyPropertyChanged
     public ImageEditingSession Editing { get; } = new();
     public MemoryImage CurrentImage => Editing.CurrentImage;
     public bool IsModified => !ReferenceEquals(CurrentImage, _savedImage);
+    /// <summary>Whether the current image has an occupied byte whose value differs from the last saved image.</summary>
+    public bool IsEditedByte(uint address)
+    {
+        if (!CurrentImage.TryGetByte(address, out var current)) return false;
+        return _savedImage is null || !_savedImage.TryGetByte(address, out var saved) || saved != current;
+    }
     public bool CanUndo => Editing.CanUndo;
     public bool CanRedo => Editing.CanRedo;
     public string? SourcePath { get; private set; }

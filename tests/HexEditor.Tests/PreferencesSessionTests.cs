@@ -179,6 +179,7 @@ public sealed class PreferencesSessionTests
             Assert.AreEqual("#885E3138", choices.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
             choices.SetColor(AppearanceMode.Light, ComparisonColorKind.Different, "#FF112233");
             choices.ResetPalette(AppearanceMode.Dark);
+            choices.SetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByte, "#FF00FF00");
             Assert.AreEqual("#FF112233", choices.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
             Assert.AreEqual("#885E3138", choices.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
             Assert.AreEqual("#55D03838", settings.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
@@ -187,6 +188,7 @@ public sealed class PreferencesSessionTests
             var restarted = new ComparisonColorSettings(path);
             Assert.AreEqual("#FF112233", restarted.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
             Assert.AreEqual("#885E3138", restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
+            Assert.AreEqual("#FF00FF00", restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByte));
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }
