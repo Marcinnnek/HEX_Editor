@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Globalization;
 using HexEditor.Core;
 using HexEditor.UI;
 
@@ -14,7 +13,7 @@ public sealed class CompareSegmentListLayoutTests
     [DataRow(1100)]
     [DataRow(650)]
     [TestMethod]
-    public void EachMemorySegmentListStaysAboveItsOwnCompareDataPanel(int width)
+    public void CompareBlocksStayWithTheirImagesAndSupportHorizontalScrollingAndSelection(int width)
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -22,68 +21,80 @@ public sealed class CompareSegmentListLayoutTests
             try
             {
                 var workspace = new CompareWorkspaceTabViewModel(
-                    MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x1010, [0x11])]),
-                    MemoryImage.FromSegments([new MemorySegment(0x2000, [0x20]), new MemorySegment(0x2010, [0x21])]),
+                    MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x1010, new byte[0x15BC])]),
+                    MemoryImage.FromSegments([new MemorySegment(0x2000, [0x20]), new MemorySegment(0x2010, new byte[0x15BC])]),
                     "base.hex", "reference.hex");
                 var view = new CompareView(workspace);
                 view.Measure(new Size(width, 650));
                 view.Arrange(new Rect(0, 0, width, 650));
                 view.UpdateLayout();
 
-                var segmentLists = Descendants<DataGrid>(view)
-                    .Where(grid => ReferenceEquals(grid.ItemsSource, workspace.BlocksA) ||
-                                   ReferenceEquals(grid.ItemsSource, workspace.BlocksB))
+                var segmentLists = Descendants<ListBox>(view)
+                    .Where(list => ReferenceEquals(list.ItemsSource, workspace.BlocksA) ||
+                                   ReferenceEquals(list.ItemsSource, workspace.BlocksB))
                     .ToArray();
                 var dataPanels = Descendants<HexViewControl>(view).ToArray();
                 Assert.HasCount(2, segmentLists);
                 Assert.HasCount(2, dataPanels);
+                var baseBlocks = segmentLists.Single(list => ReferenceEquals(list.ItemsSource, workspace.BlocksA));
+                var referenceBlocks = segmentLists.Single(list => ReferenceEquals(list.ItemsSource, workspace.BlocksB));
+                Assert.AreEqual(SelectionMode.Extended, baseBlocks.SelectionMode);
+                Assert.AreEqual(SelectionMode.Single, referenceBlocks.SelectionMode);
+                Assert.AreEqual("Block 1 Starts at: 0x00001000 Ends at: 0x00001000 (Length: 0x1 = 1)",
+                    ((CompareMemoryBlockRow)baseBlocks.Items[0]).Description);
+                Assert.AreEqual("Block 2 Starts at: 0x00001010 Ends at: 0x000025CB (Length: 0x15BC = 5564)",
+                    ((CompareMemoryBlockRow)baseBlocks.Items[1]).Description);
 
-                Assert.IsTrue(segmentLists.All(grid => !grid.CanUserSortColumns));
-                Assert.IsTrue(segmentLists.All(grid => grid.RowHeight == 21));
-                Assert.IsTrue(segmentLists.All(grid => grid.HorizontalScrollBarVisibility == ScrollBarVisibility.Auto));
-                foreach (var grid in segmentLists) AssertRenderedRowGap(grid);
-                Assert.IsTrue(workspace.BlocksA.All(row => row.ByteCountText == $"0x{row.ByteCount:X} = {row.ByteCount}"));
-
-                AssertAligned(workspace.BlocksA, workspace.Comparison.FileARows);
-                AssertAligned(workspace.BlocksB, workspace.Comparison.FileBRows);
-
-                // A moved divider changes the shared column width while preserving ownership.
-                var compareGrid = Ancestor<Grid>(dataPanels[0]);
-                Assert.IsNotNull(compareGrid);
-                compareGrid.ColumnDefinitions[0].Width = new GridLength(width * 0.4, GridUnitType.Pixel);
-                view.Measure(new Size(width, 650));
-                view.Arrange(new Rect(0, 0, width, 650));
-                view.UpdateLayout();
-                AssertAligned(workspace.BlocksA, workspace.Comparison.FileARows);
-                AssertAligned(workspace.BlocksB, workspace.Comparison.FileBRows);
-
-                // Both segment lists still navigate their aligned data panels by address.
-                SelectSegment(workspace.BlocksA, workspace.Comparison.FileARows, "00001000");
-                SelectSegment(workspace.BlocksB, workspace.Comparison.FileBRows, "00002000");
-
-                void SelectSegment(object blocks, object rows, string expectedAddress)
+                foreach (var list in segmentLists)
                 {
-                    var list = segmentLists.Single(grid => ReferenceEquals(grid.ItemsSource, blocks));
-                    list.SelectedIndex = 0;
-                    var panel = dataPanels.Single(control => ReferenceEquals(control.ItemsSource, rows));
-                    Assert.AreEqual(expectedAddress, ((HexViewRow)panel.ItemsGrid.SelectedItem).Address);
+                    Assert.AreEqual(ScrollBarVisibility.Auto, ScrollViewer.GetHorizontalScrollBarVisibility(list));
+                    var horizontalScroll = Descendants<ScrollViewer>(list).Single();
+                    Assert.IsGreaterThan(0, horizontalScroll.ScrollableWidth,
+                        "The full one-line Block description should remain reachable in a narrow Compare column.");
+                    var firstRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
+                    var text = Descendants<TextBlock>(firstRow).Single();
+                    Assert.AreEqual(TextWrapping.NoWrap, text.TextWrapping);
+                    Assert.AreEqual(((CompareMemoryBlockRow)list.Items[0]).Description, text.Text);
                 }
 
-                void AssertAligned(object blocks, object rows)
+                AssertAligned(baseBlocks, dataPanels.Single(panel => ReferenceEquals(panel.ItemsSource, workspace.Comparison.FileARows)));
+                AssertAligned(referenceBlocks, dataPanels.Single(panel => ReferenceEquals(panel.ItemsSource, workspace.Comparison.FileBRows)));
+
+                baseBlocks.SelectedIndex = 1;
+                Assert.AreEqual(0x1010u, ParseSelectedAddress(view));
+                Assert.HasCount(1, baseBlocks.SelectedItems);
+                AssertPanelsNavigateTo("00001010");
+                baseBlocks.SelectAll();
+                Assert.HasCount(2, view.SelectedBaseSegmentIndexes,
+                    "Ctrl/Shift selection in the base list supplies multiple segment indexes for export.");
+
+                referenceBlocks.SelectedIndex = 1;
+                Assert.AreEqual(0x2010u, ParseSelectedAddress(view));
+                Assert.HasCount(1, referenceBlocks.SelectedItems);
+                AssertPanelsNavigateTo("00002010");
+
+                uint ParseSelectedAddress(CompareView compareView) =>
+                    HexAddressParser.Parse(compareView.FindName("AddressBox") is TextBox box ? box.Text : "");
+
+                void AssertPanelsNavigateTo(string expectedAddress)
                 {
-                    var list = segmentLists.Single(grid => ReferenceEquals(grid.ItemsSource, blocks));
-                    var panel = dataPanels.Single(control => ReferenceEquals(control.ItemsSource, rows));
+                    foreach (var panel in dataPanels)
+                    {
+                        Assert.IsInstanceOfType<HexViewRow>(panel.ItemsGrid.SelectedItem);
+                        Assert.AreEqual(expectedAddress, ((HexViewRow)panel.ItemsGrid.SelectedItem).Address);
+                    }
+                }
+
+                void AssertAligned(ListBox list, HexViewControl panel)
+                {
                     var group = Ancestor<GroupBox>(list);
                     Assert.IsNotNull(group);
-                    var listBounds = group.TransformToAncestor(view)
-                        .TransformBounds(new Rect(group.RenderSize));
-                    var panelBounds = panel.TransformToAncestor(view)
-                        .TransformBounds(new Rect(panel.RenderSize));
+                    var listBounds = group.TransformToAncestor(view).TransformBounds(new Rect(group.RenderSize));
+                    var panelBounds = panel.TransformToAncestor(view).TransformBounds(new Rect(panel.RenderSize));
                     Assert.AreEqual(panelBounds.Left, listBounds.Left, 1.0);
                     Assert.AreEqual(panelBounds.Width, listBounds.Width, 1.0);
                     Assert.IsLessThanOrEqualTo(panelBounds.Top, listBounds.Bottom);
                     Assert.IsLessThanOrEqualTo(12, panelBounds.Top - listBounds.Bottom);
-                    Assert.IsGreaterThan(200, listBounds.Width);
                 }
             }
             catch (Exception exception) { failure = exception; }
@@ -92,22 +103,6 @@ public sealed class CompareSegmentListLayoutTests
         thread.Start();
         thread.Join();
         if (failure is not null) throw failure;
-    }
-
-    private static void AssertRenderedRowGap(DataGrid grid)
-    {
-        var firstRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
-        var secondRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(1);
-        var firstText = Descendants<TextBlock>(firstRow).First();
-        var secondText = Descendants<TextBlock>(secondRow).First();
-        var firstBounds = firstRow.TransformToAncestor(grid).TransformBounds(new Rect(firstRow.RenderSize));
-        var secondBounds = secondRow.TransformToAncestor(grid).TransformBounds(new Rect(secondRow.RenderSize));
-        var lineHeight = new FormattedText(firstText.Text, CultureInfo.CurrentCulture, firstText.FlowDirection,
-            new Typeface(firstText.FontFamily, firstText.FontStyle, firstText.FontWeight, firstText.FontStretch),
-            firstText.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(firstText).PixelsPerDip).Height;
-        var gapInCharacterHeights = (secondBounds.Top - firstBounds.Top - lineHeight) / firstText.FontSize;
-        Assert.IsTrue(gapInCharacterHeights is >= 0.35 and <= 0.65,
-            $"Expected about half a character of visible text-to-text gap, got {gapInCharacterHeights:F2}.");
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject

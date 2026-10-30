@@ -115,15 +115,16 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
     }
 
     private static IReadOnlyList<CompareMemoryBlockRow> CreateRows(MemoryImage image) => image.Segments
-        .Select(segment => new CompareMemoryBlockRow(segment.StartAddress, segment.EndAddress, segment.ByteCount))
+        .Select((segment, index) => new CompareMemoryBlockRow(index + 1, segment.StartAddress, segment.EndAddress, segment.ByteCount))
         .ToArray();
 }
 
-public sealed record CompareMemoryBlockRow(uint StartAddress, uint EndAddress, int ByteCount)
+public sealed record CompareMemoryBlockRow(int Number, uint StartAddress, uint EndAddress, int ByteCount)
 {
     public string StartText => StartAddress.ToString("X8");
     public string EndText => EndAddress.ToString("X8");
     public string ByteCountText => SegmentByteCountFormatter.Format(ByteCount);
+    public string Description => SegmentBlockFormatter.Format(Number, StartText, EndText, ByteCount);
 }
 
 public enum ComparePanelSide { Base, Reference }
