@@ -132,7 +132,7 @@ public sealed class CompareRowActivationTests
         Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth + GridSpacingSettings.Current.HorizontalByteSpacing + byteWidth * 0.1, 1), out var second));
         Assert.AreEqual(0x1001u, second);
         Assert.IsFalse(control.TryGetAddressAt(new Point(control.DesiredSize.Width, 1), out _));
-        Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth * 0.1, control.DesiredSize.Height - 0.5), out _));
+        Assert.IsFalse(control.TryGetAddressAt(new Point(byteWidth * 0.1, control.DesiredSize.Height - 0.5), out _));
         Assert.IsFalse(control.TryGetAddressAt(new Point(0, control.DesiredSize.Height), out _));
     }
 }

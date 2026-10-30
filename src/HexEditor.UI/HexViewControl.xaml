@@ -14,6 +14,11 @@
                 <Setter Property="Margin" Value="{Binding RowGap, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" />
             </Style>
         </ui:DataGrid.RowStyle>
+        <ui:DataGrid.CellStyle>
+            <Style TargetType="DataGridCell">
+                <Setter Property="Padding" Value="0" />
+            </Style>
+        </ui:DataGrid.CellStyle>
         <ui:DataGrid.Columns>
             <DataGridTemplateColumn Header="Address" Width="100">
                 <DataGridTemplateColumn.CellTemplate>
