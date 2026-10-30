@@ -10,6 +10,8 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 {
     private int _bytesPerRow;
     private bool _showAscii;
+    private uint? _findMatchStart;
+    private uint? _findMatchEnd;
     private SparseRowList<HexViewRow> _rows;
 
     public HexImageViewModel(MemoryImage image, int bytesPerRow = 16, bool showAscii = true)
@@ -50,6 +52,21 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         }
     }
 
+    public void SetFindMatch(uint startAddress, uint endAddress)
+    {
+        if (startAddress > endAddress) throw new ArgumentOutOfRangeException(nameof(startAddress));
+        _findMatchStart = startAddress;
+        _findMatchEnd = endAddress;
+        RebuildRows();
+    }
+
+    public void ClearFindMatch()
+    {
+        if (_findMatchStart is null) return;
+        _findMatchStart = _findMatchEnd = null;
+        RebuildRows();
+    }
+
     public bool TryNavigateToAddress(uint address, out int rowIndex)
     {
         var originalRowCount = _rows.Count;
@@ -74,12 +91,12 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(Rows));
     }
 
-    private static SparseRowList<HexViewRow> CreateRows(MemoryImage image, int bytesPerRow, bool showAscii) =>
+    private SparseRowList<HexViewRow> CreateRows(MemoryImage image, int bytesPerRow, bool showAscii) =>
         new(BuildRanges(image, bytesPerRow), bytesPerRow, position => position.IsGap
             ? HexViewRow.Gap((uint)position.GapStartAddress, (uint)position.GapEndAddress)
             : CreateRow(image, bytesPerRow, showAscii, (uint)position.RowAddress));
 
-    private static HexViewRow CreateRow(MemoryImage image, int bytesPerRow, bool showAscii, uint rowAddress)
+    private HexViewRow CreateRow(MemoryImage image, int bytesPerRow, bool showAscii, uint rowAddress)
     {
         var hex = new StringBuilder((bytesPerRow * 3) - 1);
         var ascii = showAscii ? new StringBuilder(bytesPerRow) : null;
@@ -92,7 +109,10 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
             var text = ByteText.FromByte(value);
             hex.Append(text.HexColumn);
             ascii?.Append(text.Ascii);
-            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), address <= uint.MaxValue ? (uint)address : null, ByteHighlightState.None);
+            var byteAddress = address <= uint.MaxValue ? (uint?)address : null;
+            var isFindMatch = byteAddress is uint current && _findMatchStart is uint matchStart &&
+                current >= matchStart && current <= _findMatchEnd!.Value;
+            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), byteAddress, ByteHighlightState.None, isFindMatch);
         }
         return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null) { Cells = cells };
     }
@@ -152,4 +172,4 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
 
 public enum ByteHighlightState { None, Different, OnlyInPanel, OnlyOther, OnlyInA, OnlyInB }
 
-public sealed record HexByteCell(string Hex, string Ascii, uint? Address, ByteHighlightState Highlight);
+public sealed record HexByteCell(string Hex, string Ascii, uint? Address, ByteHighlightState Highlight, bool IsFindMatch = false);

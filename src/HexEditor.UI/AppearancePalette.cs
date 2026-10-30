@@ -28,6 +28,7 @@ internal static class AppearancePalette
         Set(resources, "HexSelectionBrush", dark ? "#315F8A" : "#C4DDF5");
         Set(resources, "HexFocusBrush", dark ? "#79BCFF" : "#246CA4");
         Set(resources, "HexErrorBrush", dark ? "#FF9292" : "#A52828");
+        Set(resources, "HexFindMatchBrush", dark ? "#FFFFB347" : "#FFB56600");
         Set(resources, "HexAsciiBackgroundBrush", dark ? "#244C6E93" : "#146B87A6");
         var colors = ComparisonColorSettings.Current.GetPalette(dark ? AppearanceMode.Dark : AppearanceMode.Light);
         Set(resources, "HexDifferentBrush", colors.Different);
