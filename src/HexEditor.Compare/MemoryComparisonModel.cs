@@ -18,17 +18,20 @@ public sealed class MemoryComparisonModel
     private uint _rangeEnd = uint.MaxValue;
     private uint? _navigationAddress;
     private SparseRowList<CompareViewRow> _rows;
+    private MemorySegment[] _occupiedSegments;
     private string _comparisonStatus = "No differences";
 
-    public MemoryComparisonModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true)
+    public MemoryComparisonModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true,
+        CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null)
     {
         _fileA = fileA ?? throw new ArgumentNullException(nameof(fileA));
         _fileB = fileB ?? throw new ArgumentNullException(nameof(fileB));
         ValidateRowWidth(bytesPerRow);
         _bytesPerRow = bytesPerRow;
         _showAscii = showAscii;
+        _occupiedSegments = BuildOccupiedSegmentIndex(fileA, fileB);
         _rows = CreateRows();
-        UpdateComparisonStatus();
+        UpdateComparisonStatus(cancellationToken, progress);
     }
 
     public event NotifyCollectionChangedEventHandler? RowsChanged;
@@ -52,7 +55,8 @@ public sealed class MemoryComparisonModel
     {
         _fileA = fileA ?? throw new ArgumentNullException(nameof(fileA));
         _fileB = fileB ?? throw new ArgumentNullException(nameof(fileB));
-        UpdateComparisonStatus();
+        _occupiedSegments = BuildOccupiedSegmentIndex(_fileA, _fileB);
+        UpdateComparisonStatus(CancellationToken.None, null);
         RebuildRows();
     }
 
@@ -153,9 +157,8 @@ public sealed class MemoryComparisonModel
 
     private IEnumerable<uint> GetOccupiedAddresses()
     {
-        var segments = _fileA.Segments.Concat(_fileB.Segments).OrderBy(segment => segment.StartAddress).ToArray();
         uint? last = null;
-        foreach (var segment in segments)
+        foreach (var segment in _occupiedSegments)
         {
             for (var offset = 0; offset < segment.ByteCount; offset++)
             {
@@ -167,26 +170,40 @@ public sealed class MemoryComparisonModel
         }
     }
 
+    private static MemorySegment[] BuildOccupiedSegmentIndex(MemoryImage fileA, MemoryImage fileB) =>
+        fileA.Segments.Concat(fileB.Segments)
+            .OrderBy(segment => segment.StartAddress)
+            .ToArray();
+
     private void RebuildRows()
     {
         _rows = CreateRows();
         RowsChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 
-    private void UpdateComparisonStatus()
+    private void UpdateComparisonStatus(CancellationToken cancellationToken, IProgress<ComparisonProgress>? progress)
     {
         long different = 0;
         long onlyA = 0;
         long onlyB = 0;
+        long completed = 0;
         foreach (var address in GetOccupiedAddresses())
         {
+            if ((completed & 0xFFFF) == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new ComparisonProgress("Comparing occupied bytes", completed));
+            }
             switch (GetState(address))
             {
                 case CompareByteState.Different: different++; break;
                 case CompareByteState.OnlyA: onlyA++; break;
                 case CompareByteState.OnlyB: onlyB++; break;
             }
+            completed++;
         }
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new ComparisonProgress("Comparison complete", completed, completed));
 
         var total = different + onlyA + onlyB;
         _comparisonStatus = total == 0
@@ -299,6 +316,8 @@ public sealed class MemoryComparisonModel
     internal bool IsInSelectedAddressRange(uint address) =>
         _viewMode != CompareViewMode.AddressRange || address >= _rangeStart && address <= _rangeEnd;
 }
+
+public sealed record ComparisonProgress(string Stage, long Completed, long? Total = null);
 
 public sealed record CompareByteCell(string Hex, string Ascii, CompareByteState State, uint? Address);
 public sealed record ComparePanelRow(IReadOnlyList<CompareByteCell> Cells, string HexData, string? Ascii);

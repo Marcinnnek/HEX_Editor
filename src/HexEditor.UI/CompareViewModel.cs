@@ -13,9 +13,10 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private readonly ComparePanelRows _fileARows;
     private readonly ComparePanelRows _fileBRows;
 
-    public CompareViewModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true)
+    public CompareViewModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true,
+        CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null)
     {
-        _comparison = new MemoryComparisonModel(fileA, fileB, bytesPerRow, showAscii);
+        _comparison = new MemoryComparisonModel(fileA, fileB, bytesPerRow, showAscii, cancellationToken, progress);
         _fileARows = new ComparePanelRows(_comparison, fileA: true);
         _fileBRows = new ComparePanelRows(_comparison, fileA: false);
         _comparison.RowsChanged += OnRowsChanged;
