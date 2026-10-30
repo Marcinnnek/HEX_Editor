@@ -46,6 +46,7 @@ public partial class MainWindow : FluentWindow
         _compareWorkflow = new CompareCurrentImageWorkflow(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
         ViewModel.ImageChanged += ViewModel_ImageChanged;
+        HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         DataContext = this;
         Closing += MainWindow_Closing;
         Loaded += (_, _) => ApplyAppearance();
@@ -99,6 +100,27 @@ public partial class MainWindow : FluentWindow
     }
 
     public MainViewModel ViewModel { get; }
+
+    private void EditorRow_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source) return;
+        var gridRow = FindVisualAncestor<DataGridRow>(source);
+        var byteRow = FindVisualAncestor<HexByteRowControl>(source);
+        if (gridRow?.Item is not HexViewRow row || row.IsGapMarker || byteRow is null ||
+            !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var address) ||
+            !HexAddressParser.TryParse(row.Address, out var rowAddress) || !ViewModel.CurrentImage.TryGetByte(address, out _)) return;
+        e.Handled = true;
+        var edit = ViewModel.Workspace.BeginEditRow(rowAddress, address, ViewModel.ImageView.BytesPerRow);
+        var dialog = new EditRowWindow(edit) { Owner = this };
+        dialog.ShowDialog();
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject source) where T : DependencyObject
+    {
+        for (var current = source; current is not null; current = VisualTreeHelper.GetParent(current))
+            if (current is T match) return match;
+        return null;
+    }
 
     private async Task<T> RunFileOperationAsync<T>(Func<CancellationToken, IProgress<MemoryImageFileProgress>, Task<T>> operation)
     {
