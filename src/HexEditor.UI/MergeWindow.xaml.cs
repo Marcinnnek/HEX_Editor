@@ -1,10 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using HexEditor.Core;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
+using MessageBox = HexEditor.UI.ThemedMessageBox;
 
 namespace HexEditor.UI;
 
-public partial class MergeWindow : Window
+public partial class MergeWindow : FluentWindow
 {
     private readonly MemoryImage _imageA;
     private readonly MemoryImage _imageB;

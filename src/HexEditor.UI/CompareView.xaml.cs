@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using HexEditor.Core;
 using HexEditor.Compare;
+using MessageBox = HexEditor.UI.ThemedMessageBox;
 
 namespace HexEditor.UI;
 
