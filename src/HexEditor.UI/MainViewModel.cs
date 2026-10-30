@@ -336,8 +336,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         EditorStatus.ClearSelection();
         ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
         Segments.Clear();
-        foreach (var segment in CurrentImage.Segments)
-            Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount));
+        foreach (var (segment, index) in CurrentImage.Segments.OrderBy(segment => segment.StartAddress).Select((segment, index) => (segment, index)))
+            Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount, index + 1));
     }
 
     private void RefreshEditorStatus() => EditorStatus.UpdateImageState(SourceFormat, IsModified);
@@ -375,7 +375,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
 }
 
-public sealed record MemorySegmentRow(string StartAddress, string EndAddress, int ByteCount)
+public sealed record MemorySegmentRow(string StartAddress, string EndAddress, int ByteCount, int Number = 0)
 {
     public string ByteCountText => SegmentByteCountFormatter.Format(ByteCount);
+    public string Description => SegmentBlockFormatter.Format(Number, StartAddress, EndAddress, ByteCount);
 }
