@@ -85,7 +85,17 @@ public sealed class HexByteRowControl : Control
             if (row.Cells[index].IsEdited && TryFindResource("HexEditedByteBrush") is Brush editedBrush)
                 drawingContext.DrawRectangle(null, new Pen(editedBrush, 2), layout.GetHighlightBounds(index, IsAscii));
             if (row.Cells[index].IsFindMatch && TryFindResource("HexFindMatchBrush") is Brush findBrush)
-                drawingContext.DrawRectangle(null, new Pen(findBrush, 2), layout.GetHighlightBounds(index, IsAscii));
+            {
+                // Keep the Find marker visually distinct from the edited-byte outline,
+                // even when a user-selected palette uses a similar color for both.
+                var bounds = layout.GetHighlightBounds(index, IsAscii);
+                bounds.Inflate(-2, -2);
+                if (bounds.Width > 0 && bounds.Height > 0)
+                {
+                    var findPen = new Pen(findBrush, 2) { DashStyle = DashStyles.Dash };
+                    drawingContext.DrawRectangle(null, findPen, bounds);
+                }
+            }
         }
 
         for (var index = 0; index < row.Cells.Count; index++)

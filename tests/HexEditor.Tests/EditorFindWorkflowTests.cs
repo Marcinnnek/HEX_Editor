@@ -109,6 +109,32 @@ public sealed class EditorFindWorkflowTests
     }
 
     [TestMethod]
+    public void Compare_find_marker_layers_over_difference_and_edit_state_and_clears_independently()
+    {
+        var view = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x5000, [0xAA])]),
+            MemoryImage.FromSegments([new MemorySegment(0x5000, [0xBB])]),
+            isBaseByteEdited: address => address == 0x5000);
+
+        view.SetFindMatch(fileA: true, start: 0x5000, end: 0x5000);
+
+        var baseCell = view.FileARows.SelectMany(row => row.Cells).Single(cell => cell.Address == 0x5000);
+        var referenceCell = view.FileBRows.SelectMany(row => row.Cells).Single(cell => cell.Address == 0x5000);
+        Assert.AreEqual(ByteHighlightState.Different, baseCell.Highlight);
+        Assert.IsTrue(baseCell.IsEdited);
+        Assert.IsTrue(baseCell.IsFindMatch);
+        Assert.AreEqual(ByteHighlightState.Different, referenceCell.Highlight);
+        Assert.IsFalse(referenceCell.IsEdited);
+        Assert.IsFalse(referenceCell.IsFindMatch);
+
+        view.ClearFindMatch();
+        baseCell = view.FileARows.SelectMany(row => row.Cells).Single(cell => cell.Address == 0x5000);
+        Assert.AreEqual(ByteHighlightState.Different, baseCell.Highlight);
+        Assert.IsTrue(baseCell.IsEdited);
+        Assert.IsFalse(baseCell.IsFindMatch);
+    }
+
+    [TestMethod]
     public async Task Editor_find_can_cancel_a_sizable_scan()
     {
         var workspace = new EditorDocumentWorkspace();
