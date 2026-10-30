@@ -36,6 +36,8 @@ public partial class MainWindow : FluentWindow
     private readonly CompareCurrentImageWorkflow _compareWorkflow;
     private readonly MemoryImageFileWorkflow _files;
     private CancellationTokenSource? _fileOperationCancellation;
+    private uint? _selectionStart;
+    private uint? _selectionEnd;
 
     public MainWindow()
     {
@@ -365,7 +367,7 @@ public partial class MainWindow : FluentWindow
             Title = "Save memory image as",
             Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
             FilterIndex = document.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
-            FileName = document.SourcePath is null ? string.Empty : Path.GetFileName(document.SourcePath),
+            FileName = document.SourcePath is null ? string.Empty : System.IO.Path.GetFileName(document.SourcePath),
             AddExtension = true,
             OverwritePrompt = false
         };
@@ -450,9 +452,10 @@ public partial class MainWindow : FluentWindow
     {
         try
         {
-            var address = ParseAddress(RangeStartInput.Text);
-            var bytes = ParsePattern(PatternInput.Text);
-            _imageEdits.Insert(address, bytes, AskOverlap);
+            var (start, end) = GetSelectionDefaults();
+            var dialog = new RangeEditDialog(RangeEditDialogKind.Insert, start, end) { Owner = this };
+            if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
+            _imageEdits.Insert(input.Start, input.Pattern!, AskOverlap);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -466,7 +469,10 @@ public partial class MainWindow : FluentWindow
     {
         try
         {
-            ViewModel.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
+            var (start, end) = GetSelectionDefaults();
+            var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end) { Owner = this };
+            if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
+            ViewModel.FillRange(input.Start, input.End, input.Pattern!);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -491,15 +497,15 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    private void Copy_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Copy(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Cut_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Cut(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
-    private void Delete_Click(object sender, RoutedEventArgs e) => RunRangeEdit(() => _imageEdits.Delete(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text)));
+    private void Copy_Click(object sender, RoutedEventArgs e) => RunSelectedRangeEdit((start, end) => _imageEdits.Copy(start, end));
+    private void Cut_Click(object sender, RoutedEventArgs e) => RunSelectedRangeEdit((start, end) => _imageEdits.Cut(start, end));
+    private void Delete_Click(object sender, RoutedEventArgs e) => RunSelectedRangeEdit((start, end) => _imageEdits.Delete(start, end));
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var address = ParseAddress(RangeStartInput.Text);
+            var (address, _) = GetSelectionDefaults();
             _imageEdits.Paste(address, AskOverlap);
             Title = ViewModel.WindowTitle;
         }
@@ -627,23 +633,15 @@ public partial class MainWindow : FluentWindow
 
         SelectRow(rowIndex);
         ViewModel.EditorStatus.SetSelection(address, address);
-        RangeStartInput.Text = address.ToString("X8");
-        RangeEndInput.Text = address.ToString("X8");
+        _selectionStart = _selectionEnd = address;
     }
 
     private void SelectRange_Click(object sender, RoutedEventArgs e)
     {
-        try
-        {
-            var start = HexAddressParser.Parse(RangeStartInput.Text);
-            var end = HexAddressParser.Parse(RangeEndInput.Text);
-            ViewModel.EditorStatus.SetSelection(start, end);
-            if (ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) SelectRow(rowIndex);
-        }
-        catch (ArgumentException exception)
-        {
-            MessageBox.Show(this, exception.Message, "Invalid selection range", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
+        var (start, end) = GetSelectionDefaults();
+        var dialog = new RangeEditDialog(RangeEditDialogKind.SelectRange, start, end) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Result is not { } result) return;
+        ApplySelection(result.Start, result.End);
     }
 
     private async void ExportImage_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.EntireImage);
@@ -758,9 +756,29 @@ public partial class MainWindow : FluentWindow
 
     private void HexView_AddressRangeSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        ViewModel.EditorStatus.SetSelection(e.StartAddress, e.EndAddress);
-        RangeStartInput.Text = e.StartAddress.ToString("X8");
-        RangeEndInput.Text = e.EndAddress.ToString("X8");
+        ApplySelection(e.StartAddress, e.EndAddress);
+    }
+
+    private (uint Start, uint End) GetSelectionDefaults()
+    {
+        var address = ViewModel.EditorStatus.CurrentAddress ?? 0;
+        return (_selectionStart ?? address, _selectionEnd ?? address);
+    }
+
+    private void ApplySelection(uint start, uint end)
+    {
+        _selectionStart = start;
+        _selectionEnd = end;
+        ViewModel.EditorStatus.SetSelection(start, end);
+        if (ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) SelectRow(rowIndex);
+    }
+
+    private void RunSelectedRangeEdit(Action<uint, uint> action)
+    {
+        var (start, end) = GetSelectionDefaults();
+        var dialog = new RangeEditDialog(RangeEditDialogKind.SelectRange, start, end) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Result is not { } range) return;
+        RunRangeEdit(() => action(range.Start, range.End));
     }
 
     private void SelectRow(int rowIndex)

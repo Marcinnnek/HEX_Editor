@@ -265,6 +265,27 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void RangeEdits_CancelOverlapWithoutMutationAndFillAsOneUndoableChange()
+    {
+        var original = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11, 0x22])]);
+        var model = new MainViewModel();
+        model.LoadImage(original, null, null);
+
+        var overlap = model.PreviewInsert(0x1000, [0x11]);
+        Assert.AreEqual(1, overlap.OverlapCount, "Identical occupied bytes still require an explicit decision.");
+        model.InsertBytes(0x1000, [0x11], OverlapDecision.Cancel);
+        Assert.AreSame(original, model.CurrentImage);
+        Assert.IsFalse(model.CanUndo);
+
+        model.FillRange(0x1002, 0x1004, [0xA5, 0x5A]);
+        Assert.IsTrue(model.CanUndo);
+        Assert.AreEqual(0x1004u, model.CurrentImage.Segments.Single().EndAddress);
+        Assert.IsTrue(model.Undo());
+        Assert.AreSame(original, model.CurrentImage);
+        Assert.IsFalse(model.CanUndo);
+    }
+
+    [TestMethod]
     public void SaveAs_ChangesAssociationOnlyAfterSuccessfulAtomicSave()
     {
         var model = new MainViewModel();

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using HexEditor.Core;
+using HexEditor.Formats;
 using HexEditor.Tools;
 
 namespace HexEditor.UI;
