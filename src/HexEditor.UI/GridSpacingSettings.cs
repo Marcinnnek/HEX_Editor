@@ -86,10 +86,5 @@ public readonly record struct ByteGridLayout(double CharacterWidth, double LineH
         return true;
     }
 
-    public Rect GetHighlightBounds(int index)
-    {
-        var bounds = GetByteBounds(index, isAscii: false);
-        bounds.Height = LineHeight;
-        return bounds;
-    }
+    public Rect GetHighlightBounds(int index, bool isAscii = false) => GetByteBounds(index, isAscii);
 }
