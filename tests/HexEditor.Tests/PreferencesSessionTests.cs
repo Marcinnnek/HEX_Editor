@@ -11,6 +11,44 @@ namespace HexEditor.Tests;
 public sealed class PreferencesSessionTests
 {
     [TestMethod]
+    public void Preferences_radio_indicator_is_visible_in_both_appearances()
+    {
+        var failure = RunOnSta(() =>
+        {
+            foreach (var theme in new[] { AppearanceMode.Light, AppearanceMode.Dark })
+            {
+                var unique = Guid.NewGuid().ToString("N");
+                using var appearance = new AppearanceSession(new AppearanceSettings(
+                    Path.Combine(Path.GetTempPath(), unique + "-appearance.json")), new FixedWindowsAppearance());
+                var window = new PreferencesWindow(new PreferencesSession(appearance,
+                    new GridSpacingSettings(Path.Combine(Path.GetTempPath(), unique + "-spacing.json"))))
+                    { ShowInTaskbar = false };
+                ApplicationAppearance.ApplyToWindow(window, theme);
+                window.Show();
+                window.UpdateLayout();
+                var selected = Children<RadioButton>(window).Single(radio => radio.IsChecked == true);
+                selected.ApplyTemplate();
+                var indicator = selected.Template.FindName("PART_Indicator", selected) as FrameworkElement;
+                Assert.IsNotNull(indicator);
+                Assert.AreEqual(Visibility.Visible, indicator.Visibility,
+                    $"The selected radio indicator should be visible in {theme}.");
+                window.Close();
+            }
+        });
+        if (failure is not null) throw failure;
+    }
+
+    private static Exception? RunOnSta(Action action)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() => { try { action(); } catch (Exception exception) { failure = exception; } });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        return failure;
+    }
+
+    [TestMethod]
     public void Open_and_reopened_preferences_follow_the_effective_theme_across_repeated_changes()
     {
         Exception? failure = null;
