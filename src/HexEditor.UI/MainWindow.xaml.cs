@@ -745,7 +745,6 @@ public partial class MainWindow : Window
             ViewModel.ImageView.ClearFindMatch();
             foreach (var compare in WorkspaceTabs.Items.OfType<TabItem>().Select(item => item.Content).OfType<CompareView>())
                 compare.ViewModel.ClearFindMatch();
-            _compareFindMatch = null;
         };
         _findWindow = window;
         window.Show();
@@ -791,16 +790,37 @@ public partial class MainWindow : Window
         {
             if (searchedCompare is not null)
             {
-                var matches = await Task.Run(() =>
+                var current = _compareFindMatch is { } last
+                    ? (last.Side, last.Start)
+                    : compareView!.CurrentFindCursor;
+                var forwardAInclusive = current is { } position && ComparePanelSide.Base > position.Side;
+                var forwardBInclusive = current is { } positionB && ComparePanelSide.Reference > positionB.Side;
+                var previousAInclusive = current is { } positionC && ComparePanelSide.Base < positionC.Side;
+                var previousBInclusive = current is { } positionD && ComparePanelSide.Reference < positionD.Side;
+                var scan = await Task.Run(() =>
                 {
-                    var all = EditorFindSearch.FindAll(searchedCompare.Comparison.FileA, e.Draft, e.Mode, cancellation.Token)
-                        .Select(m => (Side: ComparePanelSide.Base, m.Start, m.End))
-                        .Concat(EditorFindSearch.FindAll(searchedCompare.Comparison.FileB, e.Draft, e.Mode, cancellation.Token)
-                            .Select(m => (Side: ComparePanelSide.Reference, m.Start, m.End)))
-                        .OrderBy(m => m.Start).ThenBy(m => m.Side).ToArray();
-                    return all;
+                    var a = EditorFindSearch.FindCandidate(searchedCompare.Comparison.FileA, e.Draft, e.Mode,
+                        current?.Item2, e.Forward, e.Forward ? forwardAInclusive : previousAInclusive, cancellation.Token, progress);
+                    var b = EditorFindSearch.FindCandidate(searchedCompare.Comparison.FileB, e.Draft, e.Mode,
+                        current?.Item2, e.Forward, e.Forward ? forwardBInclusive : previousBInclusive, cancellation.Token, progress);
+                    var eligible = new List<(ComparePanelSide Side, uint Start, uint End)>();
+                    if (a.IsValidPattern && a.MatchAddress is uint addressA) eligible.Add((ComparePanelSide.Base, addressA, a.MatchEndAddress!.Value));
+                    if (b.IsValidPattern && b.MatchAddress is uint addressB) eligible.Add((ComparePanelSide.Reference, addressB, b.MatchEndAddress!.Value));
+                    if (a.IsValidPattern && eligible.Count == 0 && current is not null)
+                    {
+                        a = EditorFindSearch.FindCandidate(searchedCompare.Comparison.FileA, e.Draft, e.Mode, null,
+                            e.Forward, inclusive: false, cancellation.Token, progress);
+                        b = EditorFindSearch.FindCandidate(searchedCompare.Comparison.FileB, e.Draft, e.Mode, null,
+                            e.Forward, inclusive: false, cancellation.Token, progress);
+                        if (a.MatchAddress is uint wrappedA) eligible.Add((ComparePanelSide.Base, wrappedA, a.MatchEndAddress!.Value));
+                        if (b.MatchAddress is uint wrappedB) eligible.Add((ComparePanelSide.Reference, wrappedB, b.MatchEndAddress!.Value));
+                    }
+                    var selected = e.Forward
+                        ? eligible.OrderBy(match => match.Start).ThenBy(match => match.Side).Select(match => ((ComparePanelSide Side, uint Start, uint End)?)match).FirstOrDefault()
+                        : eligible.OrderByDescending(match => match.Start).ThenByDescending(match => match.Side).Select(match => ((ComparePanelSide Side, uint Start, uint End)?)match).FirstOrDefault();
+                    return (A: a, B: b, Match: selected);
                 }, cancellation.Token);
-                await RunOnUiAsync(() => ApplyCompareFindResult(window, e, matches, searchedCompare, generation));
+                await RunOnUiAsync(() => ApplyCompareFindResult(window, e, scan.A, scan.B, scan.Match, searchedCompare, generation));
             }
             else
             {
@@ -840,27 +860,20 @@ public partial class MainWindow : Window
     {
         CancelFind();
         ViewModel.ImageView.ClearFindMatch();
-        foreach (var compare in WorkspaceTabs.Items.OfType<TabItem>().Select(item => item.Content).OfType<CompareView>())
-            compare.ViewModel.ClearFindMatch();
-        _compareFindMatch = null;
+            foreach (var compare in WorkspaceTabs.Items.OfType<TabItem>().Select(item => item.Content).OfType<CompareView>())
+                compare.ViewModel.ClearFindMatch();
         _findWindow?.SetStatus(status);
     }
 
     private void ApplyCompareFindResult(FindBytesWindow? window, FindRequestedEventArgs request,
-        (ComparePanelSide Side, uint Start, uint End)[] matches, CompareWorkspaceTabViewModel comparison, int generation)
+        FindSearchResult resultA, FindSearchResult resultB, (ComparePanelSide Side, uint Start, uint End)? match,
+        CompareWorkspaceTabViewModel comparison, int generation)
     {
         if (generation != _findGeneration || !ReferenceEquals((WorkspaceTabs.SelectedContent as CompareView)?.Workspace, comparison)) return;
-        var validation = EditorFindSearch.FindNext(comparison.Comparison.FileA, request.Draft, request.Mode, null, null);
-        if (!validation.IsValidPattern) { SetFindStatus(window, validation.Message ?? "Invalid pattern."); return; }
+        if (!resultA.IsValidPattern) { SetFindStatus(window, resultA.Message ?? "Invalid pattern."); return; }
         _lastFindMode = request.Mode;
         _lastFindDraft = request.Draft;
-        if (matches.Length == 0) { SetFindStatus(window, "No match."); return; }
-        var current = _compareFindMatch;
-        var result = current is null
-            ? (request.Forward ? matches[0] : matches[^1])
-            : request.Forward
-                ? matches.FirstOrDefault(m => m.Start > current.Value.Start || m.Start == current.Value.Start && m.Side > current.Value.Side, matches[0])
-                : matches.LastOrDefault(m => m.Start < current.Value.Start || m.Start == current.Value.Start && m.Side < current.Value.Side, matches[^1]);
+        if (match is not { } result) { SetFindStatus(window, resultB.Message ?? resultA.Message ?? "No match."); return; }
         _compareFindMatch = result;
         (WorkspaceTabs.SelectedContent as CompareView)?.NavigateToFindMatch(result.Side, result.Start, result.End);
         SetFindStatus(window, $"Found in {(result.Side == ComparePanelSide.Base ? "A" : "B")} at 0x{result.Start:X8}–0x{result.End:X8}.");

@@ -7,13 +7,19 @@ namespace HexEditor.Tests;
 public sealed class EditorFindWorkflowTests
 {
     [TestMethod]
-    public void Find_all_returns_overlapping_matches_in_address_order()
+    public void Find_candidate_respects_inclusive_and_exclusive_compare_cursor_boundaries()
     {
         var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0xAA, 0xAA, 0xAA])]);
 
-        var matches = EditorFindSearch.FindAll(image, "AA AA", FindPatternMode.Hex);
+        var inclusive = EditorFindSearch.FindCandidate(image, "AA", FindPatternMode.Hex, 0x1001, forward: true, inclusive: true);
+        var exclusive = EditorFindSearch.FindCandidate(image, "AA", FindPatternMode.Hex, 0x1001, forward: true, inclusive: false);
+        var previousInclusive = EditorFindSearch.FindCandidate(image, "AA", FindPatternMode.Hex, 0x1001, forward: false, inclusive: true);
+        var previousExclusive = EditorFindSearch.FindCandidate(image, "AA", FindPatternMode.Hex, 0x1001, forward: false, inclusive: false);
 
-        CollectionAssert.AreEqual(new[] { (0x1000u, 0x1001u), (0x1001u, 0x1002u) }, matches.ToArray());
+        Assert.AreEqual((uint)0x1001, inclusive.MatchAddress);
+        Assert.AreEqual((uint)0x1002, exclusive.MatchAddress);
+        Assert.AreEqual((uint)0x1001, previousInclusive.MatchAddress);
+        Assert.AreEqual((uint)0x1000, previousExclusive.MatchAddress);
     }
     [TestMethod]
     public async Task Editor_find_matches_across_adjacent_ranges_but_stops_at_address_gaps()
