@@ -287,13 +287,13 @@ public partial class MainWindow : Window
 
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Editing.Undo();
+        ViewModel.Undo();
         Title = ViewModel.WindowTitle;
     }
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
-        ViewModel.Editing.Redo();
+        ViewModel.Redo();
         Title = ViewModel.WindowTitle;
     }
 
@@ -316,7 +316,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            ViewModel.Editing.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
+            ViewModel.FillRange(ParseAddress(RangeStartInput.Text), ParseAddress(RangeEndInput.Text), ParsePattern(PatternInput.Text));
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
