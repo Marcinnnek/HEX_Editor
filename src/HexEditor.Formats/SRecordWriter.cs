@@ -6,7 +6,7 @@ namespace HexEditor.Formats;
 
 internal static class SRecordWriter
 {
-    public static void Write(MemoryImage image, int maxPayload, Stream output, SRecordMetadata metadata,
+    public static void Write(IReadOnlyList<MemoryImageRange> ranges, ulong occupiedByteCount, int maxPayload, Stream output, SRecordMetadata metadata,
         CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(metadata);
@@ -16,7 +16,7 @@ internal static class SRecordWriter
             throw new ArgumentException("An S0 header can contain at most 252 data bytes.", nameof(metadata));
         }
 
-        var highestAddress = image.Segments.Count == 0 ? 0 : image.Segments[^1].EndAddress;
+        var highestAddress = ranges.Count == 0 ? 0 : ranges[^1].EndAddress;
         if (metadata.StartAddress is { } entryAddress) highestAddress = Math.Max(highestAddress, entryAddress);
         var addressBytes = highestAddress <= 0xFFFF ? 2 : highestAddress <= 0xFFFFFF ? 3 : 4;
         var dataType = addressBytes switch { 2 => '1', 3 => '2', _ => '3' };
@@ -30,23 +30,26 @@ internal static class SRecordWriter
 
         var dataRecordCount = 0;
         long writtenBytes = 0;
-        var totalBytes = image.Segments.Sum(segment => (long)segment.ByteCount);
-        foreach (var segment in image.Segments)
+        var totalBytes = checked((long)occupiedByteCount);
+        var buffer = new byte[maxPayload];
+        foreach (var range in ranges)
         {
-            for (var offset = 0; offset < segment.ByteCount;)
+            for (ulong offset = 0; offset < range.ByteCount;)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var count = Math.Min(maxPayload, segment.ByteCount - offset);
+                var count = (int)Math.Min((ulong)maxPayload, range.ByteCount - offset);
+                range.CopyTo(offset, buffer.AsSpan(0, count));
                 WriteRecord(
                     writer,
                     dataType,
-                    (uint)((ulong)segment.StartAddress + (uint)offset),
+                    (uint)((ulong)range.StartAddress + offset),
                     addressBytes,
-                    segment.Data.Span.Slice(offset, count));
+                    buffer.AsSpan(0, count));
                 dataRecordCount++;
-                offset += count;
+                offset += (ulong)count;
                 writtenBytes += count;
                 progress?.Report(new MemoryImageFileProgress("Writing records", writtenBytes, totalBytes));
+                cancellationToken.ThrowIfCancellationRequested();
             }
         }
 
