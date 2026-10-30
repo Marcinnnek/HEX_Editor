@@ -98,6 +98,24 @@
                 <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />
                 <Style.Triggers><Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource HexDisabledTextBrush}" /></Trigger></Style.Triggers>
             </Style>
+            <Style TargetType="{x:Type RadioButton}">
+                <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />
+                <Setter Property="Background" Value="{DynamicResource HexSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource HexBorderBrush}" />
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource HexDisabledTextBrush}" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource HexFocusBrush}" /></Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="{x:Type Slider}">
+                <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />
+                <Setter Property="Background" Value="{DynamicResource HexRaisedBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource HexBorderBrush}" />
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False"><Setter Property="Foreground" Value="{DynamicResource HexDisabledTextBrush}" /></Trigger>
+                    <Trigger Property="IsKeyboardFocused" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource HexFocusBrush}" /></Trigger>
+                </Style.Triggers>
+            </Style>
             <Style TargetType="{x:Type ListBox}">
                 <Setter Property="Background" Value="{DynamicResource HexSurfaceBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />

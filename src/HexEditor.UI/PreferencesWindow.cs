@@ -30,6 +30,8 @@ public sealed class PreferencesWindow : Window
             IsSnapToTickEnabled = true, Value = choices.HorizontalByteSpacing };
         var vertical = new Slider { Minimum = 0, Maximum = 8, TickFrequency = 1,
             IsSnapToTickEnabled = true, Value = choices.VerticalRowSpacing };
+        horizontal.SetResourceReference(Control.ForegroundProperty, "HexTextBrush");
+        vertical.SetResourceReference(Control.ForegroundProperty, "HexTextBrush");
         AddSetting(panel, "Horizontal space between bytes", horizontal);
         AddSetting(panel, "Vertical space between rows", vertical);
 

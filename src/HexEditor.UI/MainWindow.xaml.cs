@@ -14,8 +14,6 @@ using System.Threading.Tasks;
 using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.Tools;
-using Wpf.Ui.Appearance;
-using WindowBackdropType = Wpf.Ui.Controls.WindowBackdropType;
 using MessageBox = HexEditor.UI.ThemedMessageBox;
 
 namespace HexEditor.UI;
@@ -81,9 +79,7 @@ public partial class MainWindow : Window
 
     private void ApplyAppearance()
     {
-        var dark = _appearanceSession.EffectiveTheme == AppearanceMode.Dark;
-        ApplicationThemeManager.Apply(dark ? ApplicationTheme.Dark : ApplicationTheme.Light, WindowBackdropType.None);
-        AppearancePalette.Apply(dark);
+        ApplicationAppearance.Apply(_appearanceSession.EffectiveTheme);
     }
 
     public MainViewModel ViewModel { get; }

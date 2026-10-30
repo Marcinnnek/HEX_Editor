@@ -3,12 +3,82 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Threading;
+using System.Windows.Media;
 
 namespace HexEditor.Tests;
 
 [TestClass]
 public sealed class PreferencesSessionTests
 {
+    [TestMethod]
+    public void Open_and_reopened_preferences_follow_the_effective_theme_across_repeated_changes()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var folder = Path.Combine(Path.GetTempPath(), "hex-editor-theme-cycle-" + Guid.NewGuid());
+                try
+                {
+                    var windows = new MutableWindowsAppearance();
+                    var appearancePath = Path.Combine(folder, "appearance.json");
+                    using var appearance = new AppearanceSession(
+                        new AppearanceSettings(appearancePath), windows);
+                    var choices = new PreferencesSession(appearance,
+                        new GridSpacingSettings(Path.Combine(folder, "spacing.json")));
+                    var alreadyOpen = new PreferencesWindow(choices)
+                    {
+                        Left = -3000, Top = -3000, ShowInTaskbar = false, ShowActivated = false
+                    };
+                    appearance.ThemeChanged += theme => ApplicationAppearance.ApplyToWindow(alreadyOpen, theme);
+                    ApplicationAppearance.ApplyToWindow(alreadyOpen, appearance.EffectiveTheme);
+                    alreadyOpen.Show();
+                    alreadyOpen.UpdateLayout();
+
+                    appearance.SetMode(AppearanceMode.Dark);
+                    Assert.AreEqual(Color.FromRgb(0x17, 0x19, 0x1D), ((SolidColorBrush)alreadyOpen.Background).Color);
+                    Assert.AreEqual(Color.FromRgb(0xF2, 0xF4, 0xF7), ((SolidColorBrush)Children<RadioButton>(alreadyOpen).First().Foreground).Color);
+                    Assert.AreEqual(Color.FromRgb(0xF2, 0xF4, 0xF7), ((SolidColorBrush)Children<Slider>(alreadyOpen).First().Foreground).Color);
+                    appearance.SetMode(AppearanceMode.Light);
+                    Assert.AreEqual(Color.FromRgb(0xF8, 0xF9, 0xFB), ((SolidColorBrush)alreadyOpen.Background).Color);
+                    appearance.SetMode(AppearanceMode.Dark);
+
+                    var reopened = new PreferencesWindow(new PreferencesSession(appearance,
+                        new GridSpacingSettings(Path.Combine(folder, "spacing.json"))))
+                    {
+                        Left = -3000, Top = -3000, ShowInTaskbar = false, ShowActivated = false
+                    };
+                    ApplicationAppearance.ApplyToWindow(reopened, appearance.EffectiveTheme);
+                    reopened.Show();
+                    reopened.UpdateLayout();
+                    Assert.AreEqual(AppearanceMode.Dark, appearance.EffectiveTheme);
+                    Assert.AreEqual(AppearanceMode.Dark, appearance.Mode);
+                    Assert.AreEqual(AppearanceMode.Dark, new AppearanceSettings(appearancePath).Mode);
+                    Assert.AreEqual(Color.FromRgb(0x17, 0x19, 0x1D), ((SolidColorBrush)reopened.Resources["HexWindowBrush"]).Color);
+                    Assert.AreEqual(Color.FromRgb(0x17, 0x19, 0x1D), ((SolidColorBrush)reopened.Background).Color);
+
+                    appearance.SetMode(AppearanceMode.Automatic);
+                    windows.ChangeTo(true);
+                    ApplicationAppearance.ApplyToWindow(reopened, appearance.EffectiveTheme);
+                    windows.ChangeTo(false);
+                    ApplicationAppearance.ApplyToWindow(reopened, appearance.EffectiveTheme);
+                    Assert.AreEqual(Color.FromRgb(0xF8, 0xF9, 0xFB), ((SolidColorBrush)alreadyOpen.Background).Color);
+                    Assert.AreEqual(Color.FromRgb(0x1B, 0x1D, 0x21), ((SolidColorBrush)Children<RadioButton>(alreadyOpen).First().Foreground).Color);
+                    Assert.AreEqual(AppearanceMode.Automatic, new AppearanceSettings(appearancePath).Mode);
+                    alreadyOpen.Close();
+                    reopened.Close();
+                }
+                finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+            }
+            catch (Exception exception) { failure = exception; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
     [TestMethod]
     public void Preferences_are_staged_until_save_and_saved_choices_survive_restart()
     {
@@ -61,6 +131,13 @@ public sealed class PreferencesSessionTests
     {
         public bool IsDark => false;
         public event Action? Changed { add { } remove { } }
+    }
+
+    private sealed class MutableWindowsAppearance : IWindowsAppearanceSource
+    {
+        public bool IsDark { get; private set; }
+        public event Action? Changed;
+        public void ChangeTo(bool dark) { IsDark = dark; Changed?.Invoke(); }
     }
 
     [TestMethod]

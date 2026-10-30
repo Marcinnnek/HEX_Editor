@@ -13,6 +13,11 @@ internal static class AppearancePalette
         var resources = Application.Current?.Resources;
         if (resources is null) return;
 
+        Apply(resources, dark);
+    }
+
+    internal static void Apply(ResourceDictionary resources, bool dark)
+    {
         Set(resources, "HexWindowBrush", dark ? "#17191D" : "#F8F9FB");
         Set(resources, "HexSurfaceBrush", dark ? "#24272D" : "#FFFFFF");
         Set(resources, "HexRaisedBrush", dark ? "#30343B" : "#EDF0F4");

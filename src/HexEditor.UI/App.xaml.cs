@@ -11,7 +11,7 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
-        AppearancePalette.Apply(dark: false);
+        ApplicationAppearance.Apply(AppearanceMode.Light);
         base.OnStartup(e);
     }
 }
