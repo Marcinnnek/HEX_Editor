@@ -36,7 +36,7 @@
                 <ui:MenuItem Header="16 bytes per row" Click="RowWidth16_Click" />
                 <ui:MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
                 <Separator />
-                <ui:MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ImageView.ShowAscii, Mode=TwoWay}" />
+                <ui:MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ActiveShowAscii, Mode=TwoWay}" />
                 <ui:MenuItem Header="Go to address" Click="GoToAddress_Click" />
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" />
             </ui:MenuItem>
@@ -83,8 +83,8 @@
                 <ui:Button Content="Redo" Padding="10,5" Click="Redo_Click" Margin="0,0,12,0" IsEnabled="{Binding ViewModel.CanRedo}" />
                 <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox Width="65" ItemsSource="{Binding ViewModel.RowWidths}"
-                          SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
-                <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ImageView.ShowAscii, UpdateSourceTrigger=PropertyChanged}"
+                          SelectedItem="{Binding ViewModel.ActiveBytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
+                <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
                           VerticalAlignment="Center" Margin="12,0,12,0" />
                 <TextBlock Text="Go to" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ui:TextBox x:Name="AddressInput" Width="90" VerticalContentAlignment="Center" />
@@ -152,7 +152,7 @@
             </TextBlock>
             <TextBlock Margin="0,3,0,0" Text="{Binding ViewModel.StatusMessage}" />
         </StackPanel>
-        <TabControl x:Name="WorkspaceTabs">
+        <TabControl x:Name="WorkspaceTabs" SelectionChanged="WorkspaceTabs_SelectionChanged">
             <TabItem Header="Editor">
                 <Grid>
                     <Grid.RowDefinitions>

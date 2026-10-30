@@ -14,6 +14,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private HexImageViewModel _imageView = new(MemoryImage.Empty);
     private string _statusMessage = "Open an Intel HEX or Motorola S-Record file to inspect its occupied memory segments.";
     private string _windowTitle = "HEX Editor";
+    private CompareViewModel? _activeComparison;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -39,6 +40,32 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MemoryImageExportFormat[] ExportFormats { get; } = Enum.GetValues<MemoryImageExportFormat>();
 
     public MemoryImage CurrentImage => Workspace.Document.CurrentImage;
+    public int ActiveBytesPerRow
+    {
+        get => _activeComparison?.BytesPerRow ?? ImageView.BytesPerRow;
+        set { if (_activeComparison is not null) _activeComparison.BytesPerRow = value; else ImageView.BytesPerRow = value; Raise(nameof(ActiveBytesPerRow)); }
+    }
+    public bool ActiveShowAscii
+    {
+        get => _activeComparison?.ShowAscii ?? ImageView.ShowAscii;
+        set { if (_activeComparison is not null) _activeComparison.ShowAscii = value; else ImageView.ShowAscii = value; Raise(nameof(ActiveShowAscii)); }
+    }
+    public void ActivateEditor() { _activeComparison = null; Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii)); }
+    public void ActivateComparison(CompareViewModel? comparison)
+    {
+        if (_activeComparison is not null) _activeComparison.PropertyChanged -= OnActiveComparisonPropertyChanged;
+        _activeComparison = comparison;
+        if (_activeComparison is not null) _activeComparison.PropertyChanged += OnActiveComparisonPropertyChanged;
+        Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+    }
+    private void OnActiveComparisonPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CompareViewModel.BytesPerRow)) Raise(nameof(ActiveBytesPerRow));
+        if (e.PropertyName == nameof(CompareViewModel.ShowAscii)) Raise(nameof(ActiveShowAscii));
+    }
+    public bool TryNavigateActiveToAddress(uint address, out int rowIndex) => _activeComparison is null
+        ? TryNavigateToAddress(address, out rowIndex)
+        : _activeComparison.TryNavigateToAddress(address, out rowIndex);
     public bool IsModified => Workspace.Document.IsModified;
     public bool CanUndo => Workspace.Document.CanUndo;
     public bool CanRedo => Workspace.Document.CanRedo;

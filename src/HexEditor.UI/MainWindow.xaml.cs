@@ -46,6 +46,7 @@ public partial class MainWindow : FluentWindow
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
         _compareWorkflow = new CompareCurrentImageWorkflow(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
+        HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         DataContext = this;
         Closing += MainWindow_Closing;
         Loaded += (_, _) => ApplyAppearance();
@@ -100,6 +101,27 @@ public partial class MainWindow : FluentWindow
     }
 
     public MainViewModel ViewModel { get; }
+
+    private void EditorRow_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source) return;
+        var gridRow = FindVisualAncestor<DataGridRow>(source);
+        var byteRow = FindVisualAncestor<HexByteRowControl>(source);
+        if (gridRow?.Item is not HexViewRow row || row.IsGapMarker || byteRow is null ||
+            !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var address) ||
+            !HexAddressParser.TryParse(row.Address, out var rowAddress) || !ViewModel.CurrentImage.TryGetByte(address, out _)) return;
+        e.Handled = true;
+        var edit = ViewModel.Workspace.BeginEditRow(rowAddress, address, ViewModel.ImageView.BytesPerRow);
+        var dialog = new EditRowWindow(edit) { Owner = this };
+        dialog.ShowDialog();
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject source) where T : DependencyObject
+    {
+        for (var current = source; current is not null; current = VisualTreeHelper.GetParent(current))
+            if (current is T match) return match;
+        return null;
+    }
 
     private void RecordError(string operation, Exception exception)
     {
@@ -157,9 +179,15 @@ public partial class MainWindow : FluentWindow
         _fileOperationCancellation?.Cancel();
     }
 
-    private void RowWidth8_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 8;
-    private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 16;
-    private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 32;
+    private void RowWidth8_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 8;
+    private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 16;
+    private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 32;
+
+    private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
+        ViewModel.ActivateComparison((WorkspaceTabs.SelectedContent as CompareView)?.ViewModel);
+    }
 
     private async void CompareImages_Click(object sender, RoutedEventArgs e)
     {
@@ -583,11 +611,25 @@ public partial class MainWindow : FluentWindow
 
     private void GoToAddress_Click(object sender, RoutedEventArgs e)
     {
-        if (!HexAddressParser.TryParse(AddressInput.Text, out var address) ||
-            !ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        if (!HexAddressParser.TryParse(AddressInput.Text, out var address))
         {
             MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.",
                 "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (WorkspaceTabs.SelectedContent is CompareView compareView)
+        {
+            if (!compareView.NavigateToAddress(address))
+            {
+                MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the comparison range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            return;
+        }
+        if (!ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        {
+            MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
