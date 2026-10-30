@@ -21,8 +21,8 @@
                 <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Edit">
-                <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.CanUndo}" />
-                <ui:MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.CanRedo}" />
+                <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
+                <ui:MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
                 <Separator />
                 <ui:MenuItem Header="Edit / Insert" Click="EditInsert_Click" />
                 <ui:MenuItem Header="Fill range" Click="Fill_Click" />
@@ -78,8 +78,8 @@
                 <ui:Button Content="Save" Padding="10,5" Click="Save_Click" Margin="0,0,6,0" />
                 <ui:Button Content="Save As" Padding="10,5" Click="SaveAs_Click" Margin="0,0,6,0" />
                 <ui:Button Content="Close Image" Padding="10,5" Click="CloseImage_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Undo" Padding="10,5" Click="Undo_Click" Margin="0,0,6,0" IsEnabled="{Binding ViewModel.CanUndo}" />
-                <ui:Button Content="Redo" Padding="10,5" Click="Redo_Click" Margin="0,0,12,0" IsEnabled="{Binding ViewModel.CanRedo}" />
+                <ui:Button Content="Undo" Padding="10,5" Click="Undo_Click" Margin="0,0,6,0" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
+                <ui:Button Content="Redo" Padding="10,5" Click="Redo_Click" Margin="0,0,12,0" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
                 <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox Width="65" ItemsSource="{Binding ViewModel.RowWidths}"
                           SelectedItem="{Binding ViewModel.ActiveBytesPerRow, UpdateSourceTrigger=PropertyChanged}" />

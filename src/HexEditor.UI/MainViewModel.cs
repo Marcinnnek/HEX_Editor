@@ -15,6 +15,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _statusMessage = "Open an Intel HEX or Motorola S-Record file to inspect its occupied memory segments.";
     private string _windowTitle = "HEX Editor";
     private CompareViewModel? _activeComparison;
+    private EditorDocument? _activeComparisonDocument;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -50,13 +51,35 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _activeComparison?.ShowAscii ?? ImageView.ShowAscii;
         set { if (_activeComparison is not null) _activeComparison.ShowAscii = value; else ImageView.ShowAscii = value; Raise(nameof(ActiveShowAscii)); }
     }
-    public void ActivateEditor() { _activeComparison = null; Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii)); }
+    public void ActivateEditor()
+    {
+        SetActiveComparisonDocument(null);
+        _activeComparison = null;
+        Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+    }
+    public void ActivateComparison(CompareWorkspaceTabViewModel? comparison)
+        => ActivateComparison(comparison?.Comparison, comparison?.BaseDocument);
     public void ActivateComparison(CompareViewModel? comparison)
+        => ActivateComparison(comparison, null);
+    private void ActivateComparison(CompareViewModel? comparison, EditorDocument? document)
     {
         if (_activeComparison is not null) _activeComparison.PropertyChanged -= OnActiveComparisonPropertyChanged;
         _activeComparison = comparison;
         if (_activeComparison is not null) _activeComparison.PropertyChanged += OnActiveComparisonPropertyChanged;
+        SetActiveComparisonDocument(document);
         Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+    }
+    private void SetActiveComparisonDocument(EditorDocument? document)
+    {
+        if (_activeComparisonDocument is not null) _activeComparisonDocument.PropertyChanged -= OnActiveDocumentPropertyChanged;
+        _activeComparisonDocument = document;
+        if (_activeComparisonDocument is not null) _activeComparisonDocument.PropertyChanged += OnActiveDocumentPropertyChanged;
+        Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo));
+    }
+    private void OnActiveDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(EditorDocument.CanUndo) or nameof(EditorDocument.CanRedo))
+            Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo));
     }
     private void OnActiveComparisonPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -69,6 +92,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool IsModified => Workspace.Document.IsModified;
     public bool CanUndo => Workspace.Document.CanUndo;
     public bool CanRedo => Workspace.Document.CanRedo;
+    public bool ActiveCanUndo => _activeComparisonDocument?.CanUndo ?? CanUndo;
+    public bool ActiveCanRedo => _activeComparisonDocument?.CanRedo ?? CanRedo;
     public string? SourcePath => Workspace.Document.SourcePath;
     public MemoryImageExportFormat? SourceFormat => Workspace.Document.SourceFormat;
     public MemoryImageFormatMetadata? SourceFormatMetadata => Workspace.Document.SourceFormatMetadata;
@@ -151,12 +176,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public bool Undo()
     {
-        return Workspace.Undo();
+        return (_activeComparisonDocument ?? Workspace.Document).Editing.Undo();
     }
 
     public bool Redo()
     {
-        return Workspace.Redo();
+        return (_activeComparisonDocument ?? Workspace.Document).Editing.Redo();
     }
 
     public void Save()

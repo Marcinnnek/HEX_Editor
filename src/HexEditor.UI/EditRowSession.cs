@@ -1,4 +1,5 @@
 using HexEditor.Core;
+using System.IO;
 
 namespace HexEditor.UI;
 
@@ -32,6 +33,9 @@ public sealed class EditRowSession
 
     public uint RowStartAddress { get; }
     public uint SelectedAddress { get; }
+    public string ImageName => string.IsNullOrWhiteSpace(_document.SourcePath)
+        ? "Untitled image"
+        : Path.GetFileName(_document.SourcePath);
     public IReadOnlyList<EditRowCell> Cells { get; }
     public bool IsValid => _invalidAddresses.Count == 0;
     public bool IsCompleted { get; private set; }

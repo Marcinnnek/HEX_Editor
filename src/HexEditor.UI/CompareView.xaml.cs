@@ -37,7 +37,7 @@ public partial class CompareView : UserControl
         .Cast<CompareMemoryBlockRow>().Select(row => Workspace.BlocksA.IndexOf(row)).Where(index => index >= 0).ToArray();
     public int[] RowWidths { get; }
     public CompareViewMode[] ViewModes { get; }
-    public event Action<uint>? BaseRowActivated;
+    public event Action<uint, uint>? BaseRowActivated;
     public event Action<string>? StatusRequested;
 
     public void RefreshImage(MemoryImage previousImage, MemoryImage updatedImage)
@@ -62,6 +62,7 @@ public partial class CompareView : UserControl
         uint? address = null;
         try
         {
+            uint? rowStartAddress = null;
             if (side == ComparePanelSide.Base)
             {
                 var source = e.OriginalSource as DependencyObject;
@@ -69,6 +70,8 @@ public partial class CompareView : UserControl
                 var cell = FindAncestor<DataGridCell>(source);
                 if (row?.Item is not HexViewRow || cell is null) return;
                 rowIndex = row.GetIndex();
+                if (!HexAddressParser.TryParse(((HexViewRow)row.Item).Address, out var parsedRowStart)) return;
+                rowStartAddress = parsedRowStart;
 
                 if (!ReferenceEquals(cell.Column, grid.Columns[0]))
                 {
@@ -80,8 +83,8 @@ public partial class CompareView : UserControl
             }
 
             var activation = Workspace.ActivateRow(side, rowIndex, address);
-            if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected)
-                BaseRowActivated?.Invoke(selected);
+            if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected && rowStartAddress is uint rowStart)
+                BaseRowActivated?.Invoke(rowStart, selected);
             else if (activation.StatusMessage is { } message)
                 StatusRequested?.Invoke(message);
         }

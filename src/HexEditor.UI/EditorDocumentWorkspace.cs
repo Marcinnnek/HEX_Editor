@@ -179,7 +179,12 @@ public sealed class EditorDocumentWorkspace
     public bool Undo() => Document.Editing.Undo();
     public bool Redo() => Document.Editing.Redo();
     public EditRowSession BeginEditRow(uint rowStartAddress, uint selectedAddress, int bytesPerRow) =>
-        new(Document, rowStartAddress, selectedAddress, bytesPerRow);
+        BeginEditRow(Document, rowStartAddress, selectedAddress, bytesPerRow);
+    public EditRowSession BeginEditRow(EditorDocument document, uint rowStartAddress, uint selectedAddress, int bytesPerRow)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return new EditRowSession(document, rowStartAddress, selectedAddress, bytesPerRow);
+    }
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) =>
         Document.Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
     public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) =>
