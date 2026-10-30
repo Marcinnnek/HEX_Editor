@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] At vertical spacing 0, the visible gap between consecutive data text lines is approximately 0.2 of the rendered character height, rather than the current roughly 1.5-character gap.
 - [ ] Editor and both Compare panels use the same row-density baseline, and corresponding Compare addresses remain vertically aligned.
@@ -13,3 +13,7 @@
 - [ ] HEX and ASCII clicks still resolve to the intended occupied byte at compact and expanded settings; row gaps, headers, and unoccupied addresses are not treated as bytes.
 - [ ] Sparse-row virtualization, scrolling, selection, and comparison navigation remain responsive.
 - [ ] Verify settings through public behavior and measure the absolute rendered gap relative to character height in WPF, alongside alignment and hit testing.
+
+## Answer
+
+Implemented in `a9f2846`: vertical spacing 0 uses a 0.2-character-height baseline and larger settings add separation while byte hit areas remain limited to rendered text. Editor and both Compare views share the calculation. The final full suite passed 167/167.

@@ -1,6 +1,6 @@
 # HEX Editor UI Polish
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -100,3 +100,4 @@ Make Preferences and every other dialog match the effective Light or Dark appear
 - This spec supersedes the previous UI regression spec only where the user changed a UI decision: the visible **Selected byte** heading is removed while initial byte focus and highlighting remain.
 - The existing memory-image model already supplies segments in ascending start-address order. The current segment lists bind a decimal count and allow default header sorting. The current zero vertical spacing removes added row margin but still leaves substantial row chrome. These are implementation facts and investigation leads, not prescribed fixes.
 - The user approved public operations for editing, segment order, and settings, plus rendered WPF scenarios for keyboard/pointer navigation, layout, and appearance.
+- Implementation is on `integration`; the final full test suite passed 167/167 after the code-review fixes. Representative rendered WPF acceptance was offscreen; no high-DPI screenshot was captured.

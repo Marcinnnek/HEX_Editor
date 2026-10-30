@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Offset, original HEX/ASCII, and proposed HEX/ASCII values are centered horizontally and vertically in each byte column; row labels remain left-aligned.
 - [ ] Tab visits enabled Proposed HEX inputs by increasing byte offset, then enabled Proposed ASCII inputs in the same order; Shift+Tab reverses this sequence.
@@ -14,3 +14,7 @@
 - [ ] The dialog fits its controls vertically and has a fixed normal-use height at 8, 16, and 32 bytes per row. On a constrained display, scrolling keeps all inputs and actions reachable without unreadably shrinking text.
 - [ ] Existing one- or two-digit HEX input, one-character printable ASCII input, validation, Cancel behavior, sparse-address protection, synchronized representations, and one reversible commit still work.
 - [ ] Verify editing outcomes through public editing operations and the focus, alignment, and sizing behavior in rendered WPF scenarios.
+
+## Answer
+
+Implemented in `e39791c`: Edit Row centers its byte cells, uses HEX-then-ASCII keyboard order, selects values on first focus, skips unoccupied addresses, sizes to its contents, and keeps initial focus without the Selected byte heading. Focused WPF tests passed 9/9; the final full suite passed 167/167.
