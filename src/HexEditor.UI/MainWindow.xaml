@@ -46,7 +46,7 @@
                 <ui:MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
                 <Separator />
                 <ui:MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ActiveShowAscii, Mode=TwoWay}" />
-                <ui:MenuItem Header="Go to address" Click="GoToAddress_Click" InputGestureText="Ctrl+G" />
+                <ui:MenuItem Header="Go to address" Click="GoToAddressDialog_Click" InputGestureText="Ctrl+G" />
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Compare">

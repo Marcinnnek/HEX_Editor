@@ -75,6 +75,13 @@ public sealed class SaveChangesDialogAcceptanceTests
         }
     }
 
+    [TestMethod]
+    public void Address_validation_message_uses_the_standard_window_frame()
+    {
+        var messageBoxType = typeof(SaveChangesDialog).Assembly.GetType("HexEditor.UI.ThemedMessageBox", throwOnError: true)!;
+        Assert.AreEqual(typeof(Window), messageBoxType.BaseType);
+    }
+
     private static MessageBoxResult ShowAndDismiss(bool escape)
     {
         MessageBoxResult result = MessageBoxResult.None;

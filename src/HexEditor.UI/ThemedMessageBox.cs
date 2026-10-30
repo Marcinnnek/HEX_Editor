@@ -1,12 +1,11 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace HexEditor.UI;
 
 /// <summary>Keeps application prompts visually consistent without changing their decisions.</summary>
-internal sealed class ThemedMessageBox : FluentWindow
+internal sealed class ThemedMessageBox : Window
 {
     private MessageBoxResult _result = MessageBoxResult.Cancel;
 
@@ -19,6 +18,7 @@ internal sealed class ThemedMessageBox : FluentWindow
         MinWidth = 360;
         MaxWidth = 620;
         ShowInTaskbar = false;
+        WindowStyle = WindowStyle.SingleBorderWindow;
         ResizeMode = ResizeMode.NoResize;
 
         var layout = new DockPanel { Margin = new Thickness(24) };

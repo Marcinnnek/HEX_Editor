@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace HexEditor.UI;
@@ -14,7 +15,15 @@ public sealed class RelocateSegmentDialog : Window
     public RelocateSegmentDialog(uint startAddress, uint endAddress, int byteCount)
     {
         _byteCount = byteCount;
-        _destination = new TextBox { MinWidth = 190, Text = startAddress.ToString("X8") };
+        _destination = new TextBox {  
+            MinWidth = 190,
+            MaxLength = 10,
+            FontSize = 15,
+            Padding = new Thickness(8, 5, 8, 5),
+            VerticalContentAlignment = VerticalAlignment.Center, 
+            Text = startAddress.ToString("X8") };
+        _destination.PreviewTextInput += Destination_PreviewTextInput;
+        DataObject.AddPastingHandler(_destination, Destination_Pasting);
         Title = "Relocate memory segment";
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -22,7 +31,7 @@ public sealed class RelocateSegmentDialog : Window
         var panel = new StackPanel { Margin = new Thickness(18), MinWidth = 360 };
         panel.Children.Add(new TextBlock { Text = $"Current range: 0x{startAddress:X8}–0x{endAddress:X8}" });
         panel.Children.Add(new TextBlock { Text = $"Byte count: {byteCount:N0}", Margin = new Thickness(0, 4, 0, 12) });
-        panel.Children.Add(new TextBlock { Text = "New start address (hexadecimal):" });
+        panel.Children.Add(new TextBlock { Text = "New start address (hexadecimal):", Margin = new Thickness(0, 8, 0, 12) });
         panel.Children.Add(_destination);
         panel.Children.Add(_preview);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -44,6 +53,34 @@ public sealed class RelocateSegmentDialog : Window
 
     public uint DestinationAddress { get; private set; }
     public string DestinationAddressText => _destination.Text;
+
+    private void Destination_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        var proposed = _destination.Text.Remove(_destination.SelectionStart, _destination.SelectionLength)
+            .Insert(_destination.SelectionStart, e.Text);
+        e.Handled = !IsHexAddressInput(proposed);
+    }
+
+    private void Destination_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
+            e.SourceDataObject.GetData(DataFormats.UnicodeText, true) is not string pasted)
+        {
+            e.CancelCommand();
+            return;
+        }
+
+        var proposed = _destination.Text.Remove(_destination.SelectionStart, _destination.SelectionLength)
+            .Insert(_destination.SelectionStart, pasted);
+        if (!IsHexAddressInput(proposed)) e.CancelCommand();
+    }
+
+    private static bool IsHexAddressInput(string text)
+    {
+        if (text.Length == 0) return true;
+        var digits = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
+        return digits.Length <= 8 && digits.All(Uri.IsHexDigit);
+    }
 
     private bool TryGetDestination(out uint destination)
     {

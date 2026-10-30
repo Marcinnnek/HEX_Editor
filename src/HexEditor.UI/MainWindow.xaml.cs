@@ -385,7 +385,7 @@ public partial class MainWindow : Window
         if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var typing = Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase;
-        if (typing && key is not (Key.O or Key.S or Key.W)) return;
+        if (typing && key is not (Key.O or Key.S or Key.W or Key.G)) return;
 
         switch (key)
         {
@@ -408,8 +408,7 @@ public partial class MainWindow : Window
                 Redo_Click(this, new RoutedEventArgs());
                 break;
             case Key.G:
-                AddressInput.Focus();
-                AddressInput.SelectAll();
+                GoToAddressDialog_Click(this, new RoutedEventArgs());
                 break;
             default:
                 return;
@@ -715,6 +714,18 @@ public partial class MainWindow : Window
             return;
         }
 
+        NavigateToAddress(address);
+    }
+
+    private void GoToAddressDialog_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new GoToAddressDialog { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Address is not { } address) return;
+        NavigateToAddress(address);
+    }
+
+    private void NavigateToAddress(uint address)
+    {
         if (WorkspaceTabs.SelectedContent is CompareView compareView)
         {
             if (!compareView.NavigateToAddress(address))
