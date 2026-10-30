@@ -4,8 +4,12 @@
         xmlns:local="clr-namespace:HexEditor.UI"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <DockPanel Margin="12">
-        <TextBlock DockPanel.Dock="Bottom" Margin="0,10,0,0" Text="{Binding ViewModel.ComparisonStatus}" FontWeight="SemiBold" />
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+        <Border DockPanel.Dock="Bottom" Margin="0,10,0,0" Padding="10,7"
+                BorderThickness="1" BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                CornerRadius="4" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+            <TextBlock Text="{Binding ViewModel.ComparisonStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        </Border>
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" VerticalAlignment="Center">
             <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
             <ComboBox x:Name="RowWidthBox" Width="70" ItemsSource="{Binding RowWidths}" SelectedItem="{Binding ViewModel.BytesPerRow}" />
             <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ShowAscii}" VerticalAlignment="Center" Margin="14,0" />
@@ -19,7 +23,7 @@
             <ui:Button Content="Go" Margin="4,0" Padding="8,3" Click="Go_Click" />
             <ui:Button Content="Previous difference" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
             <ui:Button Content="Next difference" Padding="8,3" Click="NextDifference_Click" />
-        </StackPanel>
+        </WrapPanel>
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
