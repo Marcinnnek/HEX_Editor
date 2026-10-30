@@ -9,6 +9,11 @@
               EnableRowVirtualization="True" EnableColumnVirtualization="True"
               VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
               ScrollViewer.CanContentScroll="True" FontFamily="Consolas">
+        <ui:DataGrid.RowStyle>
+            <Style TargetType="DataGridRow">
+                <Setter Property="Margin" Value="{Binding RowGap, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" />
+            </Style>
+        </ui:DataGrid.RowStyle>
         <ui:DataGrid.Columns>
             <DataGridTemplateColumn Header="Address" Width="100">
                 <DataGridTemplateColumn.CellTemplate>

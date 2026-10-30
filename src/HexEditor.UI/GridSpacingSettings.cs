@@ -70,7 +70,7 @@ public readonly record struct ByteGridLayout(double CharacterWidth, double LineH
     {
         var width = CharacterWidth * (isAscii ? 1 : 2);
         var stride = width + (isAscii ? 0 : HorizontalSpacing);
-        return new Rect(index * stride, 0, width, LineHeight + VerticalSpacing);
+        return new Rect(index * stride, 0, width, LineHeight);
     }
 
     public bool TryGetByteIndexAt(Point point, int count, bool isAscii, out int index)
@@ -79,7 +79,7 @@ public readonly record struct ByteGridLayout(double CharacterWidth, double LineH
         if (count <= 0 || point.X < 0 || point.Y < 0) return false;
         var byteWidth = CharacterWidth * (isAscii ? 1 : 2);
         var stride = byteWidth + (isAscii ? 0 : HorizontalSpacing);
-        if (byteWidth <= 0 || stride <= 0 || point.Y >= LineHeight + VerticalSpacing || point.X >= GetRowSize(count, isAscii).Width) return false;
+        if (byteWidth <= 0 || stride <= 0 || point.Y >= LineHeight || point.X >= GetRowSize(count, isAscii).Width) return false;
         var candidate = (int)(point.X / stride);
         if ((uint)candidate >= (uint)count || !GetByteBounds(candidate, isAscii).Contains(point)) return false;
         index = candidate;
