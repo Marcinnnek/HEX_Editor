@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The base image's memory-segment list is immediately above the base data panel, and the reference image's list is immediately above the reference data panel.
 - [ ] Each list uses its corresponding column's available width at normal and narrow window sizes.
@@ -12,3 +12,7 @@
 - [ ] Segment selection and absolute-address navigation remain usable on both sides.
 - [ ] Compare's settings, aligned rows, and difference-result area remain visible and usable.
 - [ ] Inspect the layout and interactions in WPF at normal and narrow sizes, retaining existing public comparison/navigation tests as regression coverage.
+
+## Answer
+
+Each Compare column now stacks its own segment list above its data panel. WPF geometry checks at 1100 px and 650 px and after divider movement confirmed alignment; existing segment navigation and comparison tests passed.

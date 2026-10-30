@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Opening Edit Row from Editor or the editable Compare panel uses that tab's current 8-, 16-, or 32-byte row width.
 - [ ] Byte offsets, original HEX/ASCII, and proposed HEX/ASCII remain identifiable on one horizontal line; the row start and selected absolute address remain visible.
@@ -13,3 +13,7 @@
 - [ ] One printable ASCII character and one or two hexadecimal digits remain the accepted input forms; invalid input, Cancel, and absent bytes preserve the base image and dirty state.
 - [ ] A valid confirmation remains one reversible edit, with synchronized HEX/ASCII representations.
 - [ ] Exercise row width and edit outcomes through the public workspace/editing seam and inspect the WPF dialog at all three widths.
+
+## Answer
+
+Edit Row now uses the active 8-, 16-, or 32-byte width in a compact single line. Proposed values are rendered once, the dialog sizes to its content, and horizontal scrolling remains available when the work area is too narrow. Editing and dialog layout are covered by workspace and WPF tests.

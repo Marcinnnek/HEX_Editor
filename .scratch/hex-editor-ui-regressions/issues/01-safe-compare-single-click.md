@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A single click on an occupied data row or byte in the base panel responds without a hang or application exit.
 - [ ] The same single-click interaction is safe in the read-only reference panel.
@@ -13,3 +13,7 @@
 - [ ] Left-panel double-click editing, right-panel read-only feedback, and Previous/Next Difference remain usable after a single click.
 - [ ] A recoverable interaction error reports the operation, panel, and address or selection when available in status and error diagnostics; open documents and unsaved edits survive.
 - [ ] Cover observable selection and navigation through existing public workspace/model operations and reproduce the click in a WPF acceptance scenario.
+
+## Answer
+
+Compare handles single clicks, selection synchronization, scrolling, double clicks, and difference navigation through guarded event paths. WPF click tests cover both panels, editing and read-only feedback, and failure reporting. A one-off WPF test loaded read-only copies of the reported firmware pair and completed address-row clicks in both panels without changing either file. The desktop automation tool could not complete physical byte clicks against its temporary test window; this remains a manual acceptance check.

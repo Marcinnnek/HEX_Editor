@@ -4,10 +4,14 @@
 
 **Blocked by:** 04: Render a readable Dark appearance throughout the app.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The ASCII data column is subtly distinct from Address and HEX Data in Editor and both Compare panels.
 - [ ] The tint follows Light and Dark appearance without reducing text, focus, or selection contrast.
 - [ ] Comparison-difference highlights remain visible on ASCII bytes; separator spaces remain neutral.
 - [ ] The tint does not change memory-image values, byte alignment, row sizing, or hit testing.
 - [ ] Inspect both themes and representative changed/unchanged ASCII bytes in WPF; retain existing comparison highlight tests.
+
+## Answer
+
+The custom renderer now paints a subtle theme-aware ASCII background in Editor and both Compare panels. Byte highlights are drawn above the tint and separator spaces remain outside their highlight bounds. Rendering and comparison highlight tests passed.
