@@ -7,7 +7,7 @@ namespace HexEditor.UI;
 public sealed class CompareWorkspaceTabViewModel
 {
     public CompareWorkspaceTabViewModel(MemoryImage fileA, MemoryImage fileB, string nameA, string nameB,
-        string? pathA = null, string? pathB = null)
+        string? pathA = null, string? pathB = null, EditorDocument? baseDocument = null)
     {
         ArgumentNullException.ThrowIfNull(fileA);
         ArgumentNullException.ThrowIfNull(fileB);
@@ -17,6 +17,8 @@ public sealed class CompareWorkspaceTabViewModel
         _fileB = fileB;
         _pathA = NormalizePath(pathA);
         _pathB = NormalizePath(pathB);
+        BaseDocument = baseDocument;
+        if (BaseDocument is not null) BaseDocument.ImageChanged += OnBaseDocumentChanged;
         Comparison = new CompareViewModel(fileA, fileB);
         BlocksA = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileA));
         BlocksB = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileB));
@@ -24,6 +26,7 @@ public sealed class CompareWorkspaceTabViewModel
 
     public string NameA { get; }
     public string NameB { get; }
+    public EditorDocument? BaseDocument { get; }
     public CompareViewModel Comparison { get; }
     public ObservableCollection<CompareMemoryBlockRow> BlocksA { get; }
     public ObservableCollection<CompareMemoryBlockRow> BlocksB { get; }
@@ -71,6 +74,8 @@ public sealed class CompareWorkspaceTabViewModel
         var updateB = ReferenceEquals(_fileB, previousImage);
         RefreshImages(updatedImage, updateA, updateB);
     }
+
+    private void OnBaseDocumentChanged(MemoryImage previous, MemoryImage updated) => RefreshImage(previous, updated);
 
     private void RefreshImages(MemoryImage updatedImage, bool updateA, bool updateB)
     {
