@@ -136,6 +136,58 @@ public sealed class CompareCurrentImageWorkflowTests
         finally { File.Delete(basePath); File.Delete(badPath); }
     }
 
+    [TestMethod]
+    public async Task CompareFromCompareUsesSameBaseDocumentAndEachReferenceKeepsLiveSharedEdits()
+    {
+        var basePath = CreateImageFile(0x10);
+        var firstReferencePath = CreateImageFile(0x40);
+        var secondReferencePath = CreateImageFile(0x30);
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.Workspace.Open(basePath, OverlapDecision.OverwriteIncoming);
+            var baseDocument = viewModel.Workspace.Document;
+            var workflow = new CompareCurrentImageWorkflow(viewModel);
+            var first = await workflow.StartAsync((_, _) => firstReferencePath, () => { }, CancellationToken.None, null);
+            var second = await workflow.StartAsync((_, _) => secondReferencePath, () => { }, CancellationToken.None, null,
+                first!.BaseDocument);
+
+            Assert.IsNotNull(first);
+            Assert.IsNotNull(second);
+            Assert.AreSame(baseDocument, first.BaseDocument);
+            Assert.AreSame(baseDocument, second.BaseDocument);
+            Assert.AreEqual((byte)0x40, ReadByte(first.Comparison.FileB, 0x1000));
+            Assert.AreEqual((byte)0x30, ReadByte(second.Comparison.FileB, 0x1000));
+
+            baseDocument.Editing.EditByte(0x1000, 0x40, OverlapDecision.OverwriteIncoming);
+            Assert.AreEqual((byte)0x40, ReadByte(first.Comparison.FileA, 0x1000));
+            Assert.AreEqual((byte)0x40, ReadByte(second.Comparison.FileA, 0x1000));
+            Assert.AreEqual("No differences", first.Comparison.ComparisonStatus);
+            Assert.IsTrue(baseDocument.Editing.Undo());
+            Assert.AreEqual((byte)0x10, ReadByte(first.Comparison.FileA, 0x1000));
+            Assert.AreNotEqual("No differences", first.Comparison.ComparisonStatus);
+            Assert.IsTrue(baseDocument.Editing.Redo());
+            Assert.AreEqual((byte)0x40, ReadByte(second.Comparison.FileA, 0x1000));
+
+            viewModel.Workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x99])]),
+                "another.hex", MemoryImageExportFormat.IntelHex);
+            Assert.AreEqual((byte)0x99, ReadByte(viewModel.Workspace.Document.CurrentImage, 0x1000));
+            Assert.IsFalse(viewModel.Workspace.Document.CanUndo, "A new base document starts with its own history.");
+            Assert.IsTrue(baseDocument.CanUndo, "The earlier base keeps its independent edit history.");
+            Assert.AreEqual((byte)0x40, ReadByte(baseDocument.CurrentImage, 0x1000));
+            baseDocument.Editing.EditByte(0x1000, 0x50, OverlapDecision.OverwriteIncoming);
+            Assert.AreEqual((byte)0x50, ReadByte(first.Comparison.FileA, 0x1000));
+            Assert.AreEqual((byte)0x50, ReadByte(second.Comparison.FileA, 0x1000));
+        }
+        finally { File.Delete(basePath); File.Delete(firstReferencePath); File.Delete(secondReferencePath); }
+    }
+
+    private static byte ReadByte(MemoryImage image, uint address)
+    {
+        Assert.IsTrue(image.TryGetByte(address, out var value));
+        return value;
+    }
+
     private static string CreateImageFile(byte value)
     {
         var path = Path.Combine(Path.GetTempPath(), $"comparison-{Guid.NewGuid():N}.hex");

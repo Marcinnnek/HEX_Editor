@@ -28,7 +28,6 @@ public partial class MainWindow : FluentWindow
 {
     private readonly AppearanceSettings _appearanceSettings = new();
     private bool _watchingSystemTheme;
-    private readonly List<CompareView> _comparisonViews = [];
     private readonly ImageEditWorkflow _imageEdits;
     private readonly ChecksumWorkflow _checksums;
     private readonly ComparisonImageLoader _comparisonImageLoader;
@@ -176,6 +175,7 @@ public partial class MainWindow : FluentWindow
     {
         try
         {
+            var baseDocument = (WorkspaceTabs.SelectedContent as CompareView)?.Workspace.BaseDocument;
             var comparison = await RunFileOperationAsync((token, progress) => _compareWorkflow.StartAsync(
                 (title, directory) =>
                 {
@@ -186,14 +186,13 @@ public partial class MainWindow : FluentWindow
                 {
                     WorkspaceTabs.SelectedIndex = 0;
                     Title = ViewModel.WindowTitle;
-                }, token, progress));
+                }, token, progress, baseDocument));
             if (comparison is null) return;
 
             var view = new CompareView(comparison);
             view.StatusRequested += ViewModel.ReportCompareInteraction;
             view.BaseRowActivated += address =>
                 ViewModel.ReportCompareInteraction($"Base row at 0x{address:X8} selected.");
-            _comparisonViews.Add(view);
             var tab = new TabItem { Header = $"Compare: {comparison.NameA} ↔ {comparison.NameB}", Content = view };
             WorkspaceTabs.Items.Add(tab);
             WorkspaceTabs.SelectedItem = tab;
@@ -245,12 +244,6 @@ public partial class MainWindow : FluentWindow
         IProgress<MemoryImageFileProgress> progress, string stage) =>
         new Progress<MemoryImageFileProgress>(update =>
             progress.Report(update with { Stage = $"{stage}: {update.Stage}" }));
-
-    private void ViewModel_ImageChanged(HexEditor.Core.MemoryImage previousImage, HexEditor.Core.MemoryImage updatedImage)
-    {
-        foreach (var comparison in _comparisonViews.ToArray())
-            comparison.Workspace.RefreshDocument(ViewModel.SourcePath, updatedImage);
-    }
 
     private async void OpenImage_Click(object sender, RoutedEventArgs e)
     {
