@@ -184,6 +184,27 @@ public sealed class EditorDocumentWorkspace
 
     public bool CloseView(CompareWorkspaceTabViewModel view) => _comparisonViews.Remove(view);
 
+    /// <summary>Finds the next byte sequence in the current Editor image, wrapping at the image boundary.</summary>
+    public Task<FindSearchResult> FindNextAsync(string draft, FindPatternMode mode, uint? selectionStart,
+        uint? selectionEnd, CancellationToken cancellationToken, IProgress<(ulong Completed, ulong Total)>? progress) =>
+        SearchAsync(draft, mode, selectionStart, selectionEnd, forward: true, cancellationToken, progress);
+
+    /// <summary>Finds the previous byte sequence in the current Editor image, wrapping at the image boundary.</summary>
+    public Task<FindSearchResult> FindPreviousAsync(string draft, FindPatternMode mode, uint? selectionStart,
+        uint? selectionEnd, CancellationToken cancellationToken, IProgress<(ulong Completed, ulong Total)>? progress) =>
+        SearchAsync(draft, mode, selectionStart, selectionEnd, forward: false, cancellationToken, progress);
+
+    private Task<FindSearchResult> SearchAsync(string draft, FindPatternMode mode, uint? selectionStart,
+        uint? selectionEnd, bool forward, CancellationToken cancellationToken,
+        IProgress<(ulong Completed, ulong Total)>? progress)
+    {
+        var image = Document.CurrentImage;
+        return Task.Run(() => forward
+            ? EditorFindSearch.FindNext(image, draft, mode, selectionStart, selectionEnd, cancellationToken, progress)
+            : EditorFindSearch.FindPrevious(image, draft, mode, selectionStart, selectionEnd, cancellationToken, progress),
+            cancellationToken);
+    }
+
     public IReadOnlyList<CompareWorkspaceTabViewModel> CloseImage(EditorDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);

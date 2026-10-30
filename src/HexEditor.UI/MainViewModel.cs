@@ -52,6 +52,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public EditorDocument ActiveDocument => _activeComparisonDocument ?? Workspace.Document;
     public MemoryImage ActiveImage => ActiveDocument.CurrentImage;
     public bool ActiveHasImage => ActiveImage.Segments.Count > 0;
+    public bool ActiveIsEditor => _activeComparison is null;
     public bool ActiveCanSave => !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) && ActiveDocument.SourceFormat is not null;
     public bool ActiveCanSaveAs => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath);
     public bool ActiveCanCloseImage => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) || ActiveDocument.IsModified;
@@ -89,7 +90,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshTitle();
         Raise(nameof(ActiveDocument), nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave),
             nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveHasSelection),
-            nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+            nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii), nameof(ActiveIsEditor));
     }
     public void ActivateComparison(CompareWorkspaceTabViewModel? comparison)
     {
@@ -116,7 +117,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshTitle();
         Raise(nameof(ActiveDocument), nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave),
             nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveHasSelection),
-            nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+            nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii), nameof(ActiveIsEditor));
     }
     private void SetActiveComparisonDocument(EditorDocument? document)
     {

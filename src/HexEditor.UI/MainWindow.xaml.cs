@@ -34,6 +34,11 @@ public partial class MainWindow : Window
     private readonly CompareCurrentImageWorkflow _compareWorkflow;
     private readonly MemoryImageFileWorkflow _files;
     private CancellationTokenSource? _fileOperationCancellation;
+    private CancellationTokenSource? _findCancellation;
+    private FindBytesWindow? _findWindow;
+    private FindPatternMode? _lastFindMode;
+    private string? _lastFindDraft;
+    private int _findGeneration;
     private uint? _selectionStart;
     private uint? _selectionEnd;
     private bool _suppressSegmentNavigation;
@@ -42,6 +47,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
+        ViewModel.ImageChanged += (_, _) => InvalidateFind("Image changed. Search again.");
         ViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.WindowTitle)) Title = ViewModel.WindowTitle;
@@ -173,6 +179,7 @@ public partial class MainWindow : Window
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
+        InvalidateFind("Active view changed. Search again.");
         ViewModel.ActivateComparison((WorkspaceTabs.SelectedContent as CompareView)?.Workspace);
     }
 
@@ -348,6 +355,7 @@ public partial class MainWindow : Window
             if (document.SourcePath is null || document.SourceFormat is null) { await TrySaveAsAsync(document); return; }
             await RunFileOperationAsync((token, progress) => document.SaveAsync(token, progress));
             RefreshSavedDocumentTabs(document);
+            InvalidateFind("Image saved. Search again.");
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -374,10 +382,16 @@ public partial class MainWindow : Window
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.F3 && (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) == 0)
+        {
+            RepeatLastFind((Keyboard.Modifiers & ModifierKeys.Shift) != 0);
+            e.Handled = true;
+            return;
+        }
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
         var typing = Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase;
-        if (typing && key is not (Key.O or Key.S or Key.W or Key.G)) return;
+        if (typing && key is not (Key.O or Key.S or Key.W or Key.G or Key.F)) return;
 
         switch (key)
         {
@@ -402,6 +416,9 @@ public partial class MainWindow : Window
             case Key.G:
                 GoToAddressDialog_Click(this, new RoutedEventArgs());
                 break;
+            case Key.F:
+                FindBytes_Click(this, new RoutedEventArgs());
+                break;
             default:
                 return;
         }
@@ -417,6 +434,7 @@ public partial class MainWindow : Window
                 token, progress));
             ViewModel.RefreshActiveCommandState();
             RefreshSavedDocumentTabs(document);
+            InvalidateFind("Image saved. Search again.");
             return true;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); return false; }
@@ -436,6 +454,7 @@ public partial class MainWindow : Window
             document.SaveAs(selection.Path, selection.Format, selection.Overwrite);
             ViewModel.RefreshActiveCommandState();
             RefreshSavedDocumentTabs(document);
+            InvalidateFind("Image saved. Search again.");
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
@@ -702,6 +721,158 @@ public partial class MainWindow : Window
         var dialog = new GoToAddressDialog { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Address is not { } address) return;
         NavigateToAddress(address);
+    }
+
+    private void FindBytes_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.ActiveIsEditor) return;
+        if (_findWindow is { IsVisible: true } existing)
+        {
+            existing.Activate();
+            existing.PatternInput.Focus();
+            return;
+        }
+
+        var window = new FindBytesWindow { Owner = this };
+        if (_lastFindMode is { } mode && _lastFindDraft is { } draft)
+            window.SetDraft(mode, draft);
+        window.FindRequested += FindWindow_FindRequested;
+        window.CancelRequested += (_, _) => CancelFind();
+        window.Closed += (_, _) =>
+        {
+            CancelFind();
+            _findWindow = null;
+            ViewModel.ImageView.ClearFindMatch();
+        };
+        _findWindow = window;
+        window.Show();
+        window.Activate();
+        window.PatternInput.Focus();
+        window.PatternInput.SelectAll();
+    }
+
+    private async void FindWindow_FindRequested(object? sender, FindRequestedEventArgs e)
+    {
+        var window = _findWindow;
+        if (!ViewModel.ActiveIsEditor) return;
+        if (_findCancellation is not null)
+        {
+            CancelFind();
+            return;
+        }
+
+        var selectionStart = ViewModel.EditorStatus.CurrentAddress;
+        uint? selectionEnd = selectionStart is uint start && ViewModel.EditorStatus.SelectionLength > 0 &&
+            (ulong)start + (ulong)ViewModel.EditorStatus.SelectionLength - 1 <= uint.MaxValue
+            ? (uint)((ulong)start + (ulong)ViewModel.EditorStatus.SelectionLength - 1)
+            : null;
+
+        using var cancellation = new CancellationTokenSource();
+        _findCancellation = cancellation;
+        var generation = ++_findGeneration;
+        var searchedDocument = ViewModel.Workspace.Document;
+        var searchedImage = searchedDocument.CurrentImage;
+        window?.SetSearching(true);
+        var progress = new InlineProgress<(ulong Completed, ulong Total)>(update =>
+        {
+            if (window is null) return;
+            _ = Dispatcher.InvokeAsync(() =>
+            {
+                if (ReferenceEquals(_findCancellation, cancellation) && !cancellation.IsCancellationRequested)
+                    window.SetProgress(update.Completed, update.Total);
+            });
+        });
+        try
+        {
+            var result = e.Forward
+                ? await ViewModel.Workspace.FindNextAsync(e.Draft, e.Mode, selectionStart, selectionEnd,
+                    cancellation.Token, progress)
+                : await ViewModel.Workspace.FindPreviousAsync(e.Draft, e.Mode, selectionStart, selectionEnd,
+                    cancellation.Token, progress);
+            await RunOnUiAsync(() => ApplyFindResult(window, e, result, searchedDocument, searchedImage, generation));
+        }
+        catch (OperationCanceledException)
+        {
+            await RunOnUiAsync(() => SetFindStatus(window, "Search cancelled."));
+        }
+        finally
+        {
+            await RunOnUiAsync(() =>
+            {
+                if (ReferenceEquals(_findCancellation, cancellation)) _findCancellation = null;
+                window?.SetSearching(false);
+            });
+        }
+    }
+
+    private void RepeatLastFind(bool previous)
+    {
+        if (!ViewModel.ActiveIsEditor) return;
+        if (_findWindow is { IsVisible: true } window)
+        {
+            FindWindow_FindRequested(window, new FindRequestedEventArgs(window.Mode, window.CurrentDraft, !previous));
+            return;
+        }
+        if (_lastFindMode is not { } mode || _lastFindDraft is not { } draft) return;
+        FindWindow_FindRequested(null, new FindRequestedEventArgs(mode, draft, !previous));
+    }
+
+    private void InvalidateFind(string status)
+    {
+        CancelFind();
+        ViewModel.ImageView.ClearFindMatch();
+        _findWindow?.SetStatus(status);
+    }
+
+    private void CancelFind()
+    {
+        _findGeneration++;
+        _findCancellation?.Cancel();
+    }
+
+    private void SetFindStatus(FindBytesWindow? window, string message)
+    {
+        if (window is { IsVisible: true }) window.SetStatus(message);
+        else ViewModel.ReportCompareInteraction(message);
+    }
+
+    private void ApplyFindResult(FindBytesWindow? window, FindRequestedEventArgs request, FindSearchResult result,
+        EditorDocument document, MemoryImage image, int generation)
+    {
+        if (generation != _findGeneration || !ReferenceEquals(document, ViewModel.Workspace.Document) ||
+            !ReferenceEquals(image, document.CurrentImage)) return;
+        if (!result.IsValidPattern)
+        {
+            SetFindStatus(window, result.Message ?? "Invalid pattern.");
+            return;
+        }
+
+        _lastFindMode = request.Mode;
+        _lastFindDraft = request.Draft;
+        if (result.MatchAddress is not uint matchStart || result.MatchEndAddress is not uint matchEnd)
+        {
+            SetFindStatus(window, result.Message ?? "No match.");
+            return;
+        }
+
+        ApplySelection(matchStart, matchEnd);
+        ViewModel.ImageView.SetFindMatch(matchStart, matchEnd);
+        SetFindStatus(window, $"Found at 0x{matchStart:X8}–0x{matchEnd:X8}.");
+    }
+
+    private Task RunOnUiAsync(Action action)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            action();
+            return Task.CompletedTask;
+        }
+        return Dispatcher.InvokeAsync(action).Task;
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 
     private void NavigateToAddress(uint address)

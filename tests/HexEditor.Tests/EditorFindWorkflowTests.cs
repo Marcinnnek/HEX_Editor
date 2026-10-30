@@ -1,0 +1,115 @@
+using HexEditor.Core;
+using HexEditor.UI;
+
+namespace HexEditor.Tests;
+
+[TestClass]
+public sealed class EditorFindWorkflowTests
+{
+    [TestMethod]
+    public async Task Editor_find_matches_across_adjacent_ranges_but_stops_at_address_gaps()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0xAA, 0xDE]),
+            new MemorySegment(0x1002, [0xAD, 0xBE, 0xEF]),
+            new MemorySegment(0x1010, [0xDE, 0xAD, 0xBE, 0xEF])]), null, null);
+
+        var first = await workspace.FindNextAsync("DE AD BE EF", FindPatternMode.Hex,
+            null, null, CancellationToken.None, null);
+        var second = await workspace.FindNextAsync("DE AD BE EF", FindPatternMode.Hex,
+            first.MatchAddress, first.MatchEndAddress, CancellationToken.None, null);
+        var wrapped = await workspace.FindNextAsync("DE AD BE EF", FindPatternMode.Hex,
+            second.MatchAddress, second.MatchEndAddress, CancellationToken.None, null);
+
+        Assert.AreEqual((uint)0x1001, first.MatchAddress);
+        Assert.AreEqual((uint)0x1004, first.MatchEndAddress);
+        Assert.AreEqual((uint)0x1010, second.MatchAddress);
+        Assert.AreEqual(first.MatchAddress, wrapped.MatchAddress);
+
+        var gapWorkspace = new EditorDocumentWorkspace();
+        gapWorkspace.OpenImage(MemoryImage.FromSegments([
+            new MemorySegment(0x1100, [0xDE, 0xAD]),
+            new MemorySegment(0x1104, [0xBE, 0xEF])]), null, null);
+        var acrossGap = await gapWorkspace.FindNextAsync("DEADBEEF", FindPatternMode.Hex,
+            null, null, CancellationToken.None, null);
+        Assert.IsNull(acrossGap.MatchAddress);
+    }
+
+    [TestMethod]
+    public async Task Editor_find_keeps_ascii_drafts_case_sensitive_and_rejects_non_ascii()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x2000, "Aba"u8)]), null, null);
+
+        var uppercase = await workspace.FindNextAsync("A", FindPatternMode.Ascii,
+            null, null, CancellationToken.None, null);
+        var lowercase = await workspace.FindNextAsync("a", FindPatternMode.Ascii,
+            0x2000, 0x2000, CancellationToken.None, null);
+        var invalid = await workspace.FindNextAsync("Ā", FindPatternMode.Ascii,
+            null, null, CancellationToken.None, null);
+
+        Assert.AreEqual((uint)0x2000, uppercase.MatchAddress);
+        Assert.AreEqual((uint)0x2002, lowercase.MatchAddress);
+        Assert.IsFalse(invalid.IsValidPattern);
+        Assert.IsNull(invalid.MatchAddress);
+    }
+
+    [TestMethod]
+    public async Task Editor_find_previous_wraps_and_rejects_incomplete_hex_pairs()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x3000, [0xDE, 0xAD, 0x00, 0xDE, 0xAD])]), null, null);
+
+        var last = await workspace.FindPreviousAsync("DEAD", FindPatternMode.Hex,
+            null, null, CancellationToken.None, null);
+        var wrapped = await workspace.FindPreviousAsync("DEAD", FindPatternMode.Hex,
+            last.MatchAddress, last.MatchEndAddress, CancellationToken.None, null);
+        var invalid = await workspace.FindNextAsync("A", FindPatternMode.Hex,
+            0x3001, 0x3001, CancellationToken.None, null);
+        var splitByte = await workspace.FindNextAsync("D E", FindPatternMode.Hex,
+            0x3001, 0x3001, CancellationToken.None, null);
+
+        Assert.AreEqual((uint)0x3003, last.MatchAddress);
+        Assert.AreEqual((uint)0x3000, wrapped.MatchAddress);
+        Assert.IsFalse(invalid.IsValidPattern);
+        Assert.IsNull(invalid.MatchAddress);
+        Assert.IsFalse(splitByte.IsValidPattern);
+    }
+
+    [TestMethod]
+    public void Editor_find_indicator_covers_each_byte_across_displayed_rows_and_can_be_cleared()
+    {
+        var view = new HexImageViewModel(MemoryImage.FromSegments([
+            new MemorySegment(0x4000, Enumerable.Range(0, 24).Select(value => (byte)value).ToArray())]), bytesPerRow: 8);
+
+        view.SetFindMatch(0x4007, 0x4009);
+
+        Assert.IsTrue(view.Rows[0].Cells[7].IsFindMatch);
+        Assert.IsTrue(view.Rows[1].Cells[0].IsFindMatch);
+        Assert.IsTrue(view.Rows[1].Cells[1].IsFindMatch);
+        view.ClearFindMatch();
+        Assert.IsFalse(view.Rows[0].Cells[7].IsFindMatch);
+        Assert.IsFalse(view.Rows[1].Cells[0].IsFindMatch);
+    }
+
+    [TestMethod]
+    public async Task Editor_find_can_cancel_a_sizable_scan()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x6000, new byte[100_000])]), null, null);
+        using var cancellation = new CancellationTokenSource();
+        var progress = new CancellingProgress(cancellation);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => workspace.FindNextAsync("FF", FindPatternMode.Hex,
+            null, null, cancellation.Token, progress));
+    }
+
+    private sealed class CancellingProgress(CancellationTokenSource cancellation) : IProgress<(ulong Completed, ulong Total)>
+    {
+        public void Report((ulong Completed, ulong Total) value)
+        {
+            if (value.Completed > 0) cancellation.Cancel();
+        }
+    }
+}
