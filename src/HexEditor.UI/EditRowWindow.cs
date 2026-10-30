@@ -11,6 +11,7 @@ public sealed class EditRowWindow : Window
     private readonly EditRowSession _session;
     private readonly TextBox[] _hex;
     private readonly TextBox[] _ascii;
+    private readonly HashSet<TextBox> _enteredInputs = [];
     private bool _syncing;
 
     public EditRowWindow(EditRowSession session)
@@ -23,19 +24,20 @@ public sealed class EditRowWindow : Window
         MaxWidth = SystemParameters.WorkArea.Width;
         MaxHeight = SystemParameters.WorkArea.Height;
         SizeToContent = SizeToContent.Height;
+        ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
         _hex = new TextBox[session.Cells.Count]; _ascii = new TextBox[session.Cells.Count];
         var root = new DockPanel { Margin = new Thickness(12) };
         var heading = new TextBlock
         {
-            Text = $"{session.ImageName}     Row starts at 0x{session.RowStartAddress:X8}     Selected byte: 0x{session.SelectedAddress:X8}",
+            Text = $"{session.ImageName}     Row starts at 0x{session.RowStartAddress:X8}",
             FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10),
             TextWrapping = TextWrapping.Wrap
         };
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Margin = new Thickness(6, 0, 0, 0) };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(6, 0, 0, 0) };
+        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Margin = new Thickness(6, 0, 0, 0), TabIndex = session.Cells.Count * 2 };
+        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(6, 0, 0, 0), TabIndex = session.Cells.Count * 2 + 1 };
         ok.Click += (_, _) => { if (_session.Commit()) { DialogResult = true; Close(); } else if (_session.IsValid) { DialogResult = true; Close(); } };
         cancel.Click += (_, _) => { _session.Cancel(); DialogResult = false; Close(); };
         buttons.Children.Add(ok); buttons.Children.Add(cancel); DockPanel.SetDock(buttons, Dock.Bottom); root.Children.Add(buttons);
@@ -50,8 +52,8 @@ public sealed class EditRowWindow : Window
         for (var i = 0; i < session.Cells.Count; i++)
         {
             var cell = session.Cells[i];
-            _hex[i] = CreateInput(cell.Hex.Trim(), cell.IsOccupied, 2);
-            _ascii[i] = CreateInput(cell.Ascii, cell.IsOccupied, 1);
+            _hex[i] = CreateInput(cell.Hex.Trim(), cell.IsOccupied, 2, i);
+            _ascii[i] = CreateInput(cell.Ascii, cell.IsOccupied, 1, session.Cells.Count + i);
             var index = i;
             _hex[i].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetHex(cell.Address!.Value, _hex[index].Text)) SyncAscii(index); };
             _ascii[i].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetAscii(cell.Address!.Value, _ascii[index].Text)) SyncHex(index); };
@@ -63,7 +65,11 @@ public sealed class EditRowWindow : Window
             }
         }
         scroll.Content = grid; root.Children.Add(scroll); Content = root;
-        if (session.Cells.Any(cell => cell.Address == session.SelectedAddress)) _hex[session.Cells.ToList().FindIndex(cell => cell.Address == session.SelectedAddress)].Focus();
+        Loaded += (_, _) =>
+        {
+            var selectedIndex = session.Cells.ToList().FindIndex(cell => cell.Address == session.SelectedAddress);
+            if (selectedIndex >= 0) _hex[selectedIndex].Focus();
+        };
     }
 
     private void SyncAscii(int index)
@@ -74,18 +80,48 @@ public sealed class EditRowWindow : Window
     }
     private void SyncHex(int index) { _syncing = true; _hex[index].Text = ((byte)_ascii[index].Text[0]).ToString("X2"); _syncing = false; }
 
-    private static TextBox CreateInput(string text, bool enabled, int maxLength) => new()
+    private TextBox CreateInput(string text, bool enabled, int maxLength, int tabIndex)
     {
-        Text = text, IsEnabled = enabled, MaxLength = maxLength, Width = 32,
-        Margin = new Thickness(2), HorizontalContentAlignment = HorizontalAlignment.Center,
-        FontFamily = new FontFamily("Consolas")
-    };
+        var input = new TextBox
+        {
+            Text = text, IsEnabled = enabled, IsTabStop = enabled, MaxLength = maxLength,
+            Width = 32, Margin = new Thickness(2), TabIndex = tabIndex,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            FontFamily = new FontFamily("Consolas")
+        };
+        input.GotKeyboardFocus += (_, _) => SelectOnFirstEntry(input);
+        input.PreviewMouseLeftButtonDown += (_, args) =>
+        {
+            if (input.IsKeyboardFocused) return;
+            input.Focus();
+            SelectOnFirstEntry(input);
+            args.Handled = true;
+        };
+        return input;
+    }
+
+    private void SelectOnFirstEntry(TextBox input)
+    {
+        if (_enteredInputs.Add(input)) input.SelectAll();
+    }
     private static void AddCell(Grid grid, int row, int col, UIElement element) { while (grid.RowDefinitions.Count <= row) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(element, row); Grid.SetColumn(element, col); grid.Children.Add(element); }
     private void AddLabelRow(Grid grid, int row, string header, Func<EditRowCell, string> value)
     {
         AddRowHeader(grid, row, header);
-        for (var i = 0; i < _session.Cells.Count; i++) AddCell(grid, row, i + 1, new TextBlock { Text = value(_session.Cells[i]), Margin = new Thickness(5, 7, 0, 4), FontFamily = new FontFamily("Consolas") });
+        for (var i = 0; i < _session.Cells.Count; i++) AddCell(grid, row, i + 1, new TextBlock
+        {
+            Text = value(_session.Cells[i]), Margin = new Thickness(2, 3, 2, 3),
+            FontFamily = new FontFamily("Consolas"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = TextAlignment.Center
+        });
     }
     private static void AddRowHeader(Grid grid, int row, string header) =>
-        AddCell(grid, row, 0, new TextBlock { Text = header, Margin = new Thickness(4, 7, 4, 4), FontWeight = FontWeights.SemiBold });
+        AddCell(grid, row, 0, new TextBlock
+        {
+            Text = header, Margin = new Thickness(4, 3, 4, 3), FontWeight = FontWeights.SemiBold,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center
+        });
 }
