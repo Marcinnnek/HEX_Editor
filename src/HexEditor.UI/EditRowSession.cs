@@ -54,8 +54,6 @@ public sealed class EditRowSession
     public bool SetAscii(uint address, string text)
     {
         if (!CanEdit(address)) return false;
-        if (_proposed[address] is < 0x20 or > 0x7E)
-        { _invalidAddresses.Add(address); return false; }
         if (text is null || text.Length != 1 || text[0] < 0x20 || text[0] > 0x7E)
         { _invalidAddresses.Add(address); return false; }
         _proposed[address] = (byte)text[0];

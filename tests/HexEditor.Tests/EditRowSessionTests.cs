@@ -8,6 +8,35 @@ namespace HexEditor.Tests;
 public class EditRowSessionTests
 {
     [TestMethod]
+    [DataRow(8)]
+    [DataRow(16)]
+    [DataRow(32)]
+    public void EditRowUsesSelectedRowWidthAndCancelPreservesSparseImage(int bytesPerRow)
+    {
+        var workspace = new EditorDocumentWorkspace();
+        var lastAddress = 0x1000u + (uint)bytesPerRow - 1;
+        workspace.OpenImage(MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x41]), new MemorySegment(lastAddress, [0x5A])
+        ]), null, null);
+
+        var edit = workspace.BeginEditRow(0x1000, lastAddress, bytesPerRow);
+
+        Assert.HasCount(bytesPerRow, edit.Cells);
+        Assert.AreEqual("00", edit.Cells[0].OffsetText);
+        Assert.AreEqual((bytesPerRow - 1).ToString("X2"), edit.Cells[^1].OffsetText);
+        Assert.AreEqual(lastAddress, edit.SelectedAddress);
+        Assert.AreEqual("Z", edit.Cells[^1].Ascii);
+        Assert.IsFalse(edit.Cells[1].IsOccupied);
+        Assert.IsFalse(edit.SetHex(0x1001, "20"));
+        Assert.IsTrue(edit.SetHex(lastAddress, "21"));
+        edit.Cancel();
+        Assert.IsFalse(workspace.Document.IsModified);
+        Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x1001, out _));
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(lastAddress, out var unchanged));
+        Assert.AreEqual((byte)'Z', unchanged);
+    }
+
+    [TestMethod]
     public void EditRowStagesPrintableAsciiAndHexAsOneUndoableChange()
     {
         var workspace = new EditorDocumentWorkspace();
@@ -15,14 +44,15 @@ public class EditRowSessionTests
         var edit = workspace.BeginEditRow(0x1000, 0x1002, 8);
         Assert.AreEqual("A", edit.Cells[0].Ascii);
         Assert.AreEqual(".", edit.Cells[1].Ascii);
-        Assert.IsFalse(edit.SetAscii(0x1001, "x"));
-        Assert.IsTrue(edit.SetHex(0x1001, "00"));
+        Assert.IsTrue(edit.SetAscii(0x1001, "x"));
         Assert.IsTrue(edit.SetAscii(0x1000, "B"));
         Assert.IsTrue(edit.SetHex(0x1002, "20"));
         Assert.IsTrue(edit.Commit());
         Assert.IsTrue(workspace.Document.IsModified);
         Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x1000, out var first));
         Assert.AreEqual((byte)'B', first);
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x1001, out var second));
+        Assert.AreEqual((byte)'x', second);
         Assert.IsTrue(workspace.Undo());
         Assert.AreEqual((byte)'A', workspace.Document.CurrentImage.Segments[0].Data.Span[0]);
         Assert.IsTrue(workspace.Redo());
