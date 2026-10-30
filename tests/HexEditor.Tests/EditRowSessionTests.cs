@@ -43,4 +43,19 @@ public class EditRowSessionTests
         Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x21, out _));
         Assert.AreEqual((byte)'A', workspace.Document.CurrentImage.Segments[0].Data.Span[0]);
     }
+
+    [TestMethod]
+    public void EditRowAcceptsOneHexDigitAsLowNibbleAndShowsZeroBasedOffsets()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x41, 0x42, 0x43])]), null, null);
+        var edit = workspace.BeginEditRow(0x1000, 0x1002, 8);
+
+        Assert.AreEqual("00", edit.Cells[0].OffsetText);
+        Assert.AreEqual("01", edit.Cells[1].OffsetText);
+        Assert.IsTrue(edit.SetHex(0x1001, "A"));
+        Assert.IsTrue(edit.Commit());
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x1001, out var changed));
+        Assert.AreEqual((byte)0x0A, changed);
+    }
 }
