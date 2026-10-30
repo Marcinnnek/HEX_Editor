@@ -70,7 +70,7 @@ public sealed class ExportOptionsDialog : Window
 
     public ExportOptions? Options { get; private set; }
 
-    private UIElement BuildPathPicker()
+    private FrameworkElement BuildPathPicker()
     {
         var panel = new DockPanel();
         var browse = new Button { Content = "Browse…", Margin = new Thickness(6, 0, 0, 0), Padding = new Thickness(8, 4, 8, 4) };
@@ -95,7 +95,7 @@ public sealed class ExportOptionsDialog : Window
         return panel;
     }
 
-    private UIElement BuildRange()
+    private FrameworkElement BuildRange()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         _start.Width = 130;
@@ -153,7 +153,7 @@ public sealed class ExportOptionsDialog : Window
             MessageBox.Show(this, "Select at least one occupied memory segment.", "No segments selected", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (File.Exists(_path.Text) && MessageBox.Show(this,
+        if (System.IO.File.Exists(_path.Text) && MessageBox.Show(this,
                 $"Replace the existing file at {System.IO.Path.GetFullPath(_path.Text)}?", "Confirm export overwrite",
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
