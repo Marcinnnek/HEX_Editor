@@ -266,7 +266,7 @@ public sealed class PreferencesSessionTests
                 Assert.AreEqual("Follow Windows", radios.Single(radio => radio.IsChecked == true).Content);
                 CollectionAssert.AreEquivalent(new[] { 2d, 1d },
                     Children<Slider>(window).Select(slider => slider.Value).ToArray());
-                CollectionAssert.AreEquivalent(new[] { "Cancel", "Save", "Choose…", "Choose…", "Choose…", "Reset palette" },
+                CollectionAssert.AreEquivalent(new[] { "Cancel", "Save", "Choose…", "Choose…", "Choose…", "Choose…", "Reset palette" },
                     Children<Wpf.Ui.Controls.Button>(window)
                         .Select(button => button.Content?.ToString()).ToArray());
                 var paletteSelector = Children<ComboBox>(window).Single(combo => combo.Name == "ComparisonPaletteSelector");

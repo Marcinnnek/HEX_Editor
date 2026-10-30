@@ -207,6 +207,13 @@ public sealed class MemoryComparisonModel
             _comparisonStatus = "No differences";
             progress?.Report(new ComparisonProgress("Comparison complete", (long)Math.Min(_fileA.OccupiedByteCount, long.MaxValue),
                 (long)Math.Min(_fileA.OccupiedByteCount, long.MaxValue)));
+            cancellationToken.ThrowIfCancellationRequested();
+            return;
+        }
+
+        if (TrySummarizeRepeatedRanges(cancellationToken, progress, out var repeatedStatus))
+        {
+            _comparisonStatus = repeatedStatus;
             return;
         }
 
@@ -236,6 +243,68 @@ public sealed class MemoryComparisonModel
         _comparisonStatus = total == 0
             ? "No differences"
             : $"{total:N0} differences ({different:N0} different, {onlyA:N0} only in File A, {onlyB:N0} only in File B)";
+    }
+
+    private bool TrySummarizeRepeatedRanges(CancellationToken cancellationToken, IProgress<ComparisonProgress>? progress, out string status)
+    {
+        status = string.Empty;
+        if (_fileA.Ranges.Count > 1 || _fileB.Ranges.Count > 1) return false;
+        var rangeA = _fileA.Ranges.Count == 1 ? _fileA.Ranges[0] : null;
+        var rangeB = _fileB.Ranges.Count == 1 ? _fileB.Ranges[0] : null;
+        if ((rangeA is not null && !rangeA.IsRepeated) || (rangeB is not null && !rangeB.IsRepeated)) return false;
+        if (rangeA is null && rangeB is null) { status = "No differences"; return true; }
+        var start = rangeA?.StartAddress ?? rangeB!.StartAddress;
+        var end = rangeA?.EndAddress ?? rangeB!.EndAddress;
+        if (rangeA is not null && rangeB is not null &&
+            (rangeA.StartAddress != rangeB.StartAddress || rangeA.EndAddress != rangeB.EndAddress)) return false;
+
+        var cycle = rangeA is null ? (ulong)rangeB!.RepetitionLength : rangeB is null ? (ulong)rangeA.RepetitionLength :
+            (ulong)LeastCommonMultiple(rangeA.RepetitionLength, rangeB.RepetitionLength);
+        var length = (ulong)end - start + 1;
+        var sampleLength = Math.Min(length, (ulong)cycle);
+        long different = 0, onlyA = 0, onlyB = 0;
+        for (ulong offset = 0; offset < sampleLength; offset++)
+        {
+            if ((offset & 0xFFF) == 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new ComparisonProgress("Comparing repeated bytes", (long)offset, (long)length));
+            }
+            switch (GetState((uint)((ulong)start + offset)))
+            {
+                case CompareByteState.Different: different++; break;
+                case CompareByteState.OnlyA: onlyA++; break;
+                case CompareByteState.OnlyB: onlyB++; break;
+            }
+        }
+        var repetitions = length / sampleLength;
+        var remainder = length % sampleLength;
+        different *= (long)repetitions;
+        onlyA *= (long)repetitions;
+        onlyB *= (long)repetitions;
+        for (ulong offset = 0; offset < remainder; offset++)
+        {
+            switch (GetState((uint)((ulong)start + offset)))
+            {
+                case CompareByteState.Different: different++; break;
+                case CompareByteState.OnlyA: onlyA++; break;
+                case CompareByteState.OnlyB: onlyB++; break;
+            }
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new ComparisonProgress("Comparison complete", (long)length, (long)length));
+        cancellationToken.ThrowIfCancellationRequested();
+        var total = different + onlyA + onlyB;
+        status = total == 0 ? "No differences" :
+            $"{total:N0} differences ({different:N0} different, {onlyA:N0} only in File A, {onlyB:N0} only in File B)";
+        return true;
+    }
+
+    private static long LeastCommonMultiple(int left, int right) => (long)left / GreatestCommonDivisor(left, right) * right;
+    private static int GreatestCommonDivisor(int left, int right)
+    {
+        while (right != 0) (left, right) = (right, left % right);
+        return left;
     }
 
     private static bool ImagesHaveSameRanges(MemoryImage left, MemoryImage right)

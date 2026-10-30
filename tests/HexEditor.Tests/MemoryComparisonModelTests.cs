@@ -106,6 +106,33 @@ public sealed class MemoryComparisonModelTests
     }
 
     [TestMethod]
+    public void ComparisonModel_FullRepeatedRangeAgainstEmptyCountsDifferencesWithoutScanningEveryAddress()
+    {
+        var image = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xA5);
+
+        var timer = Stopwatch.StartNew();
+        var comparison = new MemoryComparisonModel(image, MemoryImage.Empty, bytesPerRow: 8);
+        timer.Stop();
+
+        Assert.IsTrue(timer.Elapsed < TimeSpan.FromSeconds(2), $"Summarizing a repeated full range took {timer.Elapsed}.");
+        Assert.AreEqual($"{4_294_967_296L:N0} differences (0 different, {4_294_967_296L:N0} only in File A, 0 only in File B)", comparison.ComparisonStatus);
+    }
+
+    [TestMethod]
+    public void ComparisonModel_DifferentFullRepeatedRangesCountEveryDifferenceWithoutScanningEveryAddress()
+    {
+        var left = MemoryImage.FromPatternRange(0, uint.MaxValue, [0xA5, 0x5A]);
+        var right = MemoryImage.FromPatternRange(0, uint.MaxValue, [0xA5, 0x6A]);
+
+        var timer = Stopwatch.StartNew();
+        var comparison = new MemoryComparisonModel(left, right, bytesPerRow: 8);
+        timer.Stop();
+
+        Assert.IsTrue(timer.Elapsed < TimeSpan.FromSeconds(2), $"Summarizing differing repeated full ranges took {timer.Elapsed}.");
+        Assert.AreEqual($"{2_147_483_648L:N0} differences ({2_147_483_648L:N0} different, 0 only in File A, 0 only in File B)", comparison.ComparisonStatus);
+    }
+
+    [TestMethod]
     public void ComparisonModel_TenMegabyteOpenAndVirtualRowAccessStayBounded()
     {
         const int imageSize = 10 * 1024 * 1024;
