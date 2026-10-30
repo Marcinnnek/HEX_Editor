@@ -12,14 +12,6 @@ public partial class HexViewControl : UserControl
     public HexViewControl()
     {
         InitializeComponent();
-        RowGap = new Thickness(0, 0, 0, GridSpacingSettings.Current.VerticalRowSpacing);
-        Loaded += (_, _) =>
-        {
-            GridSpacingSettings.SpacingChanged -= SpacingChanged;
-            GridSpacingSettings.SpacingChanged += SpacingChanged;
-            SpacingChanged();
-        };
-        Unloaded += (_, _) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
     }
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
@@ -65,9 +57,6 @@ public partial class HexViewControl : UserControl
         if (owner is HexViewControl control)
             control.AsciiColumn.Visibility = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
     }
-
-    private void SpacingChanged() => Dispatcher.BeginInvoke(() =>
-        RowGap = new Thickness(0, 0, 0, GridSpacingSettings.Current.VerticalRowSpacing));
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)
     {
