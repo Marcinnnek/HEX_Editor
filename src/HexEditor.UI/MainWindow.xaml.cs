@@ -44,7 +44,6 @@ public partial class MainWindow : FluentWindow
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
         _compareWorkflow = new CompareCurrentImageWorkflow(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
-        ViewModel.ImageChanged += ViewModel_ImageChanged;
         HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         DataContext = this;
         Closing += MainWindow_Closing;
