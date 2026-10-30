@@ -107,6 +107,22 @@ public sealed class EditorDocumentWorkspace
     public EditorDocument GetActiveDocument(CompareWorkspaceTabViewModel? activeComparison) =>
         activeComparison?.BaseDocument ?? Document;
 
+    /// <summary>Returns dirty editable documents in application-close prompt order, once per document.</summary>
+    public IReadOnlyList<EditorDocument> GetDirtyEditableDocuments()
+    {
+        var documents = new List<EditorDocument>();
+        var seen = new HashSet<EditorDocument>();
+        AddIfDirty(Document);
+        foreach (var view in _comparisonViews)
+            if (view.BaseDocument is { } document) AddIfDirty(document);
+        return documents;
+
+        void AddIfDirty(EditorDocument document)
+        {
+            if (document.IsModified && seen.Add(document)) documents.Add(document);
+        }
+    }
+
     public MemoryImageImportPreview PrepareOpen(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

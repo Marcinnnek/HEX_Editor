@@ -261,4 +261,68 @@ public sealed class EditorDocumentWorkspaceTests
         CollectionAssert.AreEqual(new[] { unrelatedCompare }, workspace.ComparisonViews.ToArray());
         Assert.AreSame(unrelatedImage, workspace.Document.CurrentImage);
     }
+
+    [TestMethod]
+    public void DirtyEditableDocumentsAreReturnedOnceInEditorThenCompareOrder()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        var editor = workspace.Document;
+        editor.Editing.EditByte(0x10, 0x11, OverlapDecision.OverwriteIncoming);
+
+        var sharedOwner = new EditorDocumentWorkspace();
+        sharedOwner.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x20, [0x21])]),
+            "shared.hex", MemoryImageExportFormat.IntelHex, isModified: true);
+        var shared = sharedOwner.Document;
+        shared.Editing.EditByte(0x20, 0x22, OverlapDecision.OverwriteIncoming);
+        var otherOwner = new EditorDocumentWorkspace();
+        otherOwner.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x30, [0x31])]),
+            "other.hex", MemoryImageExportFormat.IntelHex, isModified: true);
+        var other = otherOwner.Document;
+        other.Editing.EditByte(0x30, 0x32, OverlapDecision.OverwriteIncoming);
+        var reference = MemoryImage.FromSegments([new MemorySegment(0x40, [0x41])]);
+        workspace.RegisterComparisonView(new CompareWorkspaceTabViewModel(shared.CurrentImage, reference,
+            "shared.hex", "reference.hex", baseDocument: shared));
+        workspace.RegisterComparisonView(new CompareWorkspaceTabViewModel(shared.CurrentImage, reference,
+            "shared.hex", "reference-2.hex", baseDocument: shared));
+        workspace.RegisterComparisonView(new CompareWorkspaceTabViewModel(other.CurrentImage, reference,
+            "other.hex", "reference-3.hex", baseDocument: other));
+
+        CollectionAssert.AreEqual(new[] { editor, shared, other }, workspace.GetDirtyEditableDocuments().ToArray());
+
+        var path = Path.Combine(Path.GetTempPath(), $"clean-{Guid.NewGuid():N}.hex");
+        try
+        {
+            shared.SaveAs(path, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
+            CollectionAssert.AreEqual(new[] { editor, other }, workspace.GetDirtyEditableDocuments().ToArray());
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    [TestMethod]
+    public void CancelingALaterCloseConfirmationKeepsEarlierDontSaveDocumentsDirty()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.EditByte(0x10, 0x11, OverlapDecision.OverwriteIncoming);
+        var compareOwner = new EditorDocumentWorkspace();
+        compareOwner.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x20, [0x21])]),
+            "compare.hex", MemoryImageExportFormat.IntelHex);
+        var compareDocument = compareOwner.Document;
+        compareDocument.Editing.EditByte(0x20, 0x22, OverlapDecision.OverwriteIncoming);
+        var comparison = new CompareWorkspaceTabViewModel(compareDocument.CurrentImage,
+            MemoryImage.FromSegments([new MemorySegment(0x20, [0x99])]), "compare.hex", "reference.hex",
+            baseDocument: compareDocument);
+        workspace.RegisterComparisonView(comparison);
+
+        var prompted = new List<EditorDocument>();
+        var allowed = DirtyDocumentCloseWorkflow.ConfirmAll(workspace, document =>
+        {
+            prompted.Add(document);
+            return prompted.Count == 1; // Don't save Editor, then cancel at Compare.
+        });
+
+        Assert.IsFalse(allowed);
+        CollectionAssert.AreEqual(new[] { workspace.Document, compareDocument }, prompted.ToArray());
+        Assert.IsTrue(workspace.Document.IsModified);
+        Assert.IsTrue(compareDocument.IsModified);
+    }
 }
