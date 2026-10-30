@@ -10,13 +10,13 @@ public sealed class RelocateSegmentDialog : Window
 {
     private readonly TextBox _destination;
     private readonly TextBlock _preview = new() { Margin = new Thickness(0, 8, 0, 12) };
-    private readonly int _byteCount;
+    private readonly long _byteCount;
     private readonly uint _startAddress;
     private readonly uint _endAddress;
     private readonly Func<string, bool> _confirmDelete;
 
-    public RelocateSegmentDialog(uint startAddress, uint endAddress, int byteCount, bool canDelete = true,
-        Func<string, bool>? confirmDelete = null)
+    public RelocateSegmentDialog(uint startAddress, uint endAddress, long byteCount, bool canDelete = true,
+        Func<string, bool>? confirmDelete = null, bool canRelocate = true)
     {
         _byteCount = byteCount;
         _startAddress = startAddress;
@@ -43,8 +43,6 @@ public sealed class RelocateSegmentDialog : Window
         panel.Children.Add(_preview);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(0, 0, 8, 0) };
-        var apply = new Button { Content = "Continue", IsDefault = true, MinWidth = 80 };
-        apply.Click += (_, _) => { if (TryGetDestination(out _)) { Action = RelocateSegmentDialogAction.Continue; DialogResult = true; } };
         buttons.Children.Add(cancel);
         if (canDelete)
         {
@@ -57,7 +55,12 @@ public sealed class RelocateSegmentDialog : Window
             };
             buttons.Children.Add(delete);
         }
-        buttons.Children.Add(apply);
+        if (canRelocate)
+        {
+            var apply = new Button { Content = "Continue", IsDefault = true, MinWidth = 80 };
+            apply.Click += (_, _) => { if (TryGetDestination(out _)) { Action = RelocateSegmentDialogAction.Continue; DialogResult = true; } };
+            buttons.Children.Add(apply);
+        }
         panel.Children.Add(buttons);
         Content = panel;
         Loaded += (_, _) =>
@@ -111,7 +114,7 @@ public sealed class RelocateSegmentDialog : Window
     private bool TryGetDestination(out uint destination)
     {
         if (HexAddressParser.TryParse(_destination.Text, out destination) && _byteCount > 0 &&
-            (ulong)destination + (uint)_byteCount - 1 <= uint.MaxValue)
+            (ulong)destination + (ulong)_byteCount - 1 <= uint.MaxValue)
         {
             DestinationAddress = destination;
             return true;
@@ -125,10 +128,10 @@ public sealed class RelocateSegmentDialog : Window
     private void UpdatePreview()
     {
         if (HexAddressParser.TryParse(_destination.Text, out var destination) && _byteCount > 0 &&
-            (ulong)destination + (uint)_byteCount - 1 <= uint.MaxValue)
+            (ulong)destination + (ulong)_byteCount - 1 <= uint.MaxValue)
         {
             _preview.SetResourceReference(TextBlock.ForegroundProperty, "HexTextBrush");
-            _preview.Text = $"New range: 0x{destination:X8}–0x{destination + (uint)_byteCount - 1:X8}";
+            _preview.Text = $"New range: 0x{destination:X8}–0x{(uint)((ulong)destination + (ulong)_byteCount - 1):X8}";
         }
         else
         {

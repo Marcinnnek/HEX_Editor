@@ -614,7 +614,7 @@ public partial class MainWindow : Window
         try
         {
             var (address, _) = GetSelectionDefaults();
-            _imageEdits.Paste(address, AskOverlap);
+            _imageEdits.Paste(address, AskPasteOverlap);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -643,6 +643,19 @@ public partial class MainWindow : Window
         {
             YesNoCancelChoice.Yes => OverlapDecision.OverwriteIncoming,
             YesNoCancelChoice.No => OverlapDecision.KeepExisting,
+            _ => OverlapDecision.Cancel
+        };
+    }
+
+    private OverlapDecision AskPasteOverlap(long count, string operation)
+    {
+        var result = ThemedMessageBox.Show(this,
+            $"This {operation} overlaps {count:N0} occupied byte(s). Keep existing values or overwrite them?",
+            "Resolve overlap", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        return result switch
+        {
+            MessageBoxResult.Yes => OverlapDecision.KeepExisting,
+            MessageBoxResult.No => OverlapDecision.OverwriteIncoming,
             _ => OverlapDecision.Cancel
         };
     }
@@ -969,8 +982,8 @@ public partial class MainWindow : Window
     {
         var compareView = WorkspaceTabs.SelectedContent as CompareView;
         var document = compareView?.Workspace.BaseDocument ?? ViewModel.Workspace.Document;
-        var exportSegments = document.CurrentImage.Segments.Select(segment => new MemorySegmentRow(
-            segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount)).ToArray();
+        var exportSegments = document.CurrentImage.Ranges.Select((range, index) => new MemorySegmentRow(
+            range.StartAddress.ToString("X8"), range.EndAddress.ToString("X8"), checked((long)range.ByteCount), index + 1)).ToArray();
         var selectedSegments = compareView is null
             ? SegmentsGrid.SelectedItems.Cast<MemorySegmentRow>().Select(ViewModel.Segments.IndexOf).ToArray()
             : compareView.SelectedBaseSegmentIndexes;
@@ -1011,22 +1024,24 @@ public partial class MainWindow : Window
 
     private void RelocateSegment_Click(object sender, RoutedEventArgs e)
     {
-        var segmentIndex = SegmentsGrid.SelectedIndex;
-        if ((uint)segmentIndex >= (uint)ViewModel.CurrentImage.Ranges.Count)
+        var rangeIndex = SegmentsGrid.SelectedIndex;
+        if ((uint)rangeIndex >= (uint)ViewModel.CurrentImage.Ranges.Count)
         {
             MessageBox.Show(this, "Select an occupied segment to relocate.", "No segment selected",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var segment = ViewModel.CurrentImage.Segments[segmentIndex];
-        var dialog = new RelocateSegmentDialog(segment.StartAddress, segment.EndAddress, segment.ByteCount,
-            canDelete: SegmentsGrid.SelectedItems.Count == 1) { Owner = this };
+        var range = ViewModel.CurrentImage.Ranges[rangeIndex];
+        var segmentIndex = ViewModel.CurrentImage.Segments.ToList().FindIndex(segment =>
+            segment.StartAddress == range.StartAddress && segment.EndAddress == range.EndAddress);
+        var dialog = new RelocateSegmentDialog(range.StartAddress, range.EndAddress, checked((long)range.ByteCount),
+            canDelete: SegmentsGrid.SelectedItems.Count == 1, canRelocate: segmentIndex >= 0) { Owner = this };
         if (dialog.ShowDialog() != true) return;
 
         if (dialog.DeleteRequested)
         {
-            var nextSegmentIndex = ViewModel.Workspace.DeleteBlock(segmentIndex);
+            var nextSegmentIndex = ViewModel.Workspace.DeleteBlock(rangeIndex);
             _suppressSegmentNavigation = true;
             try
             {

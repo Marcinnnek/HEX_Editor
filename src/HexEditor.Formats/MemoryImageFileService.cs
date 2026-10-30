@@ -48,16 +48,17 @@ public sealed class MemoryImageFileService
         if (indexes.Length == 0)
             throw new InvalidOperationException("Select at least one occupied segment to export.");
 
-        var selectedSegments = new List<HexEditor.Core.MemorySegment>(indexes.Length);
+        var selectedRanges = new List<HexEditor.Core.MemoryImageRange>(indexes.Length);
         foreach (var index in indexes)
         {
-            if ((uint)index >= (uint)image.Segments.Count)
+            if ((uint)index >= (uint)image.Ranges.Count)
                 throw new ArgumentOutOfRangeException(nameof(segmentIndexes), index,
-                    $"Segment index {index} is outside the available range 0-{image.Segments.Count - 1}.");
-            selectedSegments.Add(image.Segments[index]);
+                    $"Segment index {index} is outside the available range 0-{image.Ranges.Count - 1}.");
+            selectedRanges.Add(image.Ranges[index]);
         }
 
-        Export(HexEditor.Core.MemoryImage.FromSegments(selectedSegments), format, maxDataBytesPerRecord, output,
+        var selectedByteCount = selectedRanges.Aggregate(0UL, (count, range) => checked(count + range.ByteCount));
+        ExportSelectedImage(selectedRanges, selectedByteCount, format, maxDataBytesPerRecord, output,
             formatMetadata, cancellationToken, progress);
     }
 

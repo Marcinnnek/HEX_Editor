@@ -41,6 +41,25 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void Import_OverlaysSmallInputOnLogicalFullRangeImage()
+    {
+        var source = new MemoryStream(Encoding.ASCII.GetBytes(":020001000102FA\n:00000001FF\n"));
+        var existing = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xEE);
+
+        var imported = new MemoryImageFileService().PrepareImport(source, existing).Apply(OverlapDecision.OverwriteIncoming)!;
+
+        Assert.AreEqual(4_294_967_296UL, imported.Image.OccupiedByteCount);
+        Assert.IsTrue(imported.Image.TryGetByte(0, out var before));
+        Assert.IsTrue(imported.Image.TryGetByte(1, out var firstImported));
+        Assert.IsTrue(imported.Image.TryGetByte(2, out var secondImported));
+        Assert.IsTrue(imported.Image.TryGetByte(3, out var after));
+        Assert.AreEqual((byte)0xEE, before);
+        Assert.AreEqual((byte)0x01, firstImported);
+        Assert.AreEqual((byte)0x02, secondImported);
+        Assert.AreEqual((byte)0xEE, after);
+    }
+
+    [TestMethod]
     public void Import_NonSeekableInputUsesBoundedDiskStagingAndReportsReadProgress()
     {
         const string intelHex = ":02000000AABB99\n:00000001FF\n";

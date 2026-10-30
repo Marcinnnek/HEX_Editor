@@ -116,12 +116,12 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
         foreach (var row in CreateRows(image)) rows.Add(row);
     }
 
-    private static IReadOnlyList<CompareMemoryBlockRow> CreateRows(MemoryImage image) => image.Segments
-        .Select((segment, index) => new CompareMemoryBlockRow(index + 1, segment.StartAddress, segment.EndAddress, segment.ByteCount))
+    private static IReadOnlyList<CompareMemoryBlockRow> CreateRows(MemoryImage image) => image.Ranges
+        .Select((range, index) => new CompareMemoryBlockRow(index + 1, range.StartAddress, range.EndAddress, checked((long)range.ByteCount)))
         .ToArray();
 }
 
-public sealed record CompareMemoryBlockRow(int Number, uint StartAddress, uint EndAddress, int ByteCount)
+public sealed record CompareMemoryBlockRow(int Number, uint StartAddress, uint EndAddress, long ByteCount)
 {
     public string StartText => StartAddress.ToString("X8");
     public string EndText => EndAddress.ToString("X8");
