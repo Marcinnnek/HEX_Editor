@@ -132,6 +132,62 @@ public sealed class EditorDocumentWorkspaceTests
     }
 
     [TestMethod]
+    public void OpenReplacesCurrentImageWithoutImportingOrCreatingUndoHistory()
+    {
+        var oldPath = Path.Combine(Path.GetTempPath(), $"hex-editor-old-{Guid.NewGuid():N}.hex");
+        var newPath = Path.Combine(Path.GetTempPath(), $"hex-editor-new-{Guid.NewGuid():N}.hex");
+        File.WriteAllText(oldPath, ":0100100010DF\n:00000001FF\n");
+        File.WriteAllText(newPath, ":0100200020BF\n:00000001FF\n");
+        try
+        {
+            var workspace = new EditorDocumentWorkspace();
+            Assert.IsTrue(workspace.Open(oldPath, OverlapDecision.OverwriteIncoming));
+            Assert.IsTrue(workspace.Open(newPath, OverlapDecision.OverwriteIncoming));
+
+            Assert.AreEqual(Path.GetFullPath(newPath), workspace.Document.SourcePath);
+            Assert.IsFalse(workspace.Document.IsModified);
+            Assert.IsFalse(workspace.Document.CanUndo);
+            Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x10, out _));
+            Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x20, out var replacementByte));
+            Assert.AreEqual((byte)0x20, replacementByte);
+        }
+        finally
+        {
+            File.Delete(oldPath);
+            File.Delete(newPath);
+        }
+    }
+
+    [TestMethod]
+    public void OpeningSamePathReloadsDiskContentsAndFailureAfterDontSaveRetainsMemoryEdits()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-reload-{Guid.NewGuid():N}.hex");
+        File.WriteAllText(path, ":0100100010DF\n:00000001FF\n");
+        try
+        {
+            var workspace = new EditorDocumentWorkspace();
+            Assert.IsTrue(workspace.Open(path, OverlapDecision.OverwriteIncoming));
+            workspace.EditByte(0x10, 0x11, OverlapDecision.OverwriteIncoming);
+            File.WriteAllText(path, ":0100100020CF\n:00000001FF\n");
+
+            Assert.IsTrue(workspace.Open(path, OverlapDecision.OverwriteIncoming));
+            Assert.IsFalse(workspace.Document.IsModified);
+            Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x10, out var reloadedByte));
+            Assert.AreEqual((byte)0x20, reloadedByte);
+
+            workspace.EditByte(0x10, 0x30, OverlapDecision.OverwriteIncoming);
+            var oldDocument = workspace.Document;
+            File.WriteAllText(path, "not a firmware image");
+            Assert.Throws<FormatException>(() => workspace.Open(path, OverlapDecision.OverwriteIncoming));
+            Assert.AreSame(oldDocument, workspace.Document);
+            Assert.IsTrue(workspace.Document.IsModified);
+            Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x10, out var retainedByte));
+            Assert.AreEqual((byte)0x30, retainedByte);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [TestMethod]
     public void CloseReleasesTheActiveDocumentWithoutChangingItsSnapshot()
     {
         var workspace = new EditorDocumentWorkspace();
