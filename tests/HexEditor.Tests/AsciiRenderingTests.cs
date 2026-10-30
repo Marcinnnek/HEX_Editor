@@ -38,6 +38,28 @@ public sealed class AsciiRenderingTests
         Assert.AreNotEqual(light.AlphaAt(unchangedX, 1), dark.AlphaAt(unchangedX, 1));
     }
 
+    [STATestMethod]
+    public void Find_indicator_remains_visible_alongside_difference_background_and_edited_outline()
+    {
+        var row = new HexViewRow("00001000", "20", " ", false, null)
+        {
+            Cells = [new HexByteCell("20", " ", 0x1000, ByteHighlightState.Different, IsFindMatch: true, IsEdited: true)]
+        };
+        foreach (var isAscii in new[] { false, true })
+        {
+            var control = new HexByteRowControl { Row = row, IsAscii = isAscii, FontFamily = new FontFamily("Consolas"), FontSize = 16 };
+            control.Resources["HexDifferentBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0x30, 0x30, 0x30));
+            control.Resources["HexEditedByteBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0xFF, 0x00, 0x00));
+            control.Resources["HexFindMatchBrush"] = new SolidColorBrush(Color.FromArgb(0xFF, 0x00, 0x00, 0xFF));
+
+            var pixels = Render(control);
+
+            Assert.IsGreaterThan(0, pixels.CountExact(0xFF, 0x00, 0x00), "The edited outline must remain visible.");
+            Assert.IsGreaterThan(0, pixels.CountExact(0x00, 0x00, 0xFF), "The Find indicator must remain visible.");
+            Assert.IsGreaterThan(0, pixels.CountExact(0x30, 0x30, 0x30), "The difference background must remain visible.");
+        }
+    }
+
     private static PixelBuffer Render(HexByteRowControl control)
     {
         control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -55,5 +77,7 @@ public sealed class AsciiRenderingTests
     private sealed record PixelBuffer(byte[] Pixels, int Width)
     {
         public byte AlphaAt(int x, int y) => Pixels[(y * Width + x) * 4 + 3];
+        public int CountExact(byte red, byte green, byte blue) => Enumerable.Range(0, Pixels.Length / 4)
+            .Count(index => Pixels[index * 4 + 2] == red && Pixels[index * 4 + 1] == green && Pixels[index * 4] == blue);
     }
 }
