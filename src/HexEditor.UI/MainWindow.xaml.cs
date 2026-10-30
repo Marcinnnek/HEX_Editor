@@ -211,13 +211,25 @@ public partial class MainWindow : FluentWindow
 
             var view = new CompareView(comparison);
             view.StatusRequested += ViewModel.ReportCompareInteraction;
+            view.ActivationFailed += (exception, side, rowIndex, address) =>
+            {
+                _diagnostics.RecordError($"Compare {side} row activation row {rowIndex}", exception, address, address);
+            };
             view.BaseRowActivated += (rowStartAddress, address) =>
             {
                 if (comparison.BaseDocument is not { } baseDocument) return;
-                var edit = ViewModel.Workspace.BeginEditRow(baseDocument, rowStartAddress, address,
-                    comparison.Comparison.BytesPerRow);
-                var dialog = new EditRowWindow(edit) { Owner = this };
-                dialog.ShowDialog();
+                try
+                {
+                    var edit = ViewModel.Workspace.BeginEditRow(baseDocument, rowStartAddress, address,
+                        comparison.Comparison.BytesPerRow);
+                    var dialog = new EditRowWindow(edit) { Owner = this };
+                    dialog.ShowDialog();
+                }
+                catch (Exception exception)
+                {
+                    _diagnostics.RecordError("Compare row activation", exception, address, address);
+                    ViewModel.ReportCompareInteraction($"Unable to open the editor for Compare address 0x{address:X8}.");
+                }
             };
             var tab = new TabItem { Content = view };
             tab.Header = CreateCompareTabHeader(comparison, tab);

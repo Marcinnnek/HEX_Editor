@@ -39,6 +39,7 @@ public partial class CompareView : UserControl
     public CompareViewMode[] ViewModes { get; }
     public event Action<uint, uint>? BaseRowActivated;
     public event Action<string>? StatusRequested;
+    public event Action<Exception, ComparePanelSide, int, uint?>? ActivationFailed;
 
     public void RefreshImage(MemoryImage previousImage, MemoryImage updatedImage)
     {
@@ -93,6 +94,12 @@ public partial class CompareView : UserControl
             var context = address is uint selected ? $"0x{selected:X8}" : "unknown address";
             Trace.TraceError($"Compare row activation failed: side={side}, rowIndex={rowIndex}, address={context}, " +
                 $"exception={exception.GetType().Name}, hresult=0x{exception.HResult:X8}");
+            try { ActivationFailed?.Invoke(exception, side, rowIndex, address); }
+            catch (Exception diagnosticException)
+            {
+                Trace.TraceError($"Compare row diagnostic callback failed: side={side}, rowIndex={rowIndex}, " +
+                    $"exception={diagnosticException.GetType().Name}, hresult=0x{diagnosticException.HResult:X8}");
+            }
             try { StatusRequested?.Invoke($"Unable to activate Compare row at {context}."); }
             catch (Exception notificationException)
             {
