@@ -81,7 +81,9 @@ public partial class CompareView : UserControl
         _lastSelectedSide = side;
         ViewModel.ClearFindMatch();
         ViewModel.SetFindMatch(side == ComparePanelSide.Base, start, end);
-        Navigate(start);
+        AddressBox.Text = start.ToString("X8");
+        if (!ViewModel.TryNavigateToAddress(start, out var rowIndex)) return;
+        SelectFindMatchRow(rowIndex);
     }
 
     private void Panel_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -243,6 +245,20 @@ public partial class CompareView : UserControl
             FileBView.ItemsGrid.SelectedIndex = index;
             FileAView.ItemsGrid.ScrollIntoView(FileAView.ItemsGrid.Items[index]);
             FileBView.ItemsGrid.ScrollIntoView(FileBView.ItemsGrid.Items[index]);
+        }
+        finally { _syncingScroll = false; }
+    }
+
+    private void SelectFindMatchRow(int index)
+    {
+        if ((uint)index >= (uint)ViewModel.FileARows.Count) return;
+        _syncingScroll = true;
+        try
+        {
+            FileAView.ItemsGrid.SelectedIndex = index;
+            FileBView.ItemsGrid.SelectedIndex = index;
+            FileAView.ScrollToMatch(index);
+            FileBView.ScrollToMatch(index);
         }
         finally { _syncingScroll = false; }
     }
