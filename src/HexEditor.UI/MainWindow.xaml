@@ -1,63 +1,69 @@
-<Window x:Class="HexEditor.UI.MainWindow"
+<ui:FluentWindow x:Class="HexEditor.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HexEditor.UI"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
         Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640">
     <DockPanel Margin="12">
         <Menu DockPanel.Dock="Top" Margin="0,0,0,8">
-            <MenuItem Header="_File">
-                <MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" />
+            <ui:MenuItem Header="_File">
+                <ui:MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" />
                 <Separator />
-                <MenuItem Header="Save" Click="Save_Click" />
-                <MenuItem Header="Save As..." Click="SaveAs_Click" />
-                <MenuItem Header="Close Image" Click="CloseImage_Click" />
+                <ui:MenuItem Header="Save" Click="Save_Click" />
+                <ui:MenuItem Header="Save As..." Click="SaveAs_Click" />
+                <ui:MenuItem Header="Close Image" Click="CloseImage_Click" />
                 <Separator />
-                <MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
-                <MenuItem Header="Export address range..." Click="ExportRange_Click" />
-            </MenuItem>
-            <MenuItem Header="_Edit">
-                <MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.CanUndo}" />
-                <MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.CanRedo}" />
+                <ui:MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
+                <ui:MenuItem Header="Export address range..." Click="ExportRange_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_Edit">
+                <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.CanUndo}" />
+                <ui:MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.CanRedo}" />
                 <Separator />
-                <MenuItem Header="Edit / Insert" Click="EditInsert_Click" />
-                <MenuItem Header="Fill range" Click="Fill_Click" />
-                <MenuItem Header="Copy range" Click="Copy_Click" />
-                <MenuItem Header="Cut range" Click="Cut_Click" />
-                <MenuItem Header="Paste at start" Click="Paste_Click" />
-                <MenuItem Header="Delete range" Click="Delete_Click" />
-            </MenuItem>
-            <MenuItem Header="_View">
-                <MenuItem Header="8 bytes per row" Click="RowWidth8_Click" />
-                <MenuItem Header="16 bytes per row" Click="RowWidth16_Click" />
-                <MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
+                <ui:MenuItem Header="Edit / Insert" Click="EditInsert_Click" />
+                <ui:MenuItem Header="Fill range" Click="Fill_Click" />
+                <ui:MenuItem Header="Copy range" Click="Copy_Click" />
+                <ui:MenuItem Header="Cut range" Click="Cut_Click" />
+                <ui:MenuItem Header="Paste at start" Click="Paste_Click" />
+                <ui:MenuItem Header="Delete range" Click="Delete_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_View">
+                <ui:MenuItem Header="8 bytes per row" Click="RowWidth8_Click" />
+                <ui:MenuItem Header="16 bytes per row" Click="RowWidth16_Click" />
+                <ui:MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
                 <Separator />
-                <MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ImageView.ShowAscii, Mode=TwoWay}" />
-                <MenuItem Header="Go to address" Click="GoToAddress_Click" />
-                <MenuItem Header="Select range" Click="SelectRange_Click" />
-            </MenuItem>
-            <MenuItem Header="_Compare">
-                <MenuItem Header="Compare images..." Click="CompareImages_Click" />
-            </MenuItem>
-            <MenuItem Header="_Merge">
-                <MenuItem Header="Merge images..." Click="MergeImages_Click" />
-            </MenuItem>
-            <MenuItem Header="_Tools">
-                <MenuItem Header="Calculate checksum / CRC" Click="CalculateChecksum_Click" />
-                <MenuItem Header="Write checksum result" Click="WriteChecksum_Click" />
-                <MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" />
-            </MenuItem>
-            <MenuItem Header="E_xport">
-                <MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
-                <MenuItem Header="Export address range..." Click="ExportRange_Click" />
-            </MenuItem>
+                <ui:MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ImageView.ShowAscii, Mode=TwoWay}" />
+                <ui:MenuItem Header="Go to address" Click="GoToAddress_Click" />
+                <ui:MenuItem Header="Select range" Click="SelectRange_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_Compare">
+                <ui:MenuItem Header="Compare images..." Click="CompareImages_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_Merge">
+                <ui:MenuItem Header="Merge images..." Click="MergeImages_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_Tools">
+                <ui:MenuItem Header="Calculate checksum / CRC" Click="CalculateChecksum_Click" />
+                <ui:MenuItem Header="Write checksum result" Click="WriteChecksum_Click" />
+                <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_Appearance">
+                <ui:MenuItem x:Name="AutomaticAppearanceItem" Header="Follow Windows" IsCheckable="True" Click="AutomaticAppearance_Click" />
+                <ui:MenuItem x:Name="LightAppearanceItem" Header="Light" IsCheckable="True" Click="LightAppearance_Click" />
+                <ui:MenuItem x:Name="DarkAppearanceItem" Header="Dark" IsCheckable="True" Click="DarkAppearance_Click" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="E_xport">
+                <ui:MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
+                <ui:MenuItem Header="Export address range..." Click="ExportRange_Click" />
+            </ui:MenuItem>
         </Menu>
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
             <Border x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="#FF8A8A8A" BorderThickness="1" Padding="6" Margin="0,0,0,6">
                 <DockPanel>
-                    <Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
+                    <ui:Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
                     <StackPanel>
                         <TextBlock x:Name="FileOperationText" Text="Working..." Margin="0,0,0,3" />
                         <ProgressBar x:Name="FileOperationProgress" Height="8" IsIndeterminate="True" />
@@ -65,37 +71,37 @@
                 </DockPanel>
             </Border>
             <WrapPanel Margin="0,0,0,6" VerticalAlignment="Center">
-                <Button Content="Open HEX / S-Record" Padding="10,5" Click="OpenImage_Click" Margin="0,0,6,0" />
-                <Button Content="Compare images" Padding="10,5" Click="CompareImages_Click" Margin="0,0,6,0" />
-                <Button Content="Merge images" Padding="10,5" Click="MergeImages_Click" Margin="0,0,6,0" />
-                <Button Content="Save" Padding="10,5" Click="Save_Click" Margin="0,0,6,0" />
-                <Button Content="Save As" Padding="10,5" Click="SaveAs_Click" Margin="0,0,6,0" />
-                <Button Content="Close Image" Padding="10,5" Click="CloseImage_Click" Margin="0,0,6,0" />
-                <Button Content="Undo" Padding="10,5" Click="Undo_Click" Margin="0,0,6,0" IsEnabled="{Binding ViewModel.CanUndo}" />
-                <Button Content="Redo" Padding="10,5" Click="Redo_Click" Margin="0,0,12,0" IsEnabled="{Binding ViewModel.CanRedo}" />
+                <ui:Button Content="Open HEX / S-Record" Padding="10,5" Click="OpenImage_Click" Margin="0,0,6,0" />
+                <ui:Button Content="Compare images" Padding="10,5" Click="CompareImages_Click" Margin="0,0,6,0" />
+                <ui:Button Content="Merge images" Padding="10,5" Click="MergeImages_Click" Margin="0,0,6,0" />
+                <ui:Button Content="Save" Padding="10,5" Click="Save_Click" Margin="0,0,6,0" />
+                <ui:Button Content="Save As" Padding="10,5" Click="SaveAs_Click" Margin="0,0,6,0" />
+                <ui:Button Content="Close Image" Padding="10,5" Click="CloseImage_Click" Margin="0,0,6,0" />
+                <ui:Button Content="Undo" Padding="10,5" Click="Undo_Click" Margin="0,0,6,0" IsEnabled="{Binding ViewModel.CanUndo}" />
+                <ui:Button Content="Redo" Padding="10,5" Click="Redo_Click" Margin="0,0,12,0" IsEnabled="{Binding ViewModel.CanRedo}" />
                 <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox Width="65" ItemsSource="{Binding ViewModel.RowWidths}"
                           SelectedItem="{Binding ViewModel.ImageView.BytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
                 <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ImageView.ShowAscii, UpdateSourceTrigger=PropertyChanged}"
                           VerticalAlignment="Center" Margin="12,0,12,0" />
                 <TextBlock Text="Go to" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <TextBox x:Name="AddressInput" Width="90" VerticalContentAlignment="Center" />
-                <Button Content="Go" Padding="8,4" Margin="4,0,0,0" Click="GoToAddress_Click" />
-                <Button Content="Relocate selected segment" Padding="8,4" Margin="8,0,0,0" Click="RelocateSegment_Click" />
+                <ui:TextBox x:Name="AddressInput" Width="90" VerticalContentAlignment="Center" />
+                <ui:Button Content="Go" Padding="8,4" Margin="4,0,0,0" Click="GoToAddress_Click" />
+                <ui:Button Content="Relocate selected segment" Padding="8,4" Margin="8,0,0,0" Click="RelocateSegment_Click" />
             </WrapPanel>
             <WrapPanel VerticalAlignment="Center">
                 <TextBlock Text="Start" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <TextBox x:Name="RangeStartInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,6,0" />
+                <ui:TextBox x:Name="RangeStartInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,6,0" />
                 <TextBlock Text="End" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <TextBox x:Name="RangeEndInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,8,0" />
-                <Button Content="Select range" Click="SelectRange_Click" Padding="8,4" Margin="0,0,6,0" ToolTip="Select the inclusive address range above" />
-                <TextBox x:Name="PatternInput" Width="130" ToolTip="Byte or repeating hexadecimal pattern, for example 00 FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
-                <Button Content="Edit / Insert" Click="EditInsert_Click" Padding="8,4" Margin="0,0,4,0" />
-                <Button Content="Fill" Click="Fill_Click" Padding="8,4" Margin="0,0,4,0" />
-                <Button Content="Copy" Click="Copy_Click" Padding="8,4" Margin="0,0,4,0" />
-                <Button Content="Cut" Click="Cut_Click" Padding="8,4" Margin="0,0,4,0" />
-                <Button Content="Paste at Start" Click="Paste_Click" Padding="8,4" Margin="0,0,4,0" />
-                <Button Content="Delete" Click="Delete_Click" Padding="8,4" />
+                <ui:TextBox x:Name="RangeEndInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,8,0" />
+                <ui:Button Content="Select range" Click="SelectRange_Click" Padding="8,4" Margin="0,0,6,0" ToolTip="Select the inclusive address range above" />
+                <ui:TextBox x:Name="PatternInput" Width="130" ToolTip="Byte or repeating hexadecimal pattern, for example 00 FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
+                <ui:Button Content="Edit / Insert" Click="EditInsert_Click" Padding="8,4" Margin="0,0,4,0" />
+                <ui:Button Content="Fill" Click="Fill_Click" Padding="8,4" Margin="0,0,4,0" />
+                <ui:Button Content="Copy" Click="Copy_Click" Padding="8,4" Margin="0,0,4,0" />
+                <ui:Button Content="Cut" Click="Cut_Click" Padding="8,4" Margin="0,0,4,0" />
+                <ui:Button Content="Paste at Start" Click="Paste_Click" Padding="8,4" Margin="0,0,4,0" />
+                <ui:Button Content="Delete" Click="Delete_Click" Padding="8,4" />
             </WrapPanel>
             <WrapPanel Margin="0,6,0,0" VerticalAlignment="Center">
                 <TextBlock Text="Checksum" VerticalAlignment="Center" Margin="0,0,4,0" />
@@ -116,21 +122,21 @@
                     <ComboBoxItem Content="Reject" />
                     <ComboBoxItem Content="Fill byte" />
                 </ComboBox>
-                <TextBox x:Name="HoleFillByteInput" Width="45" ToolTip="Fill byte in hex" Text="FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
+                <ui:TextBox x:Name="HoleFillByteInput" Width="45" ToolTip="Fill byte in hex" Text="FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
                 <TextBlock Text="Order" VerticalAlignment="Center" Margin="0,0,4,0" />
                 <ComboBox x:Name="ChecksumByteOrderInput" Width="100" SelectedIndex="0" Margin="0,0,6,0">
                     <ComboBoxItem Content="Big endian" />
                     <ComboBoxItem Content="Little endian" />
                 </ComboBox>
-                <TextBox x:Name="ChecksumPolynomialInput" Width="72" Text="1021" ToolTip="Custom CRC polynomial in hex" VerticalContentAlignment="Center" Margin="0,0,4,0" />
-                <TextBox x:Name="ChecksumInitialInput" Width="72" Text="FFFF" ToolTip="Custom CRC initial value in hex" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                <ui:TextBox x:Name="ChecksumPolynomialInput" Width="72" Text="1021" ToolTip="Custom CRC polynomial in hex" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                <ui:TextBox x:Name="ChecksumInitialInput" Width="72" Text="FFFF" ToolTip="Custom CRC initial value in hex" VerticalContentAlignment="Center" Margin="0,0,4,0" />
                 <CheckBox x:Name="ReflectInputCheckBox" Content="RefIn" VerticalAlignment="Center" Margin="0,0,4,0" />
                 <CheckBox x:Name="ReflectOutputCheckBox" Content="RefOut" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <TextBox x:Name="ChecksumFinalXorInput" Width="72" Text="0" ToolTip="Custom CRC final XOR in hex" VerticalContentAlignment="Center" Margin="0,0,6,0" />
-                <Button Content="Calculate" Click="CalculateChecksum_Click" Padding="8,4" Margin="0,0,4,0" />
+                <ui:TextBox x:Name="ChecksumFinalXorInput" Width="72" Text="0" ToolTip="Custom CRC final XOR in hex" VerticalContentAlignment="Center" Margin="0,0,6,0" />
+                <ui:Button Content="Calculate" Click="CalculateChecksum_Click" Padding="8,4" Margin="0,0,4,0" />
                 <TextBlock Text="Write at" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <TextBox x:Name="ChecksumWriteAddressInput" Width="80" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,4,0" />
-                <Button Content="Write result" Click="WriteChecksum_Click" Padding="8,4" />
+                <ui:TextBox x:Name="ChecksumWriteAddressInput" Width="80" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,4,0" />
+                <ui:Button Content="Write result" Click="WriteChecksum_Click" Padding="8,4" />
             </WrapPanel>
             <TextBlock Text="{Binding ViewModel.Checksum.Summary}" Margin="0,4,0,0" FontWeight="SemiBold" />
             <TextBlock Text="{Binding ViewModel.Checksum.Result.Parameters}" />
@@ -139,12 +145,12 @@
                 <ComboBox x:Name="ExportFormatInput" Width="150" ItemsSource="{Binding ViewModel.ExportFormats}" SelectedIndex="0" />
                 <TextBlock Text="Max record bytes" VerticalAlignment="Center" Margin="12,0,6,0" />
                 <ComboBox x:Name="ExportPayloadInput" Width="64" ItemsSource="{Binding ViewModel.ExportPayloadSizes}" SelectedIndex="1" />
-                <Button Content="Export selected segments" Padding="10,4" Margin="12,0,0,0" Click="ExportSegments_Click" />
+                <ui:Button Content="Export selected segments" Padding="10,4" Margin="12,0,0,0" Click="ExportSegments_Click" />
                 <TextBlock Text="or range" VerticalAlignment="Center" Margin="12,0,6,0" />
-                <TextBox x:Name="ExportRangeStartInput" Width="90" ToolTip="Start address (hex)" VerticalContentAlignment="Center" />
+                <ui:TextBox x:Name="ExportRangeStartInput" Width="90" ToolTip="Start address (hex)" VerticalContentAlignment="Center" />
                 <TextBlock Text="to" VerticalAlignment="Center" Margin="6,0" />
-                <TextBox x:Name="ExportRangeEndInput" Width="90" ToolTip="End address (hex)" VerticalContentAlignment="Center" />
-                <Button Content="Export range" Padding="10,4" Margin="6,0,0,0" Click="ExportRange_Click" />
+                <ui:TextBox x:Name="ExportRangeEndInput" Width="90" ToolTip="End address (hex)" VerticalContentAlignment="Center" />
+                <ui:Button Content="Export range" Padding="10,4" Margin="6,0,0,0" Click="ExportRange_Click" />
             </WrapPanel>
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
@@ -164,15 +170,15 @@
                         <ColumnDefinition Width="12" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
+                    <ui:DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
                               HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged">
-                        <DataGrid.Columns>
+                        <ui:DataGrid.Columns>
                             <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
                             <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
                             <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="65" />
-                        </DataGrid.Columns>
-                    </DataGrid>
+                        </ui:DataGrid.Columns>
+                    </ui:DataGrid>
                     <local:HexViewControl Grid.Column="2" x:Name="HexRowsView"
                                           ItemsSource="{Binding ViewModel.ImageView.Rows}"
                                           ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
@@ -181,4 +187,4 @@
             </TabItem>
         </TabControl>
     </DockPanel>
-</Window>
+</ui:FluentWindow>

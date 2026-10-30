@@ -8,9 +8,9 @@ namespace HexEditor.UI;
 /// <summary>Draws a row of byte text and highlights without a visual element per byte.</summary>
 public sealed class HexByteRowControl : Control
 {
-    private static readonly Brush DifferentBrush = CreateBrush(0xFF, 0xB8, 0xB8);
-    private static readonly Brush OnlyInPanelBrush = CreateBrush(0xFF, 0xD9, 0x93);
-    private static readonly Brush OnlyOtherBrush = CreateBrush(0xD7, 0xD7, 0xD7);
+    private static readonly Brush DifferentBrush = CreateBrush(0xD0, 0x38, 0x38);
+    private static readonly Brush OnlyInPanelBrush = CreateBrush(0xD0, 0x85, 0x14);
+    private static readonly Brush OnlyOtherBrush = CreateBrush(0x70, 0x70, 0x70);
     private double _characterWidth;
     private double _lineHeight;
     private double _pixelsPerDip;
@@ -117,7 +117,7 @@ public sealed class HexByteRowControl : Control
 
     private static Brush CreateBrush(byte red, byte green, byte blue)
     {
-        var brush = new SolidColorBrush(Color.FromRgb(red, green, blue));
+        var brush = new SolidColorBrush(Color.FromArgb(0x55, red, green, blue));
         brush.Freeze();
         return brush;
     }
