@@ -165,6 +165,32 @@ public sealed class PreferencesSessionTests
         }
     }
 
+    [TestMethod]
+    public void Comparison_colors_are_staged_by_palette_and_reset_only_the_selected_palette()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "hex-editor-colors-" + Guid.NewGuid());
+        try
+        {
+            var path = Path.Combine(folder, "comparison-colors.json");
+            var settings = new ComparisonColorSettings(path);
+            using var appearance = new AppearanceSession(new AppearanceSettings(Path.Combine(folder, "appearance.json")), new FixedWindowsAppearance());
+            var choices = new PreferencesSession(appearance, new GridSpacingSettings(Path.Combine(folder, "spacing.json")), settings);
+
+            Assert.AreEqual("#885E3138", choices.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
+            choices.SetColor(AppearanceMode.Light, ComparisonColorKind.Different, "#FF112233");
+            choices.ResetPalette(AppearanceMode.Dark);
+            Assert.AreEqual("#FF112233", choices.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
+            Assert.AreEqual("#885E3138", choices.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
+            Assert.AreEqual("#55D03838", settings.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
+
+            choices.Save();
+            var restarted = new ComparisonColorSettings(path);
+            Assert.AreEqual("#FF112233", restarted.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
+            Assert.AreEqual("#885E3138", restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
     private sealed class FixedWindowsAppearance : IWindowsAppearanceSource
     {
         public bool IsDark => false;
@@ -238,9 +264,14 @@ public sealed class PreferencesSessionTests
                 Assert.AreEqual("Follow Windows", radios.Single(radio => radio.IsChecked == true).Content);
                 CollectionAssert.AreEquivalent(new[] { 2d, 1d },
                     Children<Slider>(window).Select(slider => slider.Value).ToArray());
-                CollectionAssert.AreEquivalent(new[] { "Cancel", "Save" },
+                CollectionAssert.AreEquivalent(new[] { "Cancel", "Save", "Choose…", "Choose…", "Choose…", "Reset palette" },
                     Children<Wpf.Ui.Controls.Button>(window)
                         .Select(button => button.Content?.ToString()).ToArray());
+                var paletteSelector = Children<ComboBox>(window).Single(combo => combo.Name == "ComparisonPaletteSelector");
+                paletteSelector.SelectedIndex = 1;
+                Assert.AreEqual(AppearanceMode.Automatic, choices.Appearance,
+                    "Selecting a color palette must not change the staged application appearance.");
+                Assert.AreEqual(AppearanceMode.Automatic, appearance.Mode);
             }
             catch (Exception exception) { failure = exception; }
         });
