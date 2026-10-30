@@ -67,8 +67,10 @@ public sealed class HexByteRowControl : Control
         EnsureMetrics();
 
         var layout = CreateLayout();
-        drawingContext.DrawRectangle(Brushes.Transparent, null,
-            new Rect(0, 0, layout.GetRowSize(row.Cells.Count, IsAscii).Width, _lineHeight));
+        var dataBounds = new Rect(0, 0, layout.GetRowSize(row.Cells.Count, IsAscii).Width, _lineHeight);
+        drawingContext.DrawRectangle(Brushes.Transparent, null, dataBounds);
+        if (IsAscii && TryFindResource("HexAsciiBackgroundBrush") is Brush asciiBackground)
+            drawingContext.DrawRectangle(asciiBackground, null, dataBounds);
         for (var index = 0; index < row.Cells.Count; index++)
         {
             var brush = row.Cells[index].Highlight switch
@@ -79,7 +81,7 @@ public sealed class HexByteRowControl : Control
                 _ => null
             };
             if (brush is not null)
-                drawingContext.DrawRectangle(brush, null, layout.GetHighlightBounds(index));
+                drawingContext.DrawRectangle(brush, null, layout.GetHighlightBounds(index, IsAscii));
         }
 
         for (var index = 0; index < row.Cells.Count; index++)
