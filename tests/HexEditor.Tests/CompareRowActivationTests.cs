@@ -123,14 +123,16 @@ public sealed class CompareRowActivationTests
         };
         var control = new HexByteRowControl { Row = row };
         control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var cellWidth = control.DesiredSize.Width / 2;
+        var byteWidth = (control.DesiredSize.Width - GridSpacingSettings.Current.HorizontalByteSpacing) / 2;
+        var separator = byteWidth + GridSpacingSettings.Current.HorizontalByteSpacing / 2d;
 
-        Assert.IsTrue(control.TryGetAddressAt(new Point(cellWidth * 0.1, 1), out var first));
+        Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth * 0.1, 1), out var first));
         Assert.AreEqual(0x1000u, first);
-        Assert.IsFalse(control.TryGetAddressAt(new Point(cellWidth * 0.9, 1), out _));
-        Assert.IsTrue(control.TryGetAddressAt(new Point(cellWidth * 1.1, 1), out var second));
+        Assert.IsFalse(control.TryGetAddressAt(new Point(separator, 1), out _));
+        Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth + GridSpacingSettings.Current.HorizontalByteSpacing + byteWidth * 0.1, 1), out var second));
         Assert.AreEqual(0x1001u, second);
-        Assert.IsFalse(control.TryGetAddressAt(new Point(cellWidth * 2, 1), out _));
+        Assert.IsFalse(control.TryGetAddressAt(new Point(control.DesiredSize.Width, 1), out _));
+        Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth * 0.1, control.DesiredSize.Height - 0.5), out _));
         Assert.IsFalse(control.TryGetAddressAt(new Point(0, control.DesiredSize.Height), out _));
     }
 }

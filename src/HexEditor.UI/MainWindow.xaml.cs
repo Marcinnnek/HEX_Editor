@@ -58,6 +58,16 @@ public partial class MainWindow : Window
     private void LightAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Light);
     private void DarkAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Dark);
 
+    private void Preferences_Click(object sender, RoutedEventArgs e)
+    {
+        try { new PreferencesWindow { Owner = this }.ShowDialog(); }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            RecordError("Save grid spacing preferences", exception);
+            MessageBox.Show(this, exception.Message, "Unable to save preferences", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void SetAppearance(AppearanceMode mode)
     {
         try

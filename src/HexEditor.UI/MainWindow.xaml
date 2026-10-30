@@ -57,6 +57,7 @@
                 <ui:MenuItem x:Name="LightAppearanceItem" Header="Light" IsCheckable="True" Click="LightAppearance_Click" />
                 <ui:MenuItem x:Name="DarkAppearanceItem" Header="Dark" IsCheckable="True" Click="DarkAppearance_Click" />
             </ui:MenuItem>
+            <ui:MenuItem Header="_Preferences..." Click="Preferences_Click" />
             <ui:MenuItem Header="E_xport">
                 <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" />
                 <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" />
