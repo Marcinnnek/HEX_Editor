@@ -226,6 +226,11 @@ public sealed class EditorDocumentWorkspace
         Document.Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
     public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) =>
         Document.Editing.ApplyRelocation(preview, decision);
+    public int DeleteBlock(int segmentIndex)
+    {
+        Document.Editing.DeleteSegment(segmentIndex);
+        return Math.Min(segmentIndex, Document.CurrentImage.Segments.Count - 1);
+    }
     public void Save() => Document.Save();
     public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
         Document.SaveAsync(cancellationToken, progress);

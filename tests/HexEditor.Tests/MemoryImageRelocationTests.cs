@@ -151,4 +151,38 @@ public sealed class MemoryImageRelocationTests
         Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x3000, out var first));
         Assert.AreEqual((byte)0x10, first);
     }
+
+    [TestMethod]
+    public void WorkspaceDeleteBlock_RemovesExactlyOneSegmentAsOneUndoableEdit()
+    {
+        var first = new MemorySegment(0x1000, [0x10, 0x20]);
+        var last = new MemorySegment(0x3000, [0x30]);
+        var image = MemoryImage.FromSegments([first, last]);
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(image, null, null);
+
+        Assert.AreEqual(0, workspace.DeleteBlock(0));
+
+        Assert.HasCount(1, workspace.Document.CurrentImage.Segments);
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x3000, out _));
+        Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x1000, out _));
+        Assert.IsTrue(workspace.Document.IsModified);
+        Assert.IsTrue(workspace.Undo());
+        Assert.AreSame(image, workspace.Document.CurrentImage);
+        Assert.IsFalse(workspace.Document.IsModified);
+    }
+
+    [TestMethod]
+    public void WorkspaceDeleteBlock_ReturnsFollowingOrPreviousBlockIndex()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x10]),
+            new MemorySegment(0x2000, [0x20]),
+            new MemorySegment(0x3000, [0x30])]), null, null);
+
+        Assert.AreEqual(1, workspace.DeleteBlock(1), "A following Block should take the deleted Block's list position.");
+        Assert.AreEqual(0, workspace.DeleteBlock(1), "When deleting the last Block, selection should fall back to the previous one.");
+        Assert.AreEqual(-1, workspace.DeleteBlock(0), "An empty Block list has no selection.");
+    }
 }

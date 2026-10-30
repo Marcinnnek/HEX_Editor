@@ -7,11 +7,17 @@ public sealed class PreferencesSession
 {
     private readonly AppearanceSession _appearance;
     private readonly GridSpacingSettings _spacing;
+    private readonly ComparisonColorSettings _comparisonColors;
+    private ComparisonColorPalette _lightColors;
+    private ComparisonColorPalette _darkColors;
 
-    public PreferencesSession(AppearanceSession appearance, GridSpacingSettings spacing)
+    public PreferencesSession(AppearanceSession appearance, GridSpacingSettings spacing, ComparisonColorSettings? comparisonColors = null)
     {
         _appearance = appearance;
         _spacing = spacing;
+        _comparisonColors = comparisonColors ?? ComparisonColorSettings.Current;
+        _lightColors = _comparisonColors.GetPalette(AppearanceMode.Light);
+        _darkColors = _comparisonColors.GetPalette(AppearanceMode.Dark);
         Appearance = appearance.Mode;
         HorizontalByteSpacing = spacing.HorizontalByteSpacing;
         VerticalRowSpacing = spacing.VerticalRowSpacing;
@@ -21,18 +27,37 @@ public sealed class PreferencesSession
     public int HorizontalByteSpacing { get; set; }
     public int VerticalRowSpacing { get; set; }
 
+    public string GetColor(AppearanceMode palette, ComparisonColorKind kind) => GetColors(palette).Get(kind);
+
+    public void SetColor(AppearanceMode palette, ComparisonColorKind kind, string color)
+    {
+        var updated = GetColors(palette).With(kind, color);
+        ComparisonColorSettings.Validate(updated);
+        SetColors(palette, updated);
+    }
+
+    public void ResetPalette(AppearanceMode palette) => SetColors(palette, palette switch
+    {
+        AppearanceMode.Light => ComparisonColorPalette.LightDefaults,
+        AppearanceMode.Dark => ComparisonColorPalette.DarkDefaults,
+        _ => throw new ArgumentOutOfRangeException(nameof(palette))
+    });
+
     public void Save()
     {
         if (!Enum.IsDefined(Appearance)) throw new ArgumentOutOfRangeException(nameof(Appearance));
         if (HorizontalByteSpacing is < 0 or > 12) throw new ArgumentOutOfRangeException(nameof(HorizontalByteSpacing));
         if (VerticalRowSpacing is < 0 or > 8) throw new ArgumentOutOfRangeException(nameof(VerticalRowSpacing));
+        ComparisonColorSettings.Validate(_lightColors);
+        ComparisonColorSettings.Validate(_darkColors);
         var writes = new[]
         {
             new StagedWrite(_spacing.FilePath, GridSpacingSettings.Serialize(HorizontalByteSpacing, VerticalRowSpacing)),
-            new StagedWrite(_appearance.SettingsPath, AppearanceSettings.Serialize(Appearance))
+            new StagedWrite(_appearance.SettingsPath, AppearanceSettings.Serialize(Appearance)),
+            new StagedWrite(_comparisonColors.FilePath, _comparisonColors.Serialize(_lightColors, _darkColors))
         };
-        if (Path.GetFullPath(writes[0].Path).Equals(Path.GetFullPath(writes[1].Path), StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("Appearance and spacing settings must use different files.");
+        if (writes.Select(write => Path.GetFullPath(write.Path)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != writes.Length)
+            throw new InvalidOperationException("Preference settings must use different files.");
 
         try
         {
@@ -57,7 +82,22 @@ public sealed class PreferencesSession
         }
 
         _spacing.ApplySavedSpacing(HorizontalByteSpacing, VerticalRowSpacing);
+        _comparisonColors.ApplySavedPalettes(_lightColors, _darkColors);
         _appearance.ApplySavedMode(Appearance);
+    }
+
+    private ComparisonColorPalette GetColors(AppearanceMode palette) => palette switch
+    {
+        AppearanceMode.Light => _lightColors,
+        AppearanceMode.Dark => _darkColors,
+        _ => throw new ArgumentOutOfRangeException(nameof(palette))
+    };
+
+    private void SetColors(AppearanceMode palette, ComparisonColorPalette colors)
+    {
+        if (palette == AppearanceMode.Light) _lightColors = colors;
+        else if (palette == AppearanceMode.Dark) _darkColors = colors;
+        else throw new ArgumentOutOfRangeException(nameof(palette));
     }
 
     private sealed class StagedWrite

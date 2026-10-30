@@ -76,8 +76,8 @@ public sealed class HexByteRowControl : Control
             var brush = row.Cells[index].Highlight switch
             {
                 ByteHighlightState.Different => TryFindResource("HexDifferentBrush") as Brush,
-                ByteHighlightState.OnlyInPanel => TryFindResource("HexOnlyInPanelBrush") as Brush,
-                ByteHighlightState.OnlyOther => TryFindResource("HexOnlyOtherBrush") as Brush,
+                ByteHighlightState.OnlyInA => TryFindResource("HexOnlyInABrush") as Brush,
+                ByteHighlightState.OnlyInB => TryFindResource("HexOnlyInBBrush") as Brush,
                 _ => null
             };
             if (brush is not null)

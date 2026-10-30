@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private int _findGeneration;
     private uint? _selectionStart;
     private uint? _selectionEnd;
+    private bool _suppressSegmentNavigation;
 
     public MainWindow()
     {
@@ -575,9 +576,9 @@ public partial class MainWindow : Window
         try
         {
             var (start, end) = GetSelectionDefaults();
-            var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end) { Owner = this };
+            var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end, ViewModel.GetFillAllRegion()) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
-            ViewModel.FillRange(input.Start, input.End, input.Pattern!);
+            ViewModel.FillRange(input.Start, input.End, input.Pattern!, input.FillPolicy);
             Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -963,8 +964,22 @@ public partial class MainWindow : Window
         }
 
         var segment = ViewModel.CurrentImage.Segments[segmentIndex];
-        var dialog = new RelocateSegmentDialog(segment.StartAddress, segment.EndAddress, segment.ByteCount) { Owner = this };
+        var dialog = new RelocateSegmentDialog(segment.StartAddress, segment.EndAddress, segment.ByteCount,
+            canDelete: SegmentsGrid.SelectedItems.Count == 1) { Owner = this };
         if (dialog.ShowDialog() != true) return;
+
+        if (dialog.DeleteRequested)
+        {
+            var nextSegmentIndex = ViewModel.Workspace.DeleteBlock(segmentIndex);
+            _suppressSegmentNavigation = true;
+            try
+            {
+                SegmentsGrid.SelectedIndex = nextSegmentIndex;
+                ViewModel.SelectedSegmentIndex = nextSegmentIndex;
+            }
+            finally { _suppressSegmentNavigation = false; }
+            return;
+        }
 
         try
         {
@@ -1008,7 +1023,7 @@ public partial class MainWindow : Window
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         ViewModel.SelectedSegmentIndex = SegmentsGrid.SelectedIndex;
-        if (SegmentsGrid.SelectedIndex >= 0 &&
+        if (!_suppressSegmentNavigation && SegmentsGrid.SelectedIndex >= 0 &&
             ViewModel.TryNavigateToSegment(SegmentsGrid.SelectedIndex, out var rowIndex))
         {
             SelectRow(rowIndex);

@@ -97,9 +97,8 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotif
             cell.State switch
             {
                 CompareByteState.Different => ByteHighlightState.Different,
-                CompareByteState.OnlyA when _fileA => ByteHighlightState.OnlyInPanel,
-                CompareByteState.OnlyB when !_fileA => ByteHighlightState.OnlyInPanel,
-                CompareByteState.OnlyA or CompareByteState.OnlyB => ByteHighlightState.OnlyOther,
+                CompareByteState.OnlyA => ByteHighlightState.OnlyInA,
+                CompareByteState.OnlyB => ByteHighlightState.OnlyInB,
                 _ => ByteHighlightState.None
             })).ToArray();
         return new HexViewRow(row.Address, panel.HexData, panel.Ascii, false, null) { Cells = cells };
