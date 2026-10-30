@@ -1,5 +1,6 @@
 using HexEditor.Core;
 using HexEditor.Compare;
+using System.Diagnostics;
 
 namespace HexEditor.Tests;
 
@@ -55,5 +56,52 @@ public sealed class MemoryComparisonModelTests
 
         Assert.AreEqual("No differences", comparison.ComparisonStatus);
         Assert.AreEqual(CompareByteState.Equal, comparison.Rows[0].States[0]);
+    }
+
+    [TestMethod]
+    public void ComparisonModel_TenMegabyteOpenAndVirtualRowAccessStayBounded()
+    {
+        const int imageSize = 10 * 1024 * 1024;
+        var baseData = new byte[imageSize];
+        var referenceData = new byte[imageSize];
+        referenceData[^1] = 1;
+        var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, baseData)]);
+        var referenceImage = MemoryImage.FromSegments([new MemorySegment(0x1000, referenceData)]);
+
+        var timer = Stopwatch.StartNew();
+        var comparison = new MemoryComparisonModel(baseImage, referenceImage, bytesPerRow: 16);
+        timer.Stop();
+
+        Assert.IsTrue(timer.Elapsed < TimeSpan.FromSeconds(15),
+            $"Opening a 10 MB comparison took {timer.Elapsed}.");
+        Assert.AreEqual("1 differences (1 different, 0 only in File A, 0 only in File B)", comparison.ComparisonStatus);
+        Assert.AreEqual(655360, comparison.Rows.Count);
+
+        // Simulate repeated DataGrid virtualization requests over distant viewport positions.
+        for (var index = 0; index < comparison.Rows.Count; index += 4096)
+            Assert.IsFalse(comparison.Rows[index].IsGapMarker);
+    }
+
+    [TestMethod]
+    public void ComparisonModel_LongSummaryReportsProgressAndHonorsCancellation()
+    {
+        var data = new byte[256 * 1024];
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, data)]);
+        using var cancellation = new CancellationTokenSource();
+        var progress = new CancellingComparisonProgress(cancellation);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            new MemoryComparisonModel(image, image, cancellationToken: cancellation.Token, progress: progress));
+        Assert.IsTrue(progress.Reports > 0);
+    }
+
+    private sealed class CancellingComparisonProgress(CancellationTokenSource cancellation) : IProgress<ComparisonProgress>
+    {
+        public int Reports { get; private set; }
+        public void Report(ComparisonProgress value)
+        {
+            Reports++;
+            cancellation.Cancel();
+        }
     }
 }

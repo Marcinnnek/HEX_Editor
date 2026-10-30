@@ -1,5 +1,6 @@
 using System.IO;
 using HexEditor.Core;
+using HexEditor.Compare;
 using HexEditor.Formats;
 using HexEditor.Tools;
 
@@ -114,8 +115,11 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
         var reference = await _loader.LoadReferenceAsync(referencePath, cancellationToken, progress);
         cancellationToken.ThrowIfCancellationRequested();
         var baseName = document.SourcePath is null ? "Untitled" : Path.GetFileName(document.SourcePath);
-        return new CompareWorkspaceTabViewModel(document.CurrentImage, reference.Image,
-            baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path, document);
+        var comparisonProgress = progress is null ? null : new Progress<ComparisonProgress>(update =>
+            progress.Report(new MemoryImageFileProgress(update.Stage, update.Completed, update.Total)));
+        return await Task.Run(() => new CompareWorkspaceTabViewModel(document.CurrentImage, reference.Image,
+            baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path, document,
+            cancellationToken, comparisonProgress), cancellationToken);
     }
 }
 
