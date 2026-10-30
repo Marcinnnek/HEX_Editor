@@ -11,21 +11,16 @@ namespace HexEditor.UI;
 public sealed class MainViewModel : INotifyPropertyChanged
 {
     private readonly MemoryImageFileService _fileService = new();
-    private MemoryImage _savedImage = MemoryImage.Empty;
     private HexImageViewModel _imageView = new(MemoryImage.Empty);
     private string _statusMessage = "Open an Intel HEX or Motorola S-Record file to inspect its occupied memory segments.";
     private string _windowTitle = "HEX Editor";
-    private string? _sourcePath;
-    private MemoryImageExportFormat? _sourceFormat;
-    private MemoryImageFormatMetadata? _sourceFormatMetadata;
 
     public MainViewModel(MemoryImage? image = null)
     {
-        Editing.ImageChanged += OnEditingImageChanged;
+        Workspace.ImageChanged += OnEditingImageChanged;
         if (image is not null)
         {
-            Editing.Reset(image);
-            _savedImage = image;
+            Workspace.OpenImage(image, null, null);
             RefreshImage();
         }
     }
@@ -35,20 +30,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public EditorStatusViewModel EditorStatus { get; } = new();
     public ChecksumViewModel Checksum { get; } = new();
-    public ImageEditingSession Editing { get; } = new();
+    public EditorDocumentWorkspace Workspace { get; } = new();
+    public ImageEditingSession Editing => Workspace.Document.Editing;
 
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
     public int[] RowWidths { get; } = [8, 16, 32];
     public int[] ExportPayloadSizes { get; } = [8, 16, 32];
     public MemoryImageExportFormat[] ExportFormats { get; } = Enum.GetValues<MemoryImageExportFormat>();
 
-    public MemoryImage CurrentImage => Editing.CurrentImage;
-    public bool IsModified => !ReferenceEquals(CurrentImage, _savedImage);
-    public bool CanUndo => Editing.CanUndo;
-    public bool CanRedo => Editing.CanRedo;
-    public string? SourcePath => _sourcePath;
-    public MemoryImageExportFormat? SourceFormat => _sourceFormat;
-    public MemoryImageFormatMetadata? SourceFormatMetadata => _sourceFormatMetadata;
+    public MemoryImage CurrentImage => Workspace.Document.CurrentImage;
+    public bool IsModified => Workspace.Document.IsModified;
+    public bool CanUndo => Workspace.Document.CanUndo;
+    public bool CanRedo => Workspace.Document.CanRedo;
+    public string? SourcePath => Workspace.Document.SourcePath;
+    public MemoryImageExportFormat? SourceFormat => Workspace.Document.SourceFormat;
+    public MemoryImageFormatMetadata? SourceFormatMetadata => Workspace.Document.SourceFormatMetadata;
 
     public HexImageViewModel ImageView
     {
@@ -59,43 +55,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string StatusMessage { get => _statusMessage; private set => SetProperty(ref _statusMessage, value); }
     public string WindowTitle { get => _windowTitle; private set => SetProperty(ref _windowTitle, value); }
     public MemoryImageImportPreview PrepareOpen(string path)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        using var stream = File.OpenRead(path);
-        return _fileService.PrepareImport(stream, CurrentImage, path);
-    }
+        => Workspace.PrepareOpen(path);
 
     public Task<MemoryImageImportPreview> PrepareOpenAsync(string path, CancellationToken cancellationToken,
         IProgress<MemoryImageFileProgress>? progress)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        return Task.Run(() =>
-        {
-            using var stream = File.OpenRead(path);
-            return _fileService.PrepareImport(stream, CurrentImage, path, cancellationToken, progress);
-        }, cancellationToken);
-    }
+        => Workspace.PrepareOpenAsync(path, cancellationToken, progress);
 
     public void ApplyImport(MemoryImageImportPreview preview, OverlapDecision decision)
     {
         ArgumentNullException.ThrowIfNull(preview);
-        var hadExistingImage = CurrentImage.Segments.Count > 0;
         var previousImage = CurrentImage;
-        var imported = preview.Apply(decision);
-        if (imported is null) return;
+        if (!Workspace.ApplyImport(preview, decision)) return;
 
-        Editing.Reset(imported.Image);
         Checksum.Clear();
-        // An import applied over an already-open image creates merged contents that are not represented
-        // by the newly associated source file, so keep them marked unsaved until the user saves explicitly.
-        _savedImage = hadExistingImage ? MemoryImage.Empty : imported.Image;
-        _sourcePath = imported.SourcePath;
-        _sourceFormat = imported.DetectedFormat;
-        _sourceFormatMetadata = imported.FormatMetadata;
         RefreshImage();
         RefreshEditorStatus();
         RefreshTitle();
-        StatusMessage = DescribeImage(imported.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
+        StatusMessage = DescribeImage(preview.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
         Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
         if (!ReferenceEquals(previousImage, CurrentImage)) NotifyImageChanged(previousImage, CurrentImage);
     }
@@ -104,12 +80,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         ArgumentNullException.ThrowIfNull(image);
         var previousImage = CurrentImage;
-        Editing.Reset(image);
-        _savedImage = image;
+        Workspace.OpenImage(image, sourcePath, format);
         Checksum.Clear();
-        _sourcePath = sourcePath;
-        _sourceFormat = format;
-        _sourceFormatMetadata = null;
         RefreshImage();
         RefreshEditorStatus();
         RefreshTitle();
@@ -120,7 +92,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void CloseImage() => LoadImage(MemoryImage.Empty, null, null);
 
-    public void EditByte(uint address, byte value, OverlapDecision? overlapDecision = null) => Editing.EditByte(address, value, overlapDecision);
+    public void EditByte(uint address, byte value, OverlapDecision? overlapDecision = null) => Workspace.EditByte(address, value, overlapDecision);
     public void InsertBytes(uint address, IReadOnlyList<byte> bytes, OverlapDecision? overlapDecision = null) => Editing.InsertBytes(address, bytes, overlapDecision);
     public MemoryImageMergePreview PreviewMerge(MemoryImage source) => Editing.PreviewMerge(source);
     public void ApplyMerge(MemoryImageMergePreview preview, MemoryImageMergeChoice? defaultChoice,
@@ -152,53 +124,45 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public bool Undo()
     {
-        return Editing.Undo();
+        return Workspace.Undo();
     }
 
     public bool Redo()
     {
-        return Editing.Redo();
+        return Workspace.Redo();
     }
 
     public void Save()
     {
-        if (string.IsNullOrWhiteSpace(_sourcePath) || _sourceFormat is null)
-            throw new InvalidOperationException("Choose Save As and select a file format first.");
-        SaveAs(_sourcePath, _sourceFormat.Value, overwriteExisting: true);
+        Workspace.Save();
+        CompleteSave();
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        if (string.IsNullOrWhiteSpace(_sourcePath) || _sourceFormat is null)
-            throw new InvalidOperationException("Choose Save As and select a file format first.");
-        await SaveAsAsync(_sourcePath, _sourceFormat.Value, overwriteExisting: true, cancellationToken, progress);
+        var document = Workspace.Document;
+        await Workspace.SaveAsync(cancellationToken, progress);
+        if (ReferenceEquals(Workspace.Document, document)) CompleteSave();
     }
 
     public async Task SaveAsAsync(string path, MemoryImageExportFormat format, bool overwriteExisting,
         CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var image = CurrentImage;
-        var metadata = _sourceFormatMetadata;
-        await Task.Run(() => _fileService.SaveAtomically(image, path, format, 16, overwriteExisting,
-            metadata, cancellationToken, progress), cancellationToken);
-        CompleteSave(path, format, image);
+        var document = Workspace.Document;
+        await Workspace.SaveAsAsync(path, format, overwriteExisting, cancellationToken, progress);
+        if (ReferenceEquals(Workspace.Document, document)) CompleteSave();
     }
 
     public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting)
     {
-        _fileService.SaveAtomically(CurrentImage, path, format, 16, overwriteExisting, _sourceFormatMetadata);
-        CompleteSave(path, format, CurrentImage);
+        Workspace.SaveAs(path, format, overwriteExisting);
+        CompleteSave();
     }
 
-    private void CompleteSave(string path, MemoryImageExportFormat format, MemoryImage image)
+    private void CompleteSave()
     {
-        _sourcePath = Path.GetFullPath(path);
-        _sourceFormat = format;
-        _sourceFormatMetadata = MemoryImageFileService.ConvertMetadata(_sourceFormatMetadata, format);
-        _savedImage = image;
         RefreshTitle();
-        StatusMessage = $"Saved {image.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {format}.";
+        StatusMessage = $"Saved {CurrentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {SourceFormat}.";
         RefreshEditorStatus();
         Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified));
     }
@@ -207,10 +171,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
 
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
-        _fileService.ExportSegments(CurrentImage, segmentIndexes, format, maxDataBytesPerRecord, output, _sourceFormatMetadata);
+        _fileService.ExportSegments(CurrentImage, segmentIndexes, format, maxDataBytesPerRecord, output, SourceFormatMetadata);
 
     public void ExportAddressRange(uint startAddress, uint endAddress, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
-        _fileService.ExportAddressRange(CurrentImage, startAddress, endAddress, format, maxDataBytesPerRecord, output, _sourceFormatMetadata);
+        _fileService.ExportAddressRange(CurrentImage, startAddress, endAddress, format, maxDataBytesPerRecord, output, SourceFormatMetadata);
 
     public void ReportExported(string fileName)
     {
@@ -246,9 +210,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount));
     }
 
-    private void RefreshEditorStatus() => EditorStatus.UpdateImageState(_sourceFormat, IsModified);
+    private void RefreshEditorStatus() => EditorStatus.UpdateImageState(SourceFormat, IsModified);
 
-    private void RefreshTitle() => WindowTitle = $"{(string.IsNullOrWhiteSpace(_sourcePath) ? "Untitled" : Path.GetFileName(_sourcePath))}{(IsModified ? " *" : "")} - HEX Editor";
+    private void RefreshTitle() => WindowTitle = $"{(string.IsNullOrWhiteSpace(SourcePath) ? "Untitled" : Path.GetFileName(SourcePath))}{(IsModified ? " *" : "")} - HEX Editor";
     private void RefreshModifiedTitle() => RefreshTitle();
 
     private string DescribeImage(string? format)
