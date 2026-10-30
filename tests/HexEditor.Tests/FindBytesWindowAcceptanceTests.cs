@@ -304,6 +304,91 @@ public sealed class FindBytesWindowAcceptanceTests
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
+    [TestMethod]
+    public void Compare_find_navigates_result_to_top_and_synchronizes_opposite_panel_gap()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var main = new MainWindow();
+            FindBytesWindow? find = null;
+            try
+            {
+                main.Show();
+                main.UpdateLayout();
+                var tabs = Descendants<TabControl>(main).Single();
+                var baseBytes = Enumerable.Repeat((byte)0x10, 512).ToArray();
+                baseBytes[^2] = 0xAA;
+                baseBytes[^1] = 0xBB;
+                var referenceBytes = Enumerable.Repeat((byte)0x20, 512).ToArray();
+                referenceBytes[^2] = 0xAA;
+                referenceBytes[^1] = 0xBB;
+                var tailBytes = Enumerable.Repeat((byte)0x30, 512).ToArray();
+                var imageA = MemoryImage.FromSegments([
+                    new MemorySegment(0x1000, baseBytes),
+                    new MemorySegment(0x3000, tailBytes)]);
+                var imageB = MemoryImage.FromSegments([
+                    new MemorySegment(0x2000, referenceBytes),
+                    new MemorySegment(0x3000, tailBytes)]);
+                var compare = new CompareView(new CompareWorkspaceTabViewModel(imageA, imageB, "A", "B"));
+                tabs.Items.Add(new TabItem { Header = "Sparse compare", Content = compare });
+                tabs.SelectedIndex = tabs.Items.Count - 1;
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+                var baseTargetRowIndex = Enumerable.Range(0, compare.FileAView.ItemsGrid.Items.Count)
+                    .Single(index => ((HexViewRow)compare.FileAView.ItemsGrid.Items[index]).Address == "000011F0");
+                var referenceTargetRowIndex = Enumerable.Range(0, compare.FileBView.ItemsGrid.Items.Count)
+                    .Single(index => ((HexViewRow)compare.FileBView.ItemsGrid.Items[index]).Address == "000021F0");
+                var aScroll = Descendants<ScrollViewer>(compare.FileAView).Single(viewer => ScrollViewer.GetCanContentScroll(viewer));
+                var bScroll = Descendants<ScrollViewer>(compare.FileBView).Single(viewer => ScrollViewer.GetCanContentScroll(viewer));
+                aScroll.ScrollToHorizontalOffset(100);
+                bScroll.ScrollToHorizontalOffset(100);
+
+                var findMenu = LogicalDescendants<MenuItem>(main).Single(item => item.Header?.ToString() == "Find bytes...");
+                findMenu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                find = main.OwnedWindows.OfType<FindBytesWindow>().Single();
+                find.PatternInput.Text = "AA BB";
+                Descendants<Button>(find).Single(button => button.Content?.ToString() == "Find Next")
+                    .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WaitForCompareMatch(compare, fileA: true, 0x11FE);
+                WaitForCompareAddress(compare, 0x11FE);
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+                Assert.AreEqual(0d, aScroll.HorizontalOffset, "Find keeps the synchronized panel's first HEX cell visible.");
+                Assert.AreEqual(0d, bScroll.HorizontalOffset, "Find keeps the result's first HEX cell visible.");
+                Assert.AreEqual("", compare.ViewModel.FileBRows[baseTargetRowIndex].Cells[0].Hex,
+                    "Synchronizing to an address gap must not create a byte in the opposite image.");
+                Assert.IsTrue(compare.ViewModel.FileARows[baseTargetRowIndex].Cells[14].IsFindMatch);
+                Assert.IsTrue(compare.ViewModel.FileARows[baseTargetRowIndex].Cells[15].IsFindMatch);
+                AssertCompareRowAtTop(compare.FileAView, aScroll, baseTargetRowIndex);
+                AssertCompareRowAtTop(compare.FileBView, bScroll, baseTargetRowIndex);
+
+                Descendants<Button>(find).Single(button => button.Content?.ToString() == "Find Next")
+                    .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WaitForCompareMatch(compare, fileA: false, 0x21FE);
+                WaitForCompareAddress(compare, 0x21FE);
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.AreEqual("", compare.ViewModel.FileARows[referenceTargetRowIndex].Cells[0].Hex,
+                    "Synchronizing a reference result must preserve the base image's address gap.");
+                Assert.IsTrue(compare.ViewModel.FileBRows[referenceTargetRowIndex].Cells[14].IsFindMatch);
+                Assert.IsTrue(compare.ViewModel.FileBRows[referenceTargetRowIndex].Cells[15].IsFindMatch);
+                AssertCompareRowAtTop(compare.FileBView, bScroll, referenceTargetRowIndex);
+                AssertCompareRowAtTop(compare.FileAView, aScroll, referenceTargetRowIndex);
+
+                Descendants<Button>(find).Single(button => button.Content?.ToString() == "Find Next")
+                    .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WaitForCompareMatch(compare, fileA: true, 0x11FE);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { find?.Close(); main.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     private static void WaitForSelection(MainWindow window, uint address)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
@@ -319,6 +404,20 @@ public sealed class FindBytesWindowAcceptanceTests
     {
         var bounds = row.TransformToAncestor(scroll).TransformBounds(new Rect(row.RenderSize));
         return bounds.Bottom > 0 && bounds.Top < scroll.ActualHeight;
+    }
+
+    private static void AssertCompareRowAtTop(HexViewControl view, ScrollViewer scroll, int rowIndex)
+    {
+        view.UpdateLayout();
+        view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        var firstVisibleIndex = Enumerable.Range(0, view.ItemsGrid.Items.Count)
+            .Select(index => (Index: index, Row: view.ItemsGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow))
+            .Where(item => item.Row is { IsVisible: true, ActualHeight: > 0 } && RowIntersectsViewport(item.Row, scroll))
+            .Select(item => item.Index)
+            .DefaultIfEmpty(-1)
+            .Min();
+        Assert.AreEqual(rowIndex, firstVisibleIndex,
+            $"The synchronized row {rowIndex} should be the first rendered data row, got {firstVisibleIndex}.");
     }
 
     private static void AssertEditorMatchVisible(HexViewControl rowsView, ScrollViewer scroll, int matchRow, uint matchStart)
