@@ -326,8 +326,53 @@ public partial class MainWindow : FluentWindow
         await TrySaveAsAsync(ActiveDocument);
     }
 
-    private EditorDocument ActiveDocument => ViewModel.Workspace.GetActiveDocument(
-        (WorkspaceTabs.SelectedContent as CompareView)?.Workspace);
+    private EditorDocument ActiveDocument => ViewModel.ActiveDocument;
+
+    private void MoreCommands_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement element && element.ContextMenu is { } menu)
+        {
+            menu.PlacementTarget = element;
+            menu.IsOpen = true;
+        }
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        var typing = Keyboard.FocusedElement is System.Windows.Controls.Primitives.TextBoxBase;
+        if (typing && key is not (Key.O or Key.S or Key.W)) return;
+
+        switch (key)
+        {
+            case Key.O when (Keyboard.Modifiers & ModifierKeys.Shift) == 0:
+                OpenImage_Click(this, new RoutedEventArgs());
+                break;
+            case Key.S when (Keyboard.Modifiers & ModifierKeys.Shift) != 0:
+                SaveAs_Click(this, new RoutedEventArgs());
+                break;
+            case Key.S:
+                Save_Click(this, new RoutedEventArgs());
+                break;
+            case Key.W:
+                CloseImage_Click(this, new RoutedEventArgs());
+                break;
+            case Key.Z:
+                Undo_Click(this, new RoutedEventArgs());
+                break;
+            case Key.Y:
+                Redo_Click(this, new RoutedEventArgs());
+                break;
+            case Key.G:
+                AddressInput.Focus();
+                AddressInput.SelectAll();
+                break;
+            default:
+                return;
+        }
+        e.Handled = true;
+    }
 
     private async Task<bool> TrySaveAsAsync(EditorDocument document)
     {
@@ -336,6 +381,7 @@ public partial class MainWindow : FluentWindow
         {
             await RunFileOperationAsync((token, progress) => document.SaveAsAsync(selection.Path, selection.Format, selection.Overwrite,
                 token, progress));
+            ViewModel.RefreshActiveCommandState();
             RefreshSavedDocumentTabs(document);
             return true;
         }
@@ -354,6 +400,7 @@ public partial class MainWindow : FluentWindow
         try
         {
             document.SaveAs(selection.Path, selection.Format, selection.Overwrite);
+            ViewModel.RefreshActiveCommandState();
             RefreshSavedDocumentTabs(document);
             return true;
         }
@@ -753,6 +800,7 @@ public partial class MainWindow : FluentWindow
 
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        ViewModel.SelectedSegmentIndex = SegmentsGrid.SelectedIndex;
         if (SegmentsGrid.SelectedIndex >= 0 &&
             ViewModel.TryNavigateToSegment(SegmentsGrid.SelectedIndex, out var rowIndex))
         {

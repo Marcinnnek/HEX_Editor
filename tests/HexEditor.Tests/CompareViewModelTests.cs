@@ -9,6 +9,44 @@ namespace HexEditor.Tests;
 public sealed class CompareViewModelTests
 {
     [TestMethod]
+    public async Task ActiveDocumentCommands_RouteUndoRedoAndSaveAsToCompareBase()
+    {
+        var viewModel = new MainViewModel();
+        var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var baseOwner = new MainViewModel();
+        baseOwner.LoadImage(baseImage, null, MemoryImageExportFormat.IntelHex);
+        var baseDocument = baseOwner.Workspace.Document;
+        var compare = new CompareWorkspaceTabViewModel(baseImage,
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20])]),
+            "base.hex", "reference.hex", baseDocument: baseDocument);
+        viewModel.Workspace.RegisterComparisonView(compare);
+        viewModel.ActivateComparison(compare);
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-active-base-{Guid.NewGuid():N}.hex");
+
+        try
+        {
+            baseDocument.Editing.EditByte(0x1000, 0x11, OverlapDecision.OverwriteIncoming);
+            Assert.IsTrue(viewModel.ActiveCanUndo);
+            Assert.IsTrue(viewModel.Undo());
+            Assert.IsTrue(baseDocument.CurrentImage.TryGetByte(0x1000, out var undone));
+            Assert.AreEqual((byte)0x10, undone);
+            Assert.IsTrue(viewModel.Redo());
+
+            await viewModel.SaveAsAsync(path, MemoryImageExportFormat.IntelHex, false,
+                CancellationToken.None, null);
+
+            Assert.AreEqual(Path.GetFullPath(path), baseDocument.SourcePath);
+            Assert.IsFalse(baseDocument.IsModified);
+            Assert.IsNull(viewModel.Workspace.Document.SourcePath);
+            Assert.IsTrue(viewModel.ActiveCanUndo);
+        }
+        finally
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+    }
+
+    [TestMethod]
     public void ActiveTabViewSettings_RestoreIndependentlyAndSynchronizePrimaryControls()
     {
         var viewModel = new MainViewModel();

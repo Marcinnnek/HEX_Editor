@@ -16,6 +16,7 @@ public sealed class ImageEditingSession
     public MemoryImage CurrentImage => _currentImage;
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
+    public bool HasClipboard => _clipboard is not null;
 
     public void Reset(MemoryImage image)
     {

@@ -16,10 +16,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _windowTitle = "HEX Editor";
     private CompareViewModel? _activeComparison;
     private EditorDocument? _activeComparisonDocument;
+    private int _selectedSegmentIndex = -1;
 
     public MainViewModel(MemoryImage? image = null)
     {
         Workspace.ImageChanged += OnEditingImageChanged;
+        EditorStatus.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(EditorStatusViewModel.SelectionLength))
+                Raise(nameof(ActiveHasSelection), nameof(ActiveCanPaste));
+        };
         if (image is not null)
         {
             Workspace.OpenImage(image, null, null);
@@ -41,6 +47,27 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MemoryImageExportFormat[] ExportFormats { get; } = Enum.GetValues<MemoryImageExportFormat>();
 
     public MemoryImage CurrentImage => Workspace.Document.CurrentImage;
+    /// <summary>The editable base image for the selected workspace tab.</summary>
+    public EditorDocument ActiveDocument => _activeComparisonDocument ?? Workspace.Document;
+    public MemoryImage ActiveImage => ActiveDocument.CurrentImage;
+    public bool ActiveHasImage => ActiveImage.Segments.Count > 0;
+    public bool ActiveCanSave => !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) && ActiveDocument.SourceFormat is not null;
+    public bool ActiveCanSaveAs => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath);
+    public bool ActiveCanCloseImage => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) || ActiveDocument.IsModified;
+    public bool ActiveHasSelection => _activeComparison is null && EditorStatus.SelectionLength > 0;
+    public bool ActiveCanPaste => _activeComparison is null && ActiveHasSelection && Editing.HasClipboard;
+    public bool ActiveCanRelocate => _activeComparison is null &&
+        (uint)_selectedSegmentIndex < (uint)ActiveImage.Segments.Count;
+    public int SelectedSegmentIndex
+    {
+        get => _selectedSegmentIndex;
+        set
+        {
+            if (_selectedSegmentIndex == value) return;
+            _selectedSegmentIndex = value;
+            Raise(nameof(SelectedSegmentIndex), nameof(ActiveCanRelocate));
+        }
+    }
     public int ActiveBytesPerRow
     {
         get => _activeComparison?.BytesPerRow ?? ImageView.BytesPerRow;
@@ -55,7 +82,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         SetActiveComparisonDocument(null);
         _activeComparison = null;
-        Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+        Raise(nameof(ActiveDocument), nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave),
+            nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveHasSelection),
+            nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
     }
     public void ActivateComparison(CompareWorkspaceTabViewModel? comparison)
         => ActivateComparison(comparison?.Comparison, comparison?.BaseDocument);
@@ -67,19 +96,26 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _activeComparison = comparison;
         if (_activeComparison is not null) _activeComparison.PropertyChanged += OnActiveComparisonPropertyChanged;
         SetActiveComparisonDocument(document);
-        Raise(nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
+        Raise(nameof(ActiveDocument), nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave),
+            nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveHasSelection),
+            nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
     }
     private void SetActiveComparisonDocument(EditorDocument? document)
     {
         if (_activeComparisonDocument is not null) _activeComparisonDocument.PropertyChanged -= OnActiveDocumentPropertyChanged;
         _activeComparisonDocument = document;
         if (_activeComparisonDocument is not null) _activeComparisonDocument.PropertyChanged += OnActiveDocumentPropertyChanged;
-        Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo));
+        Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo), nameof(ActiveHasImage), nameof(ActiveCanSave),
+            nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveDocument), nameof(ActiveImage));
     }
     private void OnActiveDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(EditorDocument.CanUndo) or nameof(EditorDocument.CanRedo))
             Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo));
+        if (e.PropertyName is nameof(EditorDocument.CurrentImage) or nameof(EditorDocument.SourcePath) or
+            nameof(EditorDocument.SourceFormat) or nameof(EditorDocument.IsModified))
+            Raise(nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs),
+                nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
     }
     private void OnActiveComparisonPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -92,8 +128,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool IsModified => Workspace.Document.IsModified;
     public bool CanUndo => Workspace.Document.CanUndo;
     public bool CanRedo => Workspace.Document.CanRedo;
-    public bool ActiveCanUndo => _activeComparisonDocument?.CanUndo ?? CanUndo;
-    public bool ActiveCanRedo => _activeComparisonDocument?.CanRedo ?? CanRedo;
+    public bool ActiveCanUndo => ActiveDocument.CanUndo;
+    public bool ActiveCanRedo => ActiveDocument.CanRedo;
     public string? SourcePath => Workspace.Document.SourcePath;
     public MemoryImageExportFormat? SourceFormat => Workspace.Document.SourceFormat;
     public MemoryImageFormatMetadata? SourceFormatMetadata => Workspace.Document.SourceFormatMetadata;
@@ -124,7 +160,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(preview.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata),
+            nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
         if (!ReferenceEquals(previousImage, CurrentImage)) NotifyImageChanged(previousImage, CurrentImage);
     }
 
@@ -138,7 +175,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(format?.ToString());
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata),
+            nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
         if (!ReferenceEquals(previousImage, image)) NotifyImageChanged(previousImage, image);
     }
 
@@ -153,9 +191,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void CopyRange(uint startAddress, uint endAddress)
     {
         var copiedBytes = Editing.CopyRange(startAddress, endAddress);
+        Raise(nameof(ActiveCanPaste));
         StatusMessage = $"Copied {copiedBytes:N0} occupied byte(s), preserving address gaps.";
     }
-    public void CutRange(uint startAddress, uint endAddress) => Editing.CutRange(startAddress, endAddress);
+    public void CutRange(uint startAddress, uint endAddress)
+    {
+        Editing.CutRange(startAddress, endAddress);
+        Raise(nameof(ActiveCanPaste));
+    }
     public void PasteAt(uint address, OverlapDecision? overlapDecision = null) => Editing.PasteAt(address, overlapDecision);
     public int GetPasteOverlapCount(uint address) => Editing.GetPasteOverlapCount(address);
     public void DeleteRange(uint startAddress, uint endAddress) => Editing.DeleteRange(startAddress, endAddress);
@@ -186,37 +229,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void Save()
     {
-        Workspace.Save();
-        CompleteSave();
+        ActiveDocument.Save();
+        CompleteSave(ActiveDocument);
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        var document = Workspace.Document;
-        await Workspace.SaveAsync(cancellationToken, progress);
-        if (ReferenceEquals(Workspace.Document, document)) CompleteSave();
+        var document = ActiveDocument;
+        await document.SaveAsync(cancellationToken, progress);
+        if (ReferenceEquals(ActiveDocument, document)) CompleteSave(document);
     }
 
     public async Task SaveAsAsync(string path, MemoryImageExportFormat format, bool overwriteExisting,
         CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        var document = Workspace.Document;
-        await Workspace.SaveAsAsync(path, format, overwriteExisting, cancellationToken, progress);
-        if (ReferenceEquals(Workspace.Document, document)) CompleteSave();
+        var document = ActiveDocument;
+        await document.SaveAsAsync(path, format, overwriteExisting, cancellationToken, progress);
+        if (ReferenceEquals(ActiveDocument, document)) CompleteSave(document);
     }
 
     public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting)
     {
-        Workspace.SaveAs(path, format, overwriteExisting);
-        CompleteSave();
+        ActiveDocument.SaveAs(path, format, overwriteExisting);
+        CompleteSave(ActiveDocument);
     }
 
-    private void CompleteSave()
+    private void CompleteSave(EditorDocument document)
     {
-        RefreshTitle();
-        StatusMessage = $"Saved {CurrentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {SourceFormat}.";
-        RefreshEditorStatus();
-        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified));
+        if (ReferenceEquals(document, Workspace.Document)) RefreshTitle();
+        StatusMessage = $"Saved {document.CurrentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {document.SourceFormat}.";
+        if (ReferenceEquals(document, Workspace.Document)) RefreshEditorStatus();
+        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified),
+            nameof(ActiveCanSave), nameof(ActiveHasImage), nameof(ActiveCanCloseImage));
     }
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
@@ -240,6 +284,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void ReportFileOperationCancelled(string operation) => StatusMessage = $"{operation} operation cancelled.";
     public void ReportCompareInteraction(string message) => StatusMessage = message;
 
+    public void RefreshActiveCommandState() => Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo), nameof(ActiveHasImage),
+        nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate),
+        nameof(ActiveHasSelection), nameof(ActiveCanPaste));
+
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) => Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
     public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) => Editing.ApplyRelocation(preview, decision);
 
@@ -250,7 +298,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshModifiedTitle();
         StatusMessage = "Image modified. Save to write changes to disk.";
         RefreshEditorStatus();
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo));
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(ActiveImage),
+            nameof(ActiveCanUndo), nameof(ActiveCanRedo), nameof(ActiveHasImage), nameof(ActiveCanSave),
+            nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveCanPaste));
         NotifyImageChanged(previousImage, updatedImage);
     }
 
