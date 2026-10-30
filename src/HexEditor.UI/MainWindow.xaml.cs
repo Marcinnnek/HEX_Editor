@@ -156,9 +156,15 @@ public partial class MainWindow : FluentWindow
         _fileOperationCancellation?.Cancel();
     }
 
-    private void RowWidth8_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 8;
-    private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 16;
-    private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ImageView.BytesPerRow = 32;
+    private void RowWidth8_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 8;
+    private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 16;
+    private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 32;
+
+    private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
+        ViewModel.ActivateComparison((WorkspaceTabs.SelectedContent as CompareView)?.ViewModel);
+    }
 
     private async void CompareImages_Click(object sender, RoutedEventArgs e)
     {
@@ -582,11 +588,25 @@ public partial class MainWindow : FluentWindow
 
     private void GoToAddress_Click(object sender, RoutedEventArgs e)
     {
-        if (!HexAddressParser.TryParse(AddressInput.Text, out var address) ||
-            !ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        if (!HexAddressParser.TryParse(AddressInput.Text, out var address))
         {
             MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.",
                 "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (WorkspaceTabs.SelectedContent is CompareView compareView)
+        {
+            if (!compareView.NavigateToAddress(address))
+            {
+                MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the comparison range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            return;
+        }
+        if (!ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        {
+            MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
