@@ -116,8 +116,8 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
         foreach (var row in CreateRows(image)) rows.Add(row);
     }
 
-    private static IReadOnlyList<CompareMemoryBlockRow> CreateRows(MemoryImage image) => image.Ranges
-        .Select((range, index) => new CompareMemoryBlockRow(index + 1, range.StartAddress, range.EndAddress, checked((long)range.ByteCount)))
+    private static IReadOnlyList<CompareMemoryBlockRow> CreateRows(MemoryImage image) => image.Blocks
+        .Select((block, index) => new CompareMemoryBlockRow(index, block.StartAddress, block.EndAddress, checked((long)block.ByteCount)))
         .ToArray();
 }
 

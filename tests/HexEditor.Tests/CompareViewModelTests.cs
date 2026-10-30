@@ -185,7 +185,7 @@ public sealed class CompareViewModelTests
         Assert.AreEqual("right.s19", workspace.NameB);
         Assert.HasCount(2, workspace.BlocksA);
         Assert.AreEqual(0x2000u, workspace.BlocksA[1].StartAddress);
-        Assert.AreEqual("Block 2 Starts at: 0x00002000 Ends at: 0x00002000 (Length: 0x1 = 1)",
+        Assert.AreEqual("Block 1 Starts at: 0x00002000 Ends at: 0x00002000 (Length: 0x1 = 1)",
             workspace.BlocksA[1].Description);
         Assert.HasCount(1, workspace.BlocksB);
         Assert.AreEqual(0x3000u, workspace.BlocksB[0].StartAddress);
@@ -195,9 +195,48 @@ public sealed class CompareViewModelTests
 
         Assert.HasCount(2, workspace.BlocksA);
         Assert.AreEqual(0x4000u, workspace.BlocksA[1].StartAddress);
-        Assert.AreEqual("Block 2 Starts at: 0x00004000 Ends at: 0x00004000 (Length: 0x1 = 1)",
+        Assert.AreEqual("Block 1 Starts at: 0x00004000 Ends at: 0x00004000 (Length: 0x1 = 1)",
             workspace.BlocksA[1].Description);
         Assert.AreEqual(CompareByteState.OnlyA, workspace.Comparison.Rows[^1].States[0]);
+    }
+
+    [TestMethod]
+    public void WorkspaceTab_ListsMaximalContiguousBlocksWithIndependentZeroBasedNumbers()
+    {
+        var firstHalf = MemoryImage.FromRepeatedRange(0x1000, 0x1000 + 599_999, 0xA1).Ranges[0];
+        var secondHalf = MemoryImage.FromRepeatedRange(0x1000 + 600_000, 0x1000 + 1_199_999, 0xB2).Ranges[0];
+        var fileA = MemoryImage.FromRanges([
+            firstHalf,
+            secondHalf,
+            MemoryImage.FromRepeatedRange(0x200000, 0x200000, 0xC3).Ranges[0]]);
+        var fileB = MemoryImage.FromSegments([
+            new MemorySegment(0x3000, [0x10]),
+            new MemorySegment(0x5000, [0x20])]);
+        var workspace = new CompareWorkspaceTabViewModel(fileA, fileB, "left.hex", "right.hex");
+
+        Assert.HasCount(2, workspace.BlocksA);
+        Assert.AreEqual(0x1000u, workspace.BlocksA[0].StartAddress);
+        Assert.AreEqual(0x1000u + 1_199_999, workspace.BlocksA[0].EndAddress);
+        Assert.AreEqual("Block 0 Starts at: 0x00001000 Ends at: 0x00125F7F (Length: 0x124F80 = 1200000)",
+            workspace.BlocksA[0].Description);
+        Assert.AreEqual("Block 1 Starts at: 0x00200000 Ends at: 0x00200000 (Length: 0x1 = 1)",
+            workspace.BlocksA[1].Description);
+        Assert.HasCount(2, workspace.BlocksB);
+        Assert.AreEqual("Block 0 Starts at: 0x00003000 Ends at: 0x00003000 (Length: 0x1 = 1)",
+            workspace.BlocksB[0].Description);
+        Assert.AreEqual("Block 1 Starts at: 0x00005000 Ends at: 0x00005000 (Length: 0x1 = 1)",
+            workspace.BlocksB[1].Description);
+
+        var editedBase = MemoryImage.FromRanges([
+            MemoryImage.FromRepeatedRange(0x7000, 0x7000 + 1_199_999, 0xD4).Ranges[0],
+            MemoryImage.FromRepeatedRange(0x7000 + 1_200_000, 0x7000 + 2_399_999, 0xE5).Ranges[0]]);
+        workspace.RefreshImage(fileA, editedBase);
+
+        Assert.HasCount(1, workspace.BlocksA);
+        Assert.AreEqual("Block 0 Starts at: 0x00007000 Ends at: 0x00250EFF (Length: 0x249F00 = 2400000)",
+            workspace.BlocksA[0].Description);
+        Assert.AreEqual("Block 0 Starts at: 0x00003000 Ends at: 0x00003000 (Length: 0x1 = 1)",
+            workspace.BlocksB[0].Description);
     }
 
     [TestMethod]

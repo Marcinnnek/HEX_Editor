@@ -40,9 +40,9 @@ public sealed class CompareSegmentListLayoutTests
                 var referenceBlocks = segmentLists.Single(list => ReferenceEquals(list.ItemsSource, workspace.BlocksB));
                 Assert.AreEqual(SelectionMode.Extended, baseBlocks.SelectionMode);
                 Assert.AreEqual(SelectionMode.Single, referenceBlocks.SelectionMode);
-                Assert.AreEqual("Block 1 Starts at: 0x00001000 Ends at: 0x00001000 (Length: 0x1 = 1)",
+                Assert.AreEqual("Block 0 Starts at: 0x00001000 Ends at: 0x00001000 (Length: 0x1 = 1)",
                     ((CompareMemoryBlockRow)baseBlocks.Items[0]).Description);
-                Assert.AreEqual("Block 2 Starts at: 0x00001010 Ends at: 0x000025CB (Length: 0x15BC = 5564)",
+                Assert.AreEqual("Block 1 Starts at: 0x00001010 Ends at: 0x000025CB (Length: 0x15BC = 5564)",
                     ((CompareMemoryBlockRow)baseBlocks.Items[1]).Description);
 
                 foreach (var list in segmentLists)
