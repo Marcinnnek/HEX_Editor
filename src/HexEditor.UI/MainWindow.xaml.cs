@@ -363,15 +363,6 @@ public partial class MainWindow : Window
 
     private EditorDocument ActiveDocument => ViewModel.ActiveDocument;
 
-    private void MoreCommands_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement element && element.ContextMenu is { } menu)
-        {
-            menu.PlacementTarget = element;
-            menu.IsOpen = true;
-        }
-    }
-
     private void PrimaryToolBarTray_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         var width = e.NewSize.Width;
@@ -703,18 +694,6 @@ public partial class MainWindow : Window
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
-    }
-
-    private void GoToAddress_Click(object sender, RoutedEventArgs e)
-    {
-        if (!HexAddressParser.TryParse(AddressInput.Text, out var address))
-        {
-            MessageBox.Show(this, "Enter an absolute 32-bit hexadecimal address in the image's displayed range.",
-                "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        NavigateToAddress(address);
     }
 
     private void GoToAddressDialog_Click(object sender, RoutedEventArgs e)
