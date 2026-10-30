@@ -13,6 +13,9 @@ A byte explicitly stored at an address, including values `00` and `FF`.
 **Memory segment**:
 A contiguous range of occupied addresses. Segment boundaries come from address occupancy, not from source record boundaries.
 
+**Block**:
+An alternate name for a memory segment. Its boundaries follow occupied addresses, not source file records.
+
 **Address gap**:
 A range of unoccupied addresses between or around occupied bytes. A gap is not implicitly filled with any byte value.
 
