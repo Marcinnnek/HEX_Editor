@@ -127,6 +127,7 @@ public partial class HexViewControl : UserControl
         control.HexGrid.ItemsSource = enabled ? null : control.ItemsSource as IEnumerable;
         control.HexGrid.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         control.WindowedView.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+        ScrollViewer.SetCanContentScroll(control.WindowedScroll, enabled);
         control._windowStart = 0;
         control.RefreshWindow();
     }

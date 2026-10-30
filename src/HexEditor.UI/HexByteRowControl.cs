@@ -200,10 +200,13 @@ public sealed class HexByteRowControl : Control
                         advances.Add(_characterWidth + (isByteSeparator ? layout.HorizontalSpacing : 0));
                     }
                 }
-                var run = new GlyphRun(glyphTypeface, 0, false, FontSize, (float)_pixelsPerDip, glyphs,
-                    new Point(0, Format("0").Baseline), advances, null, characters, null, null, null,
-                    XmlLanguage.GetLanguage("en-US"));
-                context.DrawGlyphRun(Foreground, run);
+                if (glyphs.Count > 0)
+                {
+                    var run = new GlyphRun(glyphTypeface, 0, false, FontSize, (float)_pixelsPerDip, glyphs,
+                        new Point(0, Format("0").Baseline), advances, null, characters, null, null, null,
+                        XmlLanguage.GetLanguage("en-US"));
+                    context.DrawGlyphRun(Foreground, run);
+                }
             }
             else
                 for (var index = 0; index < row.Cells.Count; index++)

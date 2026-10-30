@@ -9,7 +9,6 @@
         <Grid.RowDefinitions><RowDefinition Height="*"/></Grid.RowDefinitions>
         <ScrollViewer x:Name="WindowedScroll" Grid.RowSpan="2" Grid.Column="0"
                       HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                      CanContentScroll="True"
                       FontFamily="Consolas"
                       PreviewMouseWheel="WindowedScroll_PreviewMouseWheel">
           <StackPanel>
