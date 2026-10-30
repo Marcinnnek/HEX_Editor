@@ -25,11 +25,20 @@ Incoming data that supplies an address already occupied by another value or reco
 **Import**:
 Reading a HEX or S-Record file into a memory image while retaining its absolute addresses and recording source format metadata.
 
+**Source record**:
+An encoded entry in an Intel HEX or Motorola S-Record file. Its boundary does not define a memory segment.
+
+**Byte sequence**:
+An ordered list of byte values used as a search pattern across consecutive occupied addresses in a memory image. It is independent of source-record boundaries and does not cross address gaps.
+
 **Merge**:
 Combining two memory images by absolute address, with explicit handling for addresses occupied by both images.
 
 **Comparison difference**:
 An absolute address where two memory images contain unequal byte values or where only one image contains a byte. An address absent from both images is not a difference.
+
+**Edited byte**:
+An occupied byte whose current value differs from the value at the same address in the image's last saved state, including a byte newly added at that address. A removed byte has no visible cell in the Editor.
 
 **Base image**:
 The editable memory image whose occupied addresses and byte values are compared with a reference image.
