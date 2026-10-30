@@ -41,6 +41,47 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void Import_NonSeekableInputUsesBoundedDiskStagingAndReportsReadProgress()
+    {
+        const string intelHex = ":02000000AABB99\n:00000001FF\n";
+        using var bytes = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
+        using var input = new NonSeekableReadStream(bytes);
+        var progress = new RecordingProgress();
+
+        var result = new MemoryImageFileService().PrepareImport(input, progress: progress)
+            .Apply(OverlapDecision.OverwriteIncoming)!;
+
+        Assert.IsTrue(result.Image.TryGetByte(0, out var first));
+        Assert.AreEqual((byte)0xAA, first);
+        Assert.IsGreaterThan(0, progress.ReadReports);
+    }
+
+    private sealed class RecordingProgress : IProgress<MemoryImageFileProgress>
+    {
+        public int ReadReports { get; private set; }
+        public void Report(MemoryImageFileProgress value)
+        {
+            if (value.Stage == "Reading file") ReadReports++;
+        }
+    }
+
+    private sealed class NonSeekableReadStream(Stream inner) : Stream
+    {
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override int Read(Span<byte> buffer) => inner.Read(buffer);
+        protected override void Dispose(bool disposing) { }
+    }
+
+    [TestMethod]
     public void SaveAtomically_CancellationPreservesExistingDestinationAndRemovesTemporaryFile()
     {
         var directory = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}");
@@ -507,6 +548,61 @@ public sealed class MemoryImageFileServiceTests
             Assert.IsFalse(imported.TryGetByte(0x1000, out _));
             Assert.IsFalse(imported.TryGetByte(0x1004, out _));
             Assert.IsFalse(imported.TryGetByte(0x2000, out _));
+        }
+    }
+
+    [TestMethod]
+    public void ExportAddressRange_StreamsClippedLogicalRangesForBothFormats()
+    {
+        var source = MemoryImage.FromPatternRange(0x1000, 0x1007, [0xAA, 0xBB, 0xCC]);
+        var service = new MemoryImageFileService();
+
+        foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+        {
+            using var exported = new MemoryStream();
+            service.ExportAddressRange(source, 0x1002, 0x1006, format, 8, exported);
+            exported.Position = 0;
+            var imported = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+
+            Assert.AreEqual((ulong)5, imported.OccupiedByteCount);
+            Assert.IsTrue(imported.TryGetByte(0x1002, out var first));
+            Assert.AreEqual((byte)0xCC, first);
+            Assert.IsTrue(imported.TryGetByte(0x1003, out var second));
+            Assert.AreEqual((byte)0xAA, second);
+            Assert.IsTrue(imported.TryGetByte(0x1006, out var last));
+            Assert.AreEqual((byte)0xAA, last);
+            Assert.IsFalse(imported.TryGetByte(0x1001, out _));
+        }
+    }
+
+    [TestMethod]
+    public void Export_FullAddressSpaceStreamsWithWideProgressAndCancellation()
+    {
+        var image = MemoryImage.FromPatternRange(0, uint.MaxValue, [0xA5, 0x5A, 0xC3]);
+        var service = new MemoryImageFileService();
+        foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+        {
+            using var cancellation = new CancellationTokenSource();
+            using var output = new MemoryStream();
+            var progress = new CapturingCancellingProgress(cancellation);
+
+            Assert.Throws<OperationCanceledException>(() => service.Export(image, format, 32, output,
+                cancellationToken: cancellation.Token, progress: progress));
+
+            Assert.AreEqual(32L, progress.Last!.Completed);
+            Assert.AreEqual(4_294_967_296L, progress.Last.Total);
+            Assert.IsGreaterThan(0, output.Length);
+        }
+    }
+
+    private sealed class CapturingCancellingProgress(CancellationTokenSource cancellation) : IProgress<MemoryImageFileProgress>
+    {
+        public MemoryImageFileProgress? Last { get; private set; }
+
+        public void Report(MemoryImageFileProgress value)
+        {
+            Last = value;
+            cancellation.Cancel();
         }
     }
 

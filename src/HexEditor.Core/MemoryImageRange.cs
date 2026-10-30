@@ -42,4 +42,49 @@ public sealed class MemoryImageRange
             : _data.Span[(int)offset];
         return true;
     }
+
+    /// <summary>Copies occupied bytes into a bounded caller-owned buffer.</summary>
+    public void CopyTo(ulong offset, Span<byte> destination)
+    {
+        if (offset > ByteCount || (ulong)destination.Length > ByteCount - offset)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset), "The requested bytes are outside this occupied range.");
+        }
+
+        if (!_isRepeated)
+        {
+            _data.Span.Slice(checked((int)offset), destination.Length).CopyTo(destination);
+            return;
+        }
+
+        var pattern = _pattern.Span;
+        var patternOffset = (int)(offset % (ulong)pattern.Length);
+        for (var index = 0; index < destination.Length; index++)
+        {
+            destination[index] = pattern[patternOffset];
+            patternOffset++;
+            if (patternOffset == pattern.Length) patternOffset = 0;
+        }
+    }
+
+    /// <summary>Returns a view clipped to an inclusive subrange without materializing repeated data.</summary>
+    public MemoryImageRange Slice(uint startAddress, uint endAddress)
+    {
+        if (startAddress < StartAddress || endAddress > EndAddress || startAddress > endAddress)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startAddress), "The requested subrange must be contained in this occupied range.");
+        }
+
+        if (_isRepeated)
+        {
+            var offset = (ulong)startAddress - StartAddress;
+            var rotatedPattern = new byte[_pattern.Length];
+            CopyTo(offset, rotatedPattern);
+            return Repeated(startAddress, endAddress, rotatedPattern);
+        }
+
+        var dataOffset = checked((int)((ulong)startAddress - StartAddress));
+        var count = checked((int)((ulong)endAddress - startAddress + 1));
+        return new MemoryImageRange(startAddress, endAddress, _data.Slice(dataOffset, count), default, false);
+    }
 }
