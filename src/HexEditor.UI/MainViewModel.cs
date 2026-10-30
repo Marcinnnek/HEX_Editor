@@ -219,6 +219,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public void ReportFileOperationCancelled(string operation) => StatusMessage = $"{operation} operation cancelled.";
+    public void ReportCompareInteraction(string message) => StatusMessage = message;
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) => Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
     public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) => Editing.ApplyRelocation(preview, decision);
