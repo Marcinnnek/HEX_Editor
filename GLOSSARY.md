@@ -27,3 +27,9 @@ Combining two memory images by absolute address, with explicit handling for addr
 
 **Comparison difference**:
 An absolute address where two memory images contain unequal byte values or where only one image contains a byte. An address absent from both images is not a difference.
+
+**Base image**:
+The editable memory image whose occupied addresses and byte values are compared with a reference image.
+
+**Reference image**:
+The read-only memory image used to identify differences from a base image.
