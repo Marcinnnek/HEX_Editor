@@ -98,14 +98,14 @@ public sealed class CompareRowActivationTests
         Assert.AreEqual((byte)0x30, ReadByte(document.CurrentImage, 0x1001));
         Assert.AreSame(document.CurrentImage, first.Comparison.FileA);
         Assert.AreSame(document.CurrentImage, second.Comparison.FileA);
-        Assert.AreEqual(0, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
-        Assert.AreEqual(1, second.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
-        Assert.IsTrue(document.IsModified);
-        Assert.IsTrue(document.Editing.Undo());
         Assert.AreEqual(1, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
         Assert.AreEqual(0, second.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
-        Assert.IsTrue(document.Editing.Redo());
+        Assert.IsTrue(document.IsModified);
+        Assert.IsTrue(document.Editing.Undo());
         Assert.AreEqual(0, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+        Assert.AreEqual(1, second.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+        Assert.IsTrue(document.Editing.Redo());
+        Assert.AreEqual(1, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
     }
 
     private static byte ReadByte(MemoryImage image, uint address)

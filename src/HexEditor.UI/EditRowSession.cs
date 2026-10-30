@@ -1,4 +1,5 @@
 using HexEditor.Core;
+using System.IO;
 
 namespace HexEditor.UI;
 
