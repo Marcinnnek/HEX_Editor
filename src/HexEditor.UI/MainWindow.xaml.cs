@@ -335,10 +335,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        var replacedDocument = ViewModel.Workspace.Document;
+        if (!ConfirmCloseImage(replacedDocument)) return;
+
         try
         {
             var preview = await RunFileOperationAsync((token, progress) => _files.PrepareOpenAsync(dialog.FileName, token, progress));
-            ViewModel.ApplyImport(preview, ChooseImportOverlap(preview));
+            ViewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+            CloseDocumentViews(replacedDocument);
+            ViewModel.ActivateEditor();
             Title = ViewModel.WindowTitle;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Open"); }
