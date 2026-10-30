@@ -11,6 +11,8 @@ public static class MemoryImageSparseOverlay
         ArgumentNullException.ThrowIfNull(first);
         ArgumentNullException.ThrowIfNull(second);
         ArgumentNullException.ThrowIfNull(chooseValue);
+        if (!HasOverlappingRanges(first, second))
+            return MemoryImage.FromRanges(first.Ranges.Concat(second.Ranges));
         if (first.Segments.Count == 0) return second;
         if (second.Segments.Count == 0) return first;
 
@@ -63,6 +65,21 @@ public static class MemoryImageSparseOverlay
 
     private static ulong NextStart(IReadOnlyList<MemorySegment> segments, int index) =>
         index < segments.Count ? segments[index].StartAddress : ulong.MaxValue;
+
+    private static bool HasOverlappingRanges(MemoryImage first, MemoryImage second)
+    {
+        var firstIndex = 0;
+        var secondIndex = 0;
+        while (firstIndex < first.Ranges.Count && secondIndex < second.Ranges.Count)
+        {
+            var left = first.Ranges[firstIndex];
+            var right = second.Ranges[secondIndex];
+            if (left.StartAddress <= right.EndAddress && right.StartAddress <= left.EndAddress) return true;
+            if (left.EndAddress < right.EndAddress) firstIndex++;
+            else secondIndex++;
+        }
+        return false;
+    }
 
     private static void Advance(IReadOnlyList<MemorySegment> segments, ref int index, ulong address)
     {

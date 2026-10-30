@@ -75,6 +75,8 @@ public sealed class ImageEditingSession
         ArgumentNullException.ThrowIfNull(preview);
         if (!ReferenceEquals(preview.Destination, _currentImage))
             throw new InvalidOperationException("The destination image changed after the merge preview was created. Preview the merge again before applying it.");
+        if (defaultChoice is not null)
+            EnsureWithinUserImageLimit(GetMergeOccupiedByteCount(preview.Destination, preview.Source));
         var merged = preview.Resolve(defaultChoice, rangeOverrides);
         if (merged is not null) Commit(merged);
     }
@@ -220,6 +222,7 @@ public sealed class ImageEditingSession
         ArgumentNullException.ThrowIfNull(preview);
         var relocated = preview.Apply(decision);
         if (relocated is null) return false;
+        EnsureWithinUserImageLimit(relocated.OccupiedByteCount);
         Commit(relocated);
         return true;
     }
@@ -275,6 +278,24 @@ public sealed class ImageEditingSession
         for (var i = 0; i < left.Ranges.Count; i++)
             if (!left.Ranges[i].ContentEquals(right.Ranges[i])) return false;
         return true;
+    }
+
+    private static ulong GetMergeOccupiedByteCount(MemoryImage destination, MemoryImage source)
+    {
+        ulong overlap = 0;
+        var destinationIndex = 0;
+        var sourceIndex = 0;
+        while (destinationIndex < destination.Ranges.Count && sourceIndex < source.Ranges.Count)
+        {
+            var destinationRange = destination.Ranges[destinationIndex];
+            var sourceRange = source.Ranges[sourceIndex];
+            var start = Math.Max((ulong)destinationRange.StartAddress, sourceRange.StartAddress);
+            var end = Math.Min((ulong)destinationRange.EndAddress, sourceRange.EndAddress);
+            if (start <= end) overlap = checked(overlap + end - start + 1);
+            if (destinationRange.EndAddress <= sourceRange.EndAddress) destinationIndex++;
+            if (sourceRange.EndAddress <= destinationRange.EndAddress) sourceIndex++;
+        }
+        return checked(destination.OccupiedByteCount + source.OccupiedByteCount - overlap);
     }
 
     private static void ValidateRange(uint startAddress, uint endAddress)
