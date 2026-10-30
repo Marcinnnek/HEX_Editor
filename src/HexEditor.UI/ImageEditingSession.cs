@@ -34,6 +34,16 @@ public sealed class ImageEditingSession
         Commit(next);
     }
 
+    public void EditOccupiedBytes(IReadOnlyDictionary<uint, byte> changes)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        if (changes.Count == 0) return;
+        if (changes.Keys.Any(address => !_currentImage.TryGetByte(address, out _)))
+            throw new InvalidOperationException("Edit Row can change occupied bytes only.");
+        Commit(MemoryImageSparseOverlay.Combine(_currentImage, MemoryImageEdits.FromBytes(changes),
+            (_, hasExisting, existing, hasIncoming, incoming) => hasIncoming ? incoming : existing));
+    }
+
     public void InsertBytes(uint address, IReadOnlyList<byte> bytes, OverlapDecision? overlapDecision = null)
     {
         var preview = PreviewInsert(address, bytes);
