@@ -7,13 +7,14 @@ namespace HexEditor.UI;
 /// <summary>Collects a destination address and previews the selected segment relocation.</summary>
 public sealed class RelocateSegmentDialog : Window
 {
-    private readonly TextBox _destination = new() { MinWidth = 190, Text = "00000000" };
+    private readonly TextBox _destination;
     private readonly TextBlock _preview = new() { Margin = new Thickness(0, 8, 0, 12) };
     private readonly int _byteCount;
 
     public RelocateSegmentDialog(uint startAddress, uint endAddress, int byteCount)
     {
         _byteCount = byteCount;
+        _destination = new TextBox { MinWidth = 190, Text = startAddress.ToString("X8") };
         Title = "Relocate memory segment";
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -32,11 +33,17 @@ public sealed class RelocateSegmentDialog : Window
         buttons.Children.Add(apply);
         panel.Children.Add(buttons);
         Content = panel;
+        Loaded += (_, _) =>
+        {
+            _destination.Focus();
+            _destination.SelectAll();
+        };
         _destination.TextChanged += (_, _) => UpdatePreview();
         UpdatePreview();
     }
 
     public uint DestinationAddress { get; private set; }
+    public string DestinationAddressText => _destination.Text;
 
     private bool TryGetDestination(out uint destination)
     {

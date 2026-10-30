@@ -816,6 +816,17 @@ public partial class MainWindow : FluentWindow
         }
     }
 
+    private void SegmentsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source ||
+            ItemsControl.ContainerFromElement(SegmentsGrid, source) is not DataGridRow)
+        {
+            return;
+        }
+
+        RelocateSegment_Click(sender, e);
+    }
+
     private void HexView_AddressRangeSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
         ApplySelection(e.StartAddress, e.EndAddress);
