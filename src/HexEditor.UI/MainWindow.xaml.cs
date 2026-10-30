@@ -63,42 +63,24 @@ public partial class MainWindow : Window
         ApplyAppearance();
     }
 
-    private void AutomaticAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Automatic);
-    private void LightAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Light);
-    private void DarkAppearance_Click(object sender, RoutedEventArgs e) => SetAppearance(AppearanceMode.Dark);
-
     private void Preferences_Click(object sender, RoutedEventArgs e)
-    {
-        try { new PreferencesWindow { Owner = this }.ShowDialog(); }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            RecordError("Save grid spacing preferences", exception);
-            MessageBox.Show(this, exception.Message, "Unable to save preferences", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void SetAppearance(AppearanceMode mode)
     {
         try
         {
-            _appearanceSession.SetMode(mode);
+            var choices = new PreferencesSession(_appearanceSession, GridSpacingSettings.Current);
+            if (new PreferencesWindow(choices) { Owner = this }.ShowDialog() != true) return;
+            choices.Save();
             ApplyAppearance();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            RecordError("Save appearance", exception);
-            MessageBox.Show(this, exception.Message, "Unable to save appearance", MessageBoxButton.OK, MessageBoxImage.Error);
-            ApplyAppearance();
+            RecordError("Save preferences", exception);
+            MessageBox.Show(this, exception.Message, "Unable to save preferences", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
     private void ApplyAppearance()
     {
-        var mode = _appearanceSession.Mode;
-        AutomaticAppearanceItem.IsChecked = mode == AppearanceMode.Automatic;
-        LightAppearanceItem.IsChecked = mode == AppearanceMode.Light;
-        DarkAppearanceItem.IsChecked = mode == AppearanceMode.Dark;
-
         var dark = _appearanceSession.EffectiveTheme == AppearanceMode.Dark;
         ApplicationThemeManager.Apply(dark ? ApplicationTheme.Dark : ApplicationTheme.Light, WindowBackdropType.None);
         AppearancePalette.Apply(dark);
