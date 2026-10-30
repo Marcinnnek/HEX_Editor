@@ -4,10 +4,14 @@
 
 **Blocked by:** 04: Share a base image across Editor and Compare tabs; 13: Rebuild the Editor and Compare workspace layout.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Switching tabs restores each tab's independent 8/16/32 bytes-per-row and ASCII visibility settings without modifying another tab.
-- [ ] The primary toolbar reflects the selected tab; changing either primary or Compare-local controls updates the same active tab state.
-- [ ] Go to address acts on the active tab; in Compare, both panels remain aligned at the same absolute address.
-- [ ] Changing row width, ASCII visibility, range filter, or tab selection preserves meaningful address and scroll position where possible.
-- [ ] Public workspace/view-model tests cover tab switching, two-way setting changes, address navigation, and aligned sparse rows; inspect the WPF bindings.
+- [x] Switching tabs restores each tab's independent 8/16/32 bytes-per-row and ASCII visibility settings without modifying another tab.
+- [x] The primary toolbar reflects the selected tab; changing either primary or Compare-local controls updates the same active tab state.
+- [x] Go to address acts on the active tab; in Compare, both panels remain aligned at the same absolute address.
+- [x] Changing row width, ASCII visibility, range filter, or tab selection preserves meaningful address and scroll position where possible.
+- [x] Public workspace/view-model tests cover tab switching, two-way setting changes, address navigation, and aligned sparse rows; inspect the WPF bindings.
+
+## Comments
+
+- Merged on `integration` as `adc640a`. Integrated test suite passed: 120 tests.

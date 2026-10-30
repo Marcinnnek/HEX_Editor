@@ -4,11 +4,16 @@
 
 **Blocked by:** 02: Give the Editor a stable image document.
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
 - [ ] The dialog shows the selected segment's current start, end, and byte count, accepts a hexadecimal new start, and previews the new end.
 - [ ] Malformed, overflowing, or format-incompatible destinations are rejected before any data changes.
 - [ ] Occupied destination bytes block by default; overwriting requires a separate affirmative confirmation even when values are identical.
 - [ ] Canceling either dialog or declining overwrite leaves image, selection, and dirty state unchanged.
 - [ ] A successful move preserves segment bytes and length, refreshes affected views, marks the base modified, and is one Undo/Redo action.
-- [ ] Test relocation through the document/workspace seam and inspect the modal flow in WPF.
+- [x] Test relocation through the document/workspace seam.
+- [ ] Inspect the modal flow in WPF.
+
+## Comments
+
+- Merged relocation dialog and workspace operation on `integration` as `1cf1166`; the implementer reports the WPF project built and all 7 relocation tests passed. Live modal inspection remains outstanding.

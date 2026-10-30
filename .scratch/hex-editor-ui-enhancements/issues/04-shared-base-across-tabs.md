@@ -4,10 +4,14 @@
 
 **Blocked by:** 03: Compare the current base image with one new file.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Compare from an active Compare tab opens a new tab using the same base document and asks only for a new reference file.
-- [ ] Every Editor or Compare view of that base shows edited bytes and refreshed comparison results without reloading from disk.
-- [ ] All views of one base share one Undo/Redo history; distinct base documents keep separate histories.
-- [ ] Opening another file in Editor leaves prior Compare tabs, reference images, base bytes, and dirty state intact.
-- [ ] Workspace-seam tests cover multiple references, an Editor switch, edits, Undo/Redo, and sparse difference updates.
+- [x] Compare from an active Compare tab opens a new tab using the same base document and asks only for a new reference file.
+- [x] Every Editor or Compare view of that base shows edited bytes and refreshed comparison results without reloading from disk.
+- [x] All views of one base share one Undo/Redo history; distinct base documents keep separate histories.
+- [x] Opening another file in Editor leaves prior Compare tabs, reference images, base bytes, and dirty state intact.
+- [x] Workspace-seam tests cover multiple references, an Editor switch, edits, Undo/Redo, and sparse difference updates.
+
+## Comments
+
+- Merged on `integration` as `fc614be` (`Share base documents across compare tabs`). The implementer reports the full suite passed: 112 tests.
