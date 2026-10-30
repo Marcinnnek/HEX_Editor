@@ -34,6 +34,7 @@ internal static class AppearancePalette
         Set(resources, "HexDifferentBrush", colors.Different);
         Set(resources, "HexOnlyInABrush", colors.OnlyInA);
         Set(resources, "HexOnlyInBBrush", colors.OnlyInB);
+        Set(resources, "HexEditedByteBrush", colors.EditedByte);
         Changed?.Invoke();
     }
 

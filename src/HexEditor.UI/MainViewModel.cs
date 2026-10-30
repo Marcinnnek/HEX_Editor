@@ -288,6 +288,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void CompleteSave(EditorDocument document)
     {
+        if (ReferenceEquals(document, Workspace.Document)) RefreshImage(clearSelection: false);
         if (ReferenceEquals(document, Workspace.Document)) RefreshTitle();
         StatusMessage = $"Saved {document.CurrentImage.OccupiedByteCount:N0} bytes as {document.SourceFormat}.";
         if (ReferenceEquals(document, Workspace.Document)) RefreshEditorStatus();
@@ -296,6 +297,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
+    public void RefreshEditedByteMarkers()
+    {
+        if (ReferenceEquals(ActiveDocument, Workspace.Document)) RefreshImage(clearSelection: false);
+    }
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
 
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>
@@ -338,10 +343,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void NotifyImageChanged(MemoryImage previousImage, MemoryImage updatedImage) => ImageChanged?.Invoke(previousImage, updatedImage);
 
-    private void RefreshImage()
+    private void RefreshImage(bool clearSelection = true)
     {
-        EditorStatus.ClearSelection();
-        ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
+        if (clearSelection) EditorStatus.ClearSelection();
+        ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii, Workspace.Document);
         Segments.Clear();
         foreach (var (range, index) in CurrentImage.Ranges.Select((range, index) => (range, index)))
             Segments.Add(new MemorySegmentRow(range.StartAddress.ToString("X8"), range.EndAddress.ToString("X8"), checked((long)range.ByteCount), index + 1));

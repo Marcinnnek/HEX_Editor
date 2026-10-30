@@ -535,6 +535,7 @@ public partial class MainWindow : Window
 
     private void RefreshSavedDocumentTabs(EditorDocument document)
     {
+        if (ReferenceEquals(document, ViewModel.Workspace.Document)) ViewModel.RefreshEditedByteMarkers();
         foreach (var tab in WorkspaceTabs.Items.OfType<TabItem>())
         {
             if (tab.Content is not CompareView view || !ReferenceEquals(view.Workspace.BaseDocument, document)) continue;

@@ -82,6 +82,8 @@ public sealed class HexByteRowControl : Control
             };
             if (brush is not null)
                 drawingContext.DrawRectangle(brush, null, layout.GetHighlightBounds(index, IsAscii));
+            if (row.Cells[index].IsEdited && TryFindResource("HexEditedByteBrush") is Brush editedBrush)
+                drawingContext.DrawRectangle(null, new Pen(editedBrush, 2), layout.GetHighlightBounds(index, IsAscii));
             if (row.Cells[index].IsFindMatch && TryFindResource("HexFindMatchBrush") is Brush findBrush)
                 drawingContext.DrawRectangle(null, new Pen(findBrush, 2), layout.GetHighlightBounds(index, IsAscii));
         }
