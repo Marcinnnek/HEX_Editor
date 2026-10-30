@@ -480,71 +480,14 @@ public partial class MainWindow : FluentWindow
     {
         try
         {
-            var request = BuildChecksumRequest();
-            _checksums.Calculate(request);
-        }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
-        {
-            RecordError("Calculate checksum", exception);
-            MessageBox.Show(this, exception.Message, "Unable to calculate checksum", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private ChecksumRequest BuildChecksumRequest()
-    {
-        var start = ParseAddress(RangeStartInput.Text);
-        var end = ParseAddress(RangeEndInput.Text);
-        var width = int.Parse(((ComboBoxItem)ChecksumWidthInput.SelectedItem).Content.ToString()!, CultureInfo.InvariantCulture);
-        var missingTreatment = MissingTreatmentInput.SelectedIndex switch
-        {
-            0 => MissingAddressTreatment.Reject,
-            1 => MissingAddressTreatment.FillByte,
-            _ => throw new ArgumentException("Choose how missing addresses are treated.")
-        };
-        byte? fillByte = missingTreatment == MissingAddressTreatment.FillByte
-            ? byte.Parse(HoleFillByteInput.Text.Trim().Replace("0x", string.Empty, StringComparison.OrdinalIgnoreCase), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture)
-            : null;
-        var byteOrder = ChecksumByteOrderInput.SelectedIndex switch
-        {
-            0 => ChecksumByteOrder.BigEndian,
-            1 => ChecksumByteOrder.LittleEndian,
-            _ => throw new ArgumentException("Choose the byte order.")
-        };
-        var algorithm = ((ComboBoxItem)ChecksumAlgorithmInput.SelectedItem).Content.ToString()!;
-        return algorithm switch
-        {
-            "Additive" => ChecksumRequest.Additive(start, end, width, missingTreatment, fillByte, byteOrder),
-            "CRC-16/CCITT-FALSE" => ChecksumRequest.Crc16CcittFalse(start, end, missingTreatment, fillByte, byteOrder),
-            "CRC-32/ISO-HDLC" => ChecksumRequest.Crc32IsoHdlc(start, end, missingTreatment, fillByte, byteOrder),
-            "Custom CRC" => ChecksumRequest.CustomCrc(start, end, width,
-                ParseHexChecksumValue(ChecksumPolynomialInput.Text), ParseHexChecksumValue(ChecksumInitialInput.Text),
-                ReflectInputCheckBox.IsChecked == true, ReflectOutputCheckBox.IsChecked == true,
-                ParseHexChecksumValue(ChecksumFinalXorInput.Text), missingTreatment, fillByte, byteOrder),
-            _ => throw new ArgumentException("Choose a checksum algorithm.")
-        };
-    }
-
-    private static ulong ParseHexChecksumValue(string text)
-    {
-        text = text.Trim();
-        if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) text = text[2..];
-        if (!ulong.TryParse(text, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var value))
-            throw new ArgumentException("Enter a hexadecimal checksum parameter.");
-        return value;
-    }
-
-    private void WriteChecksum_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            var address = ParseAddress(ChecksumWriteAddressInput.Text);
-            _checksums.Write(address, AskOverlap);
+            var dialog = new ChecksumDialog(ViewModel, AskOverlap) { Owner = this };
+            dialog.ShowDialog();
             Title = ViewModel.WindowTitle;
         }
-        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or OverflowException)
+        catch (Exception exception)
         {
-            RecordError("Write checksum", exception);
-            MessageBox.Show(this, exception.Message, "Unable to write checksum", MessageBoxButton.OK, MessageBoxImage.Error);
+            RecordError("Open checksum dialog", exception);
+            MessageBox.Show(this, exception.Message, "Unable to open checksum dialog", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
