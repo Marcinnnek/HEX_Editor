@@ -11,6 +11,14 @@ public partial class HexViewControl : UserControl
     public HexViewControl()
     {
         InitializeComponent();
+        RowGap = new Thickness(0, 0, 0, GridSpacingSettings.Current.VerticalRowSpacing);
+        Loaded += (_, _) =>
+        {
+            GridSpacingSettings.SpacingChanged -= SpacingChanged;
+            GridSpacingSettings.SpacingChanged += SpacingChanged;
+            SpacingChanged();
+        };
+        Unloaded += (_, _) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
     }
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
@@ -18,6 +26,9 @@ public partial class HexViewControl : UserControl
 
     public static readonly DependencyProperty ShowAsciiProperty = DependencyProperty.Register(
         nameof(ShowAscii), typeof(bool), typeof(HexViewControl), new PropertyMetadata(true, OnShowAsciiChanged));
+
+    public static readonly DependencyProperty RowGapProperty = DependencyProperty.Register(
+        nameof(RowGap), typeof(Thickness), typeof(HexViewControl), new PropertyMetadata(default(Thickness)));
 
     public System.Collections.IEnumerable? ItemsSource
     {
@@ -33,6 +44,12 @@ public partial class HexViewControl : UserControl
 
     public DataGrid ItemsGrid => HexGrid;
 
+    public Thickness RowGap
+    {
+        get => (Thickness)GetValue(RowGapProperty);
+        private set => SetValue(RowGapProperty, value);
+    }
+
     public event EventHandler<AddressRangeSelectedEventArgs>? AddressRangeSelected;
 
     public void ScrollToRow(int rowIndex)
@@ -46,6 +63,9 @@ public partial class HexViewControl : UserControl
         if (owner is HexViewControl control)
             control.AsciiColumn.Visibility = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
     }
+
+    private void SpacingChanged() => Dispatcher.BeginInvoke(() =>
+        RowGap = new Thickness(0, 0, 0, GridSpacingSettings.Current.VerticalRowSpacing));
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)
     {
