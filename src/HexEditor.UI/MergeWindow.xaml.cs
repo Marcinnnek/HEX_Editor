@@ -13,7 +13,7 @@ public partial class MergeWindow : FluentWindow
     private readonly string _nameA;
     private readonly string _nameB;
 
-    public MergeWindow(MemoryImage imageA, MemoryImage imageB, string nameA, string nameB)
+    public MergeWindow(MemoryImage imageA, MemoryImage imageB, string nameA, string nameB, bool fixedDestination = false)
     {
         ArgumentNullException.ThrowIfNull(imageA);
         ArgumentNullException.ThrowIfNull(imageB);
@@ -22,13 +22,16 @@ public partial class MergeWindow : FluentWindow
         _imageB = imageB;
         _nameA = nameA;
         _nameB = nameB;
+        IsFixedDestination = fixedDestination;
         DataContext = this;
 
-        DirectionOptions =
-        [
-            new MergeDirectionOption($"Merge {_nameB} into {_nameA}", false),
-            new MergeDirectionOption($"Merge {_nameA} into {_nameB}", true)
-        ];
+        DirectionOptions = fixedDestination
+            ? [new MergeDirectionOption($"Merge {_nameB} into {_nameA}", false)]
+            :
+            [
+                new MergeDirectionOption($"Merge {_nameB} into {_nameA}", false),
+                new MergeDirectionOption($"Merge {_nameA} into {_nameB}", true)
+            ];
         ChoiceOptions =
         [
             new MergeChoiceOption("Keep destination values", MemoryImageMergeChoice.KeepDestination),
@@ -36,6 +39,12 @@ public partial class MergeWindow : FluentWindow
         ];
         DirectionBox.ItemsSource = DirectionOptions;
         DirectionBox.SelectedIndex = 0;
+        if (fixedDestination)
+        {
+            DirectionLabel.Visibility = Visibility.Collapsed;
+            DirectionBox.Visibility = Visibility.Collapsed;
+            DirectionBox.IsEnabled = false;
+        }
         DefaultChoiceBox.ItemsSource = ChoiceOptions;
         DefaultChoiceBox.SelectedIndex = 0;
         OverrideChoiceBox.ItemsSource = ChoiceOptions;
@@ -48,6 +57,7 @@ public partial class MergeWindow : FluentWindow
     public MergeDirectionOption[] DirectionOptions { get; }
     public MergeChoiceOption[] ChoiceOptions { get; }
     public MemoryImageMergePreview Preview { get; private set; } = null!;
+    public bool IsFixedDestination { get; }
 
     public MemoryImage DestinationImage => Preview.Destination;
     public string DestinationName => ((MergeDirectionOption)DirectionBox.SelectedItem).Reverse ? _nameB : _nameA;

@@ -14,7 +14,7 @@
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
             <TextBlock Text="Choose the merge direction and review every occupied overlap before applying." TextWrapping="Wrap" Margin="0,0,0,10" />
             <WrapPanel Margin="0,0,0,8">
-                <TextBlock Text="Direction" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <TextBlock x:Name="DirectionLabel" Text="Direction" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox x:Name="DirectionBox" Width="300" SelectionChanged="Direction_SelectionChanged" />
                 <TextBlock Text="Default overlap choice" VerticalAlignment="Center" Margin="18,0,6,0" />
                 <ComboBox x:Name="DefaultChoiceBox" Width="230" SelectionChanged="Policy_SelectionChanged" />

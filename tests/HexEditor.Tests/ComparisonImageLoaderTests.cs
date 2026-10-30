@@ -30,6 +30,31 @@ public sealed class ComparisonImageLoaderTests
     }
 
     [TestMethod]
+    public async Task LoadReferenceAsync_ReadsSavedDiskBytesWhenPathMatchesDirtyEditorDocument()
+    {
+        var path = CreateHexFile();
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1234, [0x11, 0x22])]), path,
+                MemoryImageExportFormat.IntelHex);
+            viewModel.EditByte(0x1234, 0x33, OverlapDecision.OverwriteIncoming);
+
+            var loaded = await new ComparisonImageLoader(viewModel).LoadReferenceAsync(path, CancellationToken.None, null);
+
+            Assert.AreSame(viewModel.Workspace.Document.CurrentImage, viewModel.CurrentImage);
+            Assert.IsTrue(loaded.Image.TryGetByte(0x1234, out var savedByte));
+            Assert.AreEqual((byte)0xAA, savedByte);
+            Assert.IsTrue(viewModel.CurrentImage.TryGetByte(0x1234, out var unsavedByte));
+            Assert.AreEqual((byte)0x33, unsavedByte);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [TestMethod]
     public async Task LoadAsync_CancellationDuringReadDoesNotReturnPartialImage()
     {
         var path = CreateHexFile();

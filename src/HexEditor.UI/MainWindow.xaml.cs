@@ -231,24 +231,48 @@ public partial class MainWindow : Window
 
     private async void MergeImages_Click(object sender, RoutedEventArgs e)
     {
-        var destinationDialog = FirmwareImageDialog.CreateOpen("Select the destination image");
-        if (destinationDialog.ShowDialog(this) != true) return;
-        var sourceDialog = FirmwareImageDialog.CreateOpen(
-            "Select the source image to merge",
-            System.IO.Path.GetDirectoryName(destinationDialog.FileName));
-        if (sourceDialog.ShowDialog(this) != true) return;
-
         try
         {
-            var (imageA, imageB) = await LoadComparisonImagesAsync(destinationDialog.FileName, sourceDialog.FileName);
+            var editorDocument = ViewModel.Workspace.Document;
+            var editorHasImage = editorDocument.CurrentImage.Segments.Count > 0;
+            string? destinationPath = null;
+            string sourcePath;
+            if (editorHasImage)
+            {
+                var sourceDialog = FirmwareImageDialog.CreateOpen(
+                    "Select the source image to merge",
+                    editorDocument.SourcePath is null ? null : System.IO.Path.GetDirectoryName(editorDocument.SourcePath));
+                if (sourceDialog.ShowDialog(this) != true) return;
+                sourcePath = sourceDialog.FileName;
+            }
+            else
+            {
+                var destinationDialog = FirmwareImageDialog.CreateOpen("Select the destination image");
+                if (destinationDialog.ShowDialog(this) != true) return;
+                destinationPath = destinationDialog.FileName;
+                var sourceDialog = FirmwareImageDialog.CreateOpen("Select the source image to merge",
+                    System.IO.Path.GetDirectoryName(destinationPath));
+                if (sourceDialog.ShowDialog(this) != true) return;
+                sourcePath = sourceDialog.FileName;
+            }
+
+            var diskImages = editorHasImage
+                ? (First: (LoadedMemoryImage?)null, Second: await LoadMergeImageAsync(sourcePath, "Source image"))
+                : await LoadMergeImagesAsync(destinationPath!, sourcePath);
+            // Always read the selected source from disk. This intentionally handles a source path
+            // equal to the Editor path as the saved version rather than its in-memory document.
+            var imageA = editorHasImage
+                ? new LoadedMemoryImage(editorDocument.CurrentImage, editorDocument.SourcePath, editorDocument.SourceFormat)
+                : diskImages.First!;
+            var imageB = diskImages.Second;
             var dialog = new MergeWindow(imageA.Image, imageB.Image,
-                System.IO.Path.GetFileName(destinationDialog.FileName),
-                System.IO.Path.GetFileName(sourceDialog.FileName)) { Owner = this };
+                editorHasImage && imageA.Path is not null ? System.IO.Path.GetFileName(imageA.Path) : System.IO.Path.GetFileName(destinationPath),
+                System.IO.Path.GetFileName(sourcePath), fixedDestination: editorHasImage) { Owner = this };
             if (dialog.ShowDialog() != true) return;
 
             var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
             if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides,
-                    () => ConfirmCloseImage(ActiveDocument))) return;
+                    () => ConfirmCloseImage(ViewModel.Workspace.Document))) return;
             Title = ViewModel.WindowTitle;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
@@ -264,6 +288,18 @@ public partial class MainWindow : Window
         {
             var first = await _comparisonImageLoader.LoadAsync(firstPath, token, AddProgressStage(progress, "Image 1 of 2"));
             var second = await _comparisonImageLoader.LoadAsync(secondPath, token, AddProgressStage(progress, "Image 2 of 2"));
+            return (first, second);
+        });
+
+    private Task<LoadedMemoryImage> LoadMergeImageAsync(string path, string stage) =>
+        RunFileOperationAsync((token, progress) => _comparisonImageLoader.LoadReferenceAsync(
+            path, token, AddProgressStage(progress, stage)));
+
+    private Task<(LoadedMemoryImage First, LoadedMemoryImage Second)> LoadMergeImagesAsync(string firstPath, string secondPath) =>
+        RunFileOperationAsync(async (token, progress) =>
+        {
+            var first = await _comparisonImageLoader.LoadReferenceAsync(firstPath, token, AddProgressStage(progress, "Destination image"));
+            var second = await _comparisonImageLoader.LoadReferenceAsync(secondPath, token, AddProgressStage(progress, "Source image"));
             return (first, second);
         });
 
