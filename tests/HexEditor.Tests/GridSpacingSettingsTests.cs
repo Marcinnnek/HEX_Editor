@@ -1,7 +1,9 @@
 using HexEditor.UI;
 using HexEditor.Core;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace HexEditor.Tests;
 
@@ -73,8 +75,8 @@ public sealed class GridSpacingSettingsTests
     {
         var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 3);
 
-        Assert.AreEqual(new System.Windows.Size(45, 23), layout.GetRowSize(2, isAscii: false));
-        Assert.AreEqual(new System.Windows.Size(20, 23), layout.GetRowSize(2, isAscii: true));
+        Assert.AreEqual(new System.Windows.Size(45, 27), layout.GetRowSize(2, isAscii: false));
+        Assert.AreEqual(new System.Windows.Size(20, 27), layout.GetRowSize(2, isAscii: true));
         Assert.IsTrue(layout.TryGetByteIndexAt(new System.Windows.Point(44.9, 19.9), 2, isAscii: false, out var second));
         Assert.AreEqual(1, second);
         Assert.IsFalse(layout.TryGetByteIndexAt(new System.Windows.Point(21, 10), 2, isAscii: false, out _));
@@ -84,11 +86,25 @@ public sealed class GridSpacingSettingsTests
     }
 
     [TestMethod]
+    public void ZeroVerticalSpacingKeepsACompactTextRelativeBaselineAndHitTargets()
+    {
+        var compact = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 0);
+        var expanded = compact with { VerticalSpacing = 4 };
+
+        Assert.AreEqual(4, compact.GetRowSize(2, isAscii: false).Height - compact.LineHeight, 0.01);
+        Assert.AreEqual(8, expanded.GetRowSize(2, isAscii: false).Height - expanded.LineHeight, 0.01);
+        Assert.AreEqual(compact.GetRowSize(2, false).Height + 4, expanded.GetRowSize(2, false).Height, 0.01);
+        Assert.AreEqual(20, compact.GetByteBounds(0, false).Height, 0.01);
+        Assert.IsFalse(compact.TryGetByteIndexAt(new Point(1, 20), 2, false, out _));
+        Assert.IsTrue(compact.TryGetByteIndexAt(new Point(1, 19.9), 2, false, out _));
+    }
+
+    [TestMethod]
     public void VerticalRowGapIsOutsideOccupiedByteHitArea()
     {
         var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 8);
 
-        Assert.AreEqual(28, layout.GetRowSize(2, isAscii: false).Height);
+        Assert.AreEqual(32, layout.GetRowSize(2, isAscii: false).Height);
         Assert.AreEqual(20, layout.GetByteBounds(0, isAscii: false).Height);
         Assert.IsTrue(layout.TryGetByteIndexAt(new System.Windows.Point(2, 19.9), 2, isAscii: false, out _));
         Assert.IsFalse(layout.TryGetByteIndexAt(new System.Windows.Point(2, 20), 2, isAscii: false, out _));
@@ -139,6 +155,26 @@ public sealed class GridSpacingSettingsTests
             Assert.AreEqual(after, RowDistance(compareB), 0.01);
         }
         finally { window.Close(); }
+    }
+
+    [STATestMethod]
+    public void RenderedByteRowsUseACharacterRelativeCompactBaseline()
+    {
+        var row = new HexViewRow("00001000", "10", ".", false, null)
+        {
+            Cells = [new HexByteCell("10", ".", 0x1000, ByteHighlightState.None)]
+        };
+        var control = new HexByteRowControl { Row = row };
+        control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var line = new FormattedText(
+            "0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            new Typeface(control.FontFamily, control.FontStyle, control.FontWeight, control.FontStretch),
+            control.FontSize, control.Foreground, VisualTreeHelper.GetDpi(control).PixelsPerDip);
+        var visibleGap = control.DesiredSize.Height - line.Height - GridSpacingSettings.Current.VerticalRowSpacing;
+
+        Assert.AreEqual(line.Height * 0.2, visibleGap, 0.1);
+        Assert.IsTrue(control.TryGetAddressAt(new Point(1, line.Height - 0.1), out _));
+        Assert.IsFalse(control.TryGetAddressAt(new Point(1, line.Height + 0.1), out _));
     }
 
     private static double RowDistance(HexViewControl view)

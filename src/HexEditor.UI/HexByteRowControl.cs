@@ -56,7 +56,7 @@ public sealed class HexByteRowControl : Control
         EnsureMetrics();
         var count = Row?.Cells.Count ?? 0;
         var size = CreateLayout().GetRowSize(count, IsAscii);
-        return new Size(size.Width, _lineHeight);
+        return size;
     }
 
     protected override void OnRender(DrawingContext drawingContext)
