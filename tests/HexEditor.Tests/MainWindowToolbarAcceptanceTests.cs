@@ -36,7 +36,7 @@ public sealed class MainWindowToolbarAcceptanceTests
                 Assert.DoesNotContain("More ▾", toolbarLabels);
                 Assert.IsNull(window.FindName("AddressInput"));
 
-                var menuItems = Descendants<MenuItem>(window).ToArray();
+                var menuItems = LogicalDescendants<MenuItem>(window).ToArray();
                 Assert.IsTrue(menuItems.Any(item => item.Header?.ToString() == "Go to address" && item.InputGestureText == "Ctrl+G"),
                     "Go to address remains reachable from View with its keyboard shortcut.");
                 foreach (var command in new[]
@@ -68,6 +68,15 @@ public sealed class MainWindowToolbarAcceptanceTests
             var child = VisualTreeHelper.GetChild(parent, index);
             if (child is T match) yield return match;
             foreach (var descendant in Descendants<T>(child)) yield return descendant;
+        }
+    }
+
+    private static IEnumerable<T> LogicalDescendants<T>(DependencyObject parent) where T : DependencyObject
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+        {
+            if (child is T match) yield return match;
+            foreach (var descendant in LogicalDescendants<T>(child)) yield return descendant;
         }
     }
 }
