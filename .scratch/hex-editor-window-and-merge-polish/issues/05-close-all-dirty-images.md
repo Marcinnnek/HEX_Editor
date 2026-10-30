@@ -12,8 +12,8 @@
 - [x] If a later prompt is canceled, edits in documents previously answered Don't save remain in memory while the application stays open.
 - [x] A failed or canceled Save As aborts closing without losing that document's edits.
 - [x] Closing a single Compare tab retains the existing rule that its base image is prompted only when the last view closes.
-- [x] Workspace-level close sequence and rendered save-prompt acceptance tests cover document identity, order, cancellation, and prompt behavior.
+- [x] Public workspace/close-workflow tests cover distinct document identity and order, cancellation, and retained edits after an aborted close; rendered WPF tests cover the save prompt itself.
 
 ## Answer
 
-Application close now gets the Editor document followed by the registered Compare base documents, filters to dirty editable documents, and deduplicates by document identity. The close workflow asks in that order and aborts on Cancel or failed Save/Save As; Don't save leaves the in-memory document unchanged. Existing individual Compare-tab close behavior remains in place and still prompts only for its last view. Focused workspace tests cover ordering, shared bases, cleaning one document, cancellation, and retained edits; rendered WPF save-prompt acceptance tests cover the user-facing prompt and its Cancel/X/default actions.
+Application close now gets the Editor document followed by the registered Compare base documents, filters to dirty editable documents, and deduplicates by document identity. The close workflow asks in that order and aborts on Cancel or failed Save/Save As; Don't save leaves the in-memory document unchanged. Existing individual Compare-tab close behavior remains in place and still prompts only for its last view. Public workspace/close-workflow tests cover ordering, shared bases, cancellation, and retained edits; rendered WPF tests cover the save prompt itself, including Cancel/X/default actions. A full MainWindow modal close harness is not part of the testing decision because the previous automation attempt hung.

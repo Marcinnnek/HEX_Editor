@@ -30,7 +30,7 @@ public sealed class ComparisonImageLoaderTests
     }
 
     [TestMethod]
-    public async Task LoadReferenceAsync_ReadsSavedDiskBytesWhenPathMatchesDirtyEditorDocument()
+    public async Task Merge_source_loader_uses_disk_bytes_for_same_path_and_preserves_dirty_editor_preview_destination()
     {
         var path = CreateHexFile();
         try
@@ -41,10 +41,15 @@ public sealed class ComparisonImageLoaderTests
             viewModel.EditByte(0x1234, 0x33, OverlapDecision.OverwriteIncoming);
 
             var loaded = await new ComparisonImageLoader(viewModel).LoadReferenceAsync(path, CancellationToken.None, null);
+            var preview = viewModel.Editing.PreviewMerge(loaded.Image);
 
             Assert.AreSame(viewModel.Workspace.Document.CurrentImage, viewModel.CurrentImage);
             Assert.IsTrue(loaded.Image.TryGetByte(0x1234, out var savedByte));
             Assert.AreEqual((byte)0xAA, savedByte);
+            Assert.IsTrue(preview.Source.TryGetByte(0x1234, out var previewSourceByte));
+            Assert.AreEqual((byte)0xAA, previewSourceByte);
+            Assert.IsTrue(preview.Destination.TryGetByte(0x1234, out var previewDestinationByte));
+            Assert.AreEqual((byte)0x33, previewDestinationByte);
             Assert.IsTrue(viewModel.CurrentImage.TryGetByte(0x1234, out var unsavedByte));
             Assert.AreEqual((byte)0x33, unsavedByte);
         }
