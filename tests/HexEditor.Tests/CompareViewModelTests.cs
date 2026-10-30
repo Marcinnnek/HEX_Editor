@@ -149,6 +149,8 @@ public sealed class CompareViewModelTests
         Assert.AreEqual("right.s19", workspace.NameB);
         Assert.HasCount(2, workspace.BlocksA);
         Assert.AreEqual(0x2000u, workspace.BlocksA[1].StartAddress);
+        Assert.AreEqual("Block 2 Starts at: 0x00002000 Ends at: 0x00002000 (Length: 0x1 = 1)",
+            workspace.BlocksA[1].Description);
         Assert.HasCount(1, workspace.BlocksB);
         Assert.AreEqual(0x3000u, workspace.BlocksB[0].StartAddress);
 
@@ -157,6 +159,8 @@ public sealed class CompareViewModelTests
 
         Assert.HasCount(2, workspace.BlocksA);
         Assert.AreEqual(0x4000u, workspace.BlocksA[1].StartAddress);
+        Assert.AreEqual("Block 2 Starts at: 0x00004000 Ends at: 0x00004000 (Length: 0x1 = 1)",
+            workspace.BlocksA[1].Description);
         Assert.AreEqual(CompareByteState.OnlyA, workspace.Comparison.Rows[^1].States[0]);
     }
 

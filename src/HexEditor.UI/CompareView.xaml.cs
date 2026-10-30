@@ -161,7 +161,7 @@ public partial class CompareView : UserControl
 
     private void Block_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_syncingScroll || sender is not DataGrid grid || grid.SelectedItem is not CompareMemoryBlockRow block) return;
+        if (_syncingScroll || sender is not ListBox list || list.SelectedItem is not CompareMemoryBlockRow block) return;
         ViewModel.ViewMode = CompareViewMode.AllRegions;
         Navigate(block.StartAddress);
     }

@@ -35,30 +35,44 @@
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <GroupBox Grid.Row="0" Grid.Column="0" Margin="0,0,0,8" Header="{Binding Workspace.NameA}" MaxHeight="130">
-                <ui:DataGrid x:Name="FileABlocks" ItemsSource="{Binding Workspace.BlocksA}"
-                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                          CanUserSortColumns="False" RowHeight="21" CellStyle="{DynamicResource SegmentListCellStyle}"
-                          HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="Block_SelectionChanged"
-                          MaxHeight="104" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                    <ui:DataGrid.Columns>
-                        <DataGridTextColumn Header="Start" Binding="{Binding StartText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                        <DataGridTextColumn Header="End" Binding="{Binding EndText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                        <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCountText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                    </ui:DataGrid.Columns>
-                </ui:DataGrid>
+                <ListBox x:Name="FileABlocks" ItemsSource="{Binding Workspace.BlocksA}"
+                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                         SelectionMode="Extended" SelectionChanged="Block_SelectionChanged"
+                         MaxHeight="104" MinHeight="40"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.CanContentScroll="False">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Description}" TextWrapping="NoWrap" MinWidth="680" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
                 </GroupBox>
                 <GroupBox Grid.Row="0" Grid.Column="2" Margin="0,0,0,8" Header="{Binding Workspace.NameB}" MaxHeight="130">
-                <ui:DataGrid x:Name="FileBBlocks" ItemsSource="{Binding Workspace.BlocksB}"
-                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                          CanUserSortColumns="False" RowHeight="21" CellStyle="{DynamicResource SegmentListCellStyle}"
-                          HeadersVisibility="Column" SelectionMode="Single" SelectionChanged="Block_SelectionChanged"
-                          MaxHeight="104" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                    <ui:DataGrid.Columns>
-                        <DataGridTextColumn Header="Start" Binding="{Binding StartText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                        <DataGridTextColumn Header="End" Binding="{Binding EndText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                        <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCountText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                    </ui:DataGrid.Columns>
-                </ui:DataGrid>
+                <ListBox x:Name="FileBBlocks" ItemsSource="{Binding Workspace.BlocksB}"
+                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                         SelectionMode="Single" SelectionChanged="Block_SelectionChanged"
+                         MaxHeight="104" MinHeight="40"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto"
+                         ScrollViewer.CanContentScroll="False">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Description}" TextWrapping="NoWrap" MinWidth="680" />
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
                 </GroupBox>
             <local:HexViewControl x:Name="FileAView" Grid.Row="1" Grid.Column="0"
                                   ItemsSource="{Binding ViewModel.FileARows}"
