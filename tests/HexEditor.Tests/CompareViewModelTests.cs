@@ -2,12 +2,41 @@ using HexEditor.Core;
 using HexEditor.Compare;
 using HexEditor.Formats;
 using HexEditor.UI;
+using System.Collections.Specialized;
 
 namespace HexEditor.Tests;
 
 [TestClass]
 public sealed class CompareViewModelTests
 {
+    [TestMethod]
+    public void SelectingOccupiedCompareBytesKeepsBothSparsePanelsStable()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x11]), new MemorySegment(0x90000000, [0x20])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x12]), new MemorySegment(0x90000000, [0x21])]),
+            bytesPerRow: 8);
+        var baseRows = comparison.FileARows;
+        var referenceRows = comparison.FileBRows;
+        var baseResets = 0;
+        var referenceResets = 0;
+        ((INotifyCollectionChanged)baseRows).CollectionChanged += (_, _) => baseResets++;
+        ((INotifyCollectionChanged)referenceRows).CollectionChanged += (_, _) => referenceResets++;
+
+        foreach (var address in new uint[] { 0x1000, 0x1001, 0x90000000, 0x1001 })
+        {
+            Assert.IsTrue(comparison.TryNavigateToAddress(address, out var rowIndex));
+            Assert.AreEqual(comparison.FileARows[rowIndex].Address, comparison.FileBRows[rowIndex].Address);
+        }
+
+        Assert.AreSame(baseRows, comparison.FileARows);
+        Assert.AreSame(referenceRows, comparison.FileBRows);
+        Assert.AreEqual(0, baseResets);
+        Assert.AreEqual(0, referenceResets);
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(0x1000, null, out var next));
+        Assert.AreEqual(0x1001u, next);
+    }
+
     [TestMethod]
     public async Task ActiveDocumentCommands_RouteUndoRedoAndSaveAsToCompareBase()
     {

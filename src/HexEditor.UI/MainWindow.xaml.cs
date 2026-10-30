@@ -220,9 +220,9 @@ public partial class MainWindow : Window
 
             var view = new CompareView(comparison);
             view.StatusRequested += ViewModel.ReportCompareInteraction;
-            view.ActivationFailed += (exception, side, rowIndex, address) =>
+            view.InteractionFailed += (operation, exception, side, rowIndex, address) =>
             {
-                _diagnostics.RecordError($"Compare {side} row activation row {rowIndex}", exception, address, address);
+                _diagnostics.RecordError($"Compare {side} {operation} row {rowIndex}", exception, address, address);
             };
             view.BaseRowActivated += (rowStartAddress, address) =>
             {
