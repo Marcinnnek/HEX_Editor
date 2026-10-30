@@ -63,16 +63,56 @@ public sealed class ComparisonImageLoader(MainViewModel viewModel)
             return new LoadedMemoryImage(viewModel.CurrentImage, viewModel.SourcePath!, viewModel.SourceFormat);
         }
 
-        return await Task.Run(() =>
+        return await LoadReferenceAsync(path, cancellationToken, progress);
+    }
+
+    public Task<LoadedMemoryImage> LoadReferenceAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress) => Task.Run(() =>
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using var stream = File.OpenRead(path);
+        var preview = new MemoryImageFileService().PrepareImport(stream, MemoryImage.Empty, path,
+            cancellationToken, progress);
+        cancellationToken.ThrowIfCancellationRequested();
+        var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
+            ?? throw new InvalidOperationException("The selected reference image could not be imported.");
+        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat);
+    }, cancellationToken);
+}
+
+/// <summary>Runs the picker-driven Compare flow against the current editable document.</summary>
+public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
+{
+    private readonly ComparisonImageLoader _loader = new(viewModel);
+
+    public async Task<CompareWorkspaceTabViewModel?> StartAsync(
+        Func<string, string?, string?> chooseFile, Action baseOpened,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
+    {
+        ArgumentNullException.ThrowIfNull(chooseFile);
+        ArgumentNullException.ThrowIfNull(baseOpened);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (viewModel.SourcePath is null && viewModel.CurrentImage.Segments.Count == 0)
         {
-            using var stream = File.OpenRead(path);
-            var preview = new MemoryImageFileService().PrepareImport(stream, MemoryImage.Empty, path,
-                cancellationToken, progress);
+            var basePath = chooseFile("Select the base firmware image", null);
+            if (basePath is null) return null;
+            var preview = await viewModel.PrepareOpenAsync(basePath, cancellationToken, progress);
             cancellationToken.ThrowIfCancellationRequested();
-            var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
-                ?? throw new InvalidOperationException("The selected image could not be imported.");
-            return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat);
-        }, cancellationToken);
+            viewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+            baseOpened();
+        }
+
+        var document = viewModel.Workspace.Document;
+        var referencePath = chooseFile("Select the reference firmware image",
+            document.SourcePath is null ? null : Path.GetDirectoryName(document.SourcePath));
+        if (referencePath is null) return null;
+
+        var reference = await _loader.LoadReferenceAsync(referencePath, cancellationToken, progress);
+        cancellationToken.ThrowIfCancellationRequested();
+        var baseName = document.SourcePath is null ? "Untitled" : Path.GetFileName(document.SourcePath);
+        return new CompareWorkspaceTabViewModel(document.CurrentImage, reference.Image,
+            baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path);
     }
 }
 

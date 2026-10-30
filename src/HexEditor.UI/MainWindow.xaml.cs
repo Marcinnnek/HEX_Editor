@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private readonly ImageEditWorkflow _imageEdits;
     private readonly ChecksumWorkflow _checksums;
     private readonly ComparisonImageLoader _comparisonImageLoader;
+    private readonly CompareCurrentImageWorkflow _compareWorkflow;
     private readonly MemoryImageFileWorkflow _files;
     private CancellationTokenSource? _fileOperationCancellation;
 
@@ -36,6 +37,7 @@ public partial class MainWindow : Window
         _imageEdits = new ImageEditWorkflow(ViewModel);
         _checksums = new ChecksumWorkflow(ViewModel);
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
+        _compareWorkflow = new CompareCurrentImageWorkflow(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
         ViewModel.ImageChanged += ViewModel_ImageChanged;
         DataContext = this;
@@ -96,25 +98,27 @@ public partial class MainWindow : Window
 
     private async void CompareImages_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = FirmwareImageDialog.CreateOpen("Select the first firmware image");
-        if (dialog.ShowDialog(this) != true) return;
-        var pathA = dialog.FileName;
-        dialog.Title = "Select the second firmware image";
-        if (dialog.ShowDialog(this) != true) return;
-        var pathB = dialog.FileName;
-
         try
         {
-            var (imageA, imageB) = await LoadComparisonImagesAsync(pathA, pathB);
-            var nameA = System.IO.Path.GetFileName(pathA);
-            var nameB = System.IO.Path.GetFileName(pathB);
-            var view = new CompareView(new CompareWorkspaceTabViewModel(
-                imageA.Image, imageB.Image, nameA, nameB, imageA.Path, imageB.Path));
+            var comparison = await RunFileOperationAsync((token, progress) => _compareWorkflow.StartAsync(
+                (title, directory) =>
+                {
+                    var dialog = FirmwareImageDialog.CreateOpen(title, directory);
+                    return dialog.ShowDialog(this) == true ? dialog.FileName : null;
+                },
+                () =>
+                {
+                    WorkspaceTabs.SelectedIndex = 0;
+                    Title = ViewModel.WindowTitle;
+                }, token, progress));
+            if (comparison is null) return;
+
+            var view = new CompareView(comparison);
             view.StatusRequested += ViewModel.ReportCompareInteraction;
             view.BaseRowActivated += address =>
                 ViewModel.ReportCompareInteraction($"Base row at 0x{address:X8} selected.");
             _comparisonViews.Add(view);
-            var tab = new TabItem { Header = $"Compare: {nameA} ↔ {nameB}", Content = view };
+            var tab = new TabItem { Header = $"Compare: {comparison.NameA} ↔ {comparison.NameB}", Content = view };
             WorkspaceTabs.Items.Add(tab);
             WorkspaceTabs.SelectedItem = tab;
         }
