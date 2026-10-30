@@ -153,12 +153,12 @@ public sealed class FindBytesWindowAcceptanceTests
 
                 Assert.AreEqual(0d, scroll.HorizontalOffset,
                     "Find must return horizontal scrolling to the left edge where the first HEX byte follows Address.");
-                var visibleRows = Enumerable.Range(0, rowsView.ItemsGrid.Items.Count)
-                    .Select(index => (Index: index, Row: rowsView.ItemsGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow))
-                    .Where(item => item.Row is { IsVisible: true, ActualHeight: > 0 } &&
-                        RowIntersectsViewport(item.Row, scroll))
-                    .Select(item => item.Index)
-                    .ToArray();
+                var visibleRows = rowsView.UseWindowedScrolling
+                    ? Enumerable.Range(rowsView.FirstVisibleRowIndex, rowsView.WindowRows.Count).ToArray()
+                    : Enumerable.Range(0, rowsView.ItemsGrid.Items.Count)
+                        .Select(index => (Index: index, Row: rowsView.ItemsGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow))
+                        .Where(item => item.Row is { IsVisible: true, ActualHeight: > 0 } && RowIntersectsViewport(item.Row, scroll))
+                        .Select(item => item.Index).ToArray();
                 Assert.IsNotEmpty(visibleRows, "The Editor must render rows after Find.");
                 Assert.AreEqual(matchRow, visibleRows[0],
                     $"The first match row should lead the viewport when there is room below it (offset {scroll.VerticalOffset}, viewport {scroll.ViewportHeight}).");
@@ -425,13 +425,14 @@ public sealed class FindBytesWindowAcceptanceTests
         rowsView.UpdateLayout();
         rowsView.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
         Assert.AreEqual(0d, scroll.HorizontalOffset, "Editor Find keeps the first HEX byte at the left edge.");
-        var visibleRows = Enumerable.Range(0, rowsView.ItemsGrid.Items.Count)
-            .Select(index => (Index: index, Row: rowsView.ItemsGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow))
-            .Where(item => item.Row is { IsVisible: true, ActualHeight: > 0 } && RowIntersectsViewport(item.Row, scroll))
-            .Select(item => item.Index)
-            .ToArray();
+        var visibleRows = rowsView.UseWindowedScrolling
+            ? Enumerable.Range(rowsView.FirstVisibleRowIndex, rowsView.WindowRows.Count).ToArray()
+            : Enumerable.Range(0, rowsView.ItemsGrid.Items.Count)
+                .Select(index => (Index: index, Row: rowsView.ItemsGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow))
+                .Where(item => item.Row is { IsVisible: true, ActualHeight: > 0 } && RowIntersectsViewport(item.Row, scroll))
+                .Select(item => item.Index).ToArray();
         Assert.IsTrue(visibleRows.Contains(matchRow), $"The result row {matchRow} must be in the rendered viewport.");
-        var matchedCells = rowsView.ItemsGrid.Items.Cast<HexViewRow>()
+        var matchedCells = ((IEnumerable<HexViewRow>)rowsView.ItemsSource!)
             .SelectMany(row => row.Cells)
             .Where(cell => cell.Address >= matchStart && cell.Address <= matchStart + 3)
             .ToArray();

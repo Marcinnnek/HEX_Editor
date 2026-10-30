@@ -59,6 +59,7 @@ public partial class MainWindow : Window
         _compareWorkflow = new CompareCurrentImageWorkflow(ViewModel);
         _files = new MemoryImageFileWorkflow(ViewModel);
         HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
+        HexRowsView.WindowedByteDoubleClicked += EditorWindowedByte_DoubleClick;
         DataContext = this;
         Closing += MainWindow_Closing;
         _windowsAppearance = new WindowsAppearanceSource(this);
@@ -102,10 +103,25 @@ public partial class MainWindow : Window
         if (e.OriginalSource is not DependencyObject source) return;
         var gridRow = FindVisualAncestor<DataGridRow>(source);
         var byteRow = FindVisualAncestor<HexByteRowControl>(source);
-        if (gridRow?.Item is not HexViewRow row || row.IsGapMarker || byteRow is null ||
+        var row = byteRow?.Row ?? gridRow?.Item as HexViewRow;
+        if (row is null || row.IsGapMarker || byteRow is null ||
             !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var address) ||
             !HexAddressParser.TryParse(row.Address, out var rowAddress) || !ViewModel.CurrentImage.TryGetByte(address, out _)) return;
         e.Handled = true;
+        var edit = ViewModel.Workspace.BeginEditRow(rowAddress, address, ViewModel.ImageView.BytesPerRow);
+        var dialog = new EditRowWindow(edit) { Owner = this };
+        dialog.ShowDialog();
+    }
+
+    private void EditorWindowedByte_DoubleClick(object? sender, WindowedByteDoubleClickEventArgs e)
+    {
+        if (!ViewModel.CanEdit) return;
+        var byteRow = e.Row;
+        if (byteRow.Row is not { IsGapMarker: false } row ||
+            !byteRow.TryGetAddressAt(e.Position, out var address) ||
+            !HexAddressParser.TryParse(row.Address, out var rowAddress) ||
+            !ViewModel.CurrentImage.TryGetByte(address, out _)) return;
+        e.MouseEvent.Handled = true;
         var edit = ViewModel.Workspace.BeginEditRow(rowAddress, address, ViewModel.ImageView.BytesPerRow);
         var dialog = new EditRowWindow(edit) { Owner = this };
         dialog.ShowDialog();
