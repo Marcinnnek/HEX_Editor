@@ -6,30 +6,31 @@
         xmlns:local="clr-namespace:HexEditor.UI"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640">
+        Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
     <DockPanel Margin="12">
         <Menu DockPanel.Dock="Top" Margin="0,0,0,8">
             <ui:MenuItem Header="_File">
-                <ui:MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" />
+                <ui:MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" InputGestureText="Ctrl+O" />
                 <Separator />
-                <ui:MenuItem Header="Save" Click="Save_Click" />
-                <ui:MenuItem Header="Save As..." Click="SaveAs_Click" />
-                <ui:MenuItem Header="Close Image" Click="CloseImage_Click" />
+                <ui:MenuItem Header="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" InputGestureText="Ctrl+S" />
+                <ui:MenuItem Header="Save As..." Click="SaveAs_Click" IsEnabled="{Binding ViewModel.ActiveCanSaveAs}" InputGestureText="Ctrl+Shift+S" />
+                <ui:MenuItem Header="Close Image" Click="CloseImage_Click" IsEnabled="{Binding ViewModel.ActiveCanCloseImage}" InputGestureText="Ctrl+W" />
                 <Separator />
-                <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" />
-                <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" />
-                <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" />
+                <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Edit">
-                <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
-                <ui:MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
+                <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" InputGestureText="Ctrl+Z" />
+                <ui:MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" InputGestureText="Ctrl+Y" />
                 <Separator />
                 <ui:MenuItem Header="Edit / Insert" Click="EditInsert_Click" />
                 <ui:MenuItem Header="Fill range" Click="Fill_Click" />
-                <ui:MenuItem Header="Copy range" Click="Copy_Click" />
-                <ui:MenuItem Header="Cut range" Click="Cut_Click" />
-                <ui:MenuItem Header="Paste at start" Click="Paste_Click" />
-                <ui:MenuItem Header="Delete range" Click="Delete_Click" />
+                <ui:MenuItem Header="Copy range" Click="Copy_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
+                <ui:MenuItem Header="Cut range" Click="Cut_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
+                <ui:MenuItem Header="Paste at start" Click="Paste_Click" IsEnabled="{Binding ViewModel.ActiveCanPaste}" />
+                <ui:MenuItem Header="Delete range" Click="Delete_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_View">
                 <ui:MenuItem Header="8 bytes per row" Click="RowWidth8_Click" />
@@ -37,8 +38,8 @@
                 <ui:MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
                 <Separator />
                 <ui:MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ActiveShowAscii, Mode=TwoWay}" />
-                <ui:MenuItem Header="Go to address" Click="GoToAddress_Click" />
-                <ui:MenuItem Header="Select range" Click="SelectRange_Click" />
+                <ui:MenuItem Header="Go to address" Click="GoToAddress_Click" InputGestureText="Ctrl+G" />
+                <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Compare">
                 <ui:MenuItem Header="Compare images..." Click="CompareImages_Click" />
@@ -48,7 +49,7 @@
             </ui:MenuItem>
             <ui:MenuItem Header="_Tools">
                 <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
-                <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" />
+                <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Appearance">
                 <ui:MenuItem x:Name="AutomaticAppearanceItem" Header="Follow Windows" IsCheckable="True" Click="AutomaticAppearance_Click" />
@@ -61,8 +62,8 @@
                 <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" />
             </ui:MenuItem>
         </Menu>
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-            <Border x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="#FF8A8A8A" BorderThickness="1" Padding="6" Margin="0,0,0,6">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+            <Border DockPanel.Dock="Top" x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="#FF8A8A8A" BorderThickness="1" Padding="6" Margin="0,0,0,6">
                 <DockPanel>
                     <ui:Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
                     <StackPanel>
@@ -71,32 +72,55 @@
                     </StackPanel>
                 </DockPanel>
             </Border>
-            <WrapPanel Margin="0,0,0,6" VerticalAlignment="Center">
-                <ui:Button Content="Open HEX / S-Record" Padding="10,5" Click="OpenImage_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Compare images" Padding="10,5" Click="CompareImages_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Merge images" Padding="10,5" Click="MergeImages_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Save" Padding="10,5" Click="Save_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Save As" Padding="10,5" Click="SaveAs_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Close Image" Padding="10,5" Click="CloseImage_Click" Margin="0,0,6,0" />
-                <ui:Button Content="Undo" Padding="10,5" Click="Undo_Click" Margin="0,0,6,0" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
-                <ui:Button Content="Redo" Padding="10,5" Click="Redo_Click" Margin="0,0,12,0" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
-                <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <ComboBox Width="65" ItemsSource="{Binding ViewModel.RowWidths}"
-                          SelectedItem="{Binding ViewModel.ActiveBytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
-                <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
-                          VerticalAlignment="Center" Margin="12,0,12,0" />
-                <TextBlock Text="Go to" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <ui:TextBox x:Name="AddressInput" Width="90" VerticalContentAlignment="Center" />
-                <ui:Button Content="Go" Padding="8,4" Margin="4,0,0,0" Click="GoToAddress_Click" />
-                <ui:Button Content="Relocate selected segment" Padding="8,4" Margin="8,0,0,0" Click="RelocateSegment_Click" />
-            </WrapPanel>
-            <WrapPanel VerticalAlignment="Center">
-                <ui:Button Content="Copy" Click="Copy_Click" Padding="8,4" Margin="0,0,4,0" />
-                <ui:Button Content="Cut" Click="Cut_Click" Padding="8,4" Margin="0,0,4,0" />
-                <ui:Button Content="Paste at Start" Click="Paste_Click" Padding="8,4" Margin="0,0,4,0" />
-                <ui:Button Content="Delete" Click="Delete_Click" Padding="8,4" />
-            </WrapPanel>
-        </StackPanel>
+            <ToolBarTray DockPanel.Dock="Top" IsLocked="True" ToolTip="Primary commands">
+                <ToolBar ToolTip="File">
+                    <ui:Button Content="Open" Click="OpenImage_Click" ToolTip="Open HEX / S-Record (Ctrl+O)" />
+                    <ui:Button Content="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" ToolTip="Save active base (Ctrl+S)" />
+                </ToolBar>
+                <ToolBar ToolTip="Compare / Merge">
+                    <ui:Button Content="Compare" Click="CompareImages_Click" />
+                    <ui:Button Content="Merge" Click="MergeImages_Click" />
+                </ToolBar>
+                <ToolBar ToolTip="History">
+                    <ui:Button Content="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
+                    <ui:Button Content="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
+                </ToolBar>
+                <ToolBar ToolTip="View">
+                    <ComboBox Width="64" ToolTip="Bytes per row" ItemsSource="{Binding ViewModel.RowWidths}"
+                              SelectedItem="{Binding ViewModel.ActiveBytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
+                    <CheckBox Content="ASCII" ToolTip="Show ASCII" IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
+                              VerticalAlignment="Center" Padding="4,0" />
+                </ToolBar>
+                <ToolBar ToolTip="Navigate">
+                    <ui:TextBox x:Name="AddressInput" Width="92" VerticalContentAlignment="Center" ToolTip="Go to address (Ctrl+G)" />
+                    <ui:Button Content="Go" Click="GoToAddress_Click" />
+                </ToolBar>
+                <ToolBar ToolTip="More commands">
+                    <ui:Button Content="More ▾" Click="MoreCommands_Click">
+                        <ui:Button.ContextMenu>
+                            <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="Save As..." Click="SaveAs_Click" IsEnabled="{Binding ViewModel.ActiveCanSaveAs}" />
+                                <MenuItem Header="Close Image" Click="CloseImage_Click" IsEnabled="{Binding ViewModel.ActiveCanCloseImage}" />
+                                <Separator />
+                                <MenuItem Header="Select Range..." Click="SelectRange_Click" />
+                                <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" />
+                                <MenuItem Header="Fill Range..." Click="Fill_Click" />
+                                <MenuItem Header="Copy Range" Click="Copy_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
+                                <MenuItem Header="Cut Range" Click="Cut_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
+                                <MenuItem Header="Paste at Start" Click="Paste_Click" IsEnabled="{Binding ViewModel.ActiveCanPaste}" />
+                                <MenuItem Header="Delete Range" Click="Delete_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
+                                <MenuItem Header="Relocate Selected Segment..." Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
+                                <MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                                <Separator />
+                                <MenuItem Header="Export Image..." Click="ExportImage_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                                <MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                                <MenuItem Header="Export Address Range..." Click="ExportRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                            </ContextMenu>
+                        </ui:Button.ContextMenu>
+                    </ui:Button>
+                </ToolBar>
+            </ToolBarTray>
+        </DockPanel>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock>
                 <Run Text="Address: " /><Run Text="{Binding ViewModel.EditorStatus.CurrentAddressText, Mode=OneWay}" />
