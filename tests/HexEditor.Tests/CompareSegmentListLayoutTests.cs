@@ -37,6 +37,11 @@ public sealed class CompareSegmentListLayoutTests
                 Assert.HasCount(2, segmentLists);
                 Assert.HasCount(2, dataPanels);
 
+                Assert.IsTrue(segmentLists.All(grid => !grid.CanUserSortColumns));
+                Assert.IsTrue(segmentLists.All(grid => grid.RowHeight == 24));
+                Assert.IsTrue(segmentLists.All(grid => grid.HorizontalScrollBarVisibility == ScrollBarVisibility.Auto));
+                Assert.IsTrue(workspace.BlocksA.All(row => row.ByteCountText == $"0x{row.ByteCount:X} = {row.ByteCount}"));
+
                 AssertAligned(workspace.BlocksA, workspace.Comparison.FileARows);
                 AssertAligned(workspace.BlocksB, workspace.Comparison.FileBRows);
 

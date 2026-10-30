@@ -161,6 +161,19 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void SegmentRows_ShowByteCountsInUppercaseHexAndPlainDecimal()
+    {
+        var workspace = new CompareWorkspaceTabViewModel(
+            MemoryImage.FromSegments([
+                new MemorySegment(0x1000, [0x10]),
+                new MemorySegment(0x2000, new byte[0x15BC])]),
+            MemoryImage.Empty, "left.hex", "right.hex");
+
+        Assert.AreEqual("0x1 = 1", workspace.BlocksA[0].ByteCountText);
+        Assert.AreEqual("0x15BC = 5564", workspace.BlocksA[1].ByteCountText);
+    }
+
+    [TestMethod]
     public void WorkspaceTab_RefreshesMatchingDocumentPathWhenImagesAreSeparateInstances()
     {
         var compareImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);

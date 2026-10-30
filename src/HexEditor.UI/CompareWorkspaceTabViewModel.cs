@@ -123,6 +123,7 @@ public sealed record CompareMemoryBlockRow(uint StartAddress, uint EndAddress, i
 {
     public string StartText => StartAddress.ToString("X8");
     public string EndText => EndAddress.ToString("X8");
+    public string ByteCountText => $"0x{ByteCount:X} = {ByteCount}";
 }
 
 public enum ComparePanelSide { Base, Reference }
