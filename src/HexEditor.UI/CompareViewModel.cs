@@ -12,11 +12,14 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private readonly MemoryComparisonModel _comparison;
     private readonly ComparePanelRows _fileARows;
     private readonly ComparePanelRows _fileBRows;
+    private readonly Func<uint, bool>? _isBaseByteEdited;
     private uint? _findStartA, _findEndA, _findStartB, _findEndB;
 
     public CompareViewModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true,
-        CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null)
+        CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null,
+        Func<uint, bool>? isBaseByteEdited = null)
     {
+        _isBaseByteEdited = isBaseByteEdited;
         _comparison = new MemoryComparisonModel(fileA, fileB, bytesPerRow, showAscii, cancellationToken, progress);
         _fileARows = new ComparePanelRows(_comparison, this, fileA: true);
         _fileBRows = new ComparePanelRows(_comparison, this, fileA: false);
@@ -37,6 +40,7 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     internal uint? FindEndA => _findEndA;
     internal uint? FindStartB => _findStartB;
     internal uint? FindEndB => _findEndB;
+    internal bool IsBaseByteEdited(uint address) => _isBaseByteEdited?.Invoke(address) == true;
 
     public void SetFindMatch(bool fileA, uint start, uint end)
     {
@@ -55,6 +59,12 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     {
         _comparison.Refresh(fileA, fileB);
         Raise(nameof(FileA), nameof(FileB), nameof(ComparisonStatus));
+    }
+
+    internal void RefreshEditedBytes()
+    {
+        _fileARows.RefreshEditedBytes();
+        _fileBRows.RefreshEditedBytes();
     }
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => _comparison.TryNavigateToAddress(address, out rowIndex);
@@ -101,7 +111,11 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotif
     }
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
-    public void RefreshFind()
+    public void RefreshFind() => RefreshRows();
+
+    public void RefreshEditedBytes() => RefreshRows();
+
+    private void RefreshRows()
     {
         ClearCachedRows();
         CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
@@ -126,7 +140,8 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotif
                 CompareByteState.OnlyA => ByteHighlightState.OnlyInA,
                 CompareByteState.OnlyB => ByteHighlightState.OnlyInB,
                 _ => ByteHighlightState.None
-            }, cell.Address is uint address && findStart is uint start && findEnd is uint end && address >= start && address <= end)).ToArray();
+            }, cell.Address is uint address && findStart is uint start && findEnd is uint end && address >= start && address <= end,
+            _fileA && cell.Address is uint editedAddress && _owner.IsBaseByteEdited(editedAddress))).ToArray();
         return new HexViewRow(row.Address, panel.HexData, panel.Ascii, false, null) { Cells = cells };
     }
 }
