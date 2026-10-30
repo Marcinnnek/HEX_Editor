@@ -146,6 +146,8 @@ public sealed class EditorDocumentWorkspace
     public void EditByte(uint address, byte value, OverlapDecision? decision = null) => Document.Editing.EditByte(address, value, decision);
     public bool Undo() => Document.Editing.Undo();
     public bool Redo() => Document.Editing.Redo();
+    public EditRowSession BeginEditRow(uint rowStartAddress, uint selectedAddress, int bytesPerRow) =>
+        new(Document, rowStartAddress, selectedAddress, bytesPerRow);
     public void Save() => Document.Save();
     public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
         Document.SaveAsync(cancellationToken, progress);
