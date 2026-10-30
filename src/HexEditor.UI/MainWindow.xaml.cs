@@ -679,7 +679,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        e.Cancel = !ConfirmCloseImage(ActiveDocument);
+        e.Cancel = !DirtyDocumentCloseWorkflow.ConfirmAll(ViewModel.Workspace, ConfirmCloseImage);
     }
 
     private bool ConfirmCloseImage(EditorDocument document)
