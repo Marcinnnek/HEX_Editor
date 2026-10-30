@@ -1,5 +1,8 @@
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.UI;
@@ -10,7 +13,7 @@ namespace HexEditor.Tests;
 public sealed class ActiveWindowTitleAcceptanceTests
 {
     [TestMethod]
-    public void RenderedWindowTitleTracksTheSelectedImageAndItsSavedState()
+    public void NativeCaptionTracksTheSelectedImageAndItsSavedState()
     {
         var failures = new List<Exception>();
         var thread = new Thread(() =>
@@ -20,23 +23,23 @@ public sealed class ActiveWindowTitleAcceptanceTests
             {
                 window.Show();
                 window.UpdateLayout();
-                Assert.AreEqual("Untitled - HEX Editor", window.Title);
+                AssertNativeCaption(window, "Untitled - HEX Editor");
 
                 window.ViewModel.LoadImage(Image(0x10), "C:\\images\\editor.hex", MemoryImageExportFormat.IntelHex);
-                Assert.AreEqual("editor.hex - HEX Editor", window.Title);
+                AssertNativeCaption(window, "editor.hex - HEX Editor");
                 window.ViewModel.EditByte(0x1000, 0x11, OverlapDecision.OverwriteIncoming);
-                Assert.AreEqual("editor.hex * - HEX Editor", window.Title);
+                AssertNativeCaption(window, "editor.hex * - HEX Editor");
 
                 var savedAs = Path.Combine(Path.GetTempPath(), $"title-{Guid.NewGuid():N}.hex");
                 var savedAsName = Path.GetFileName(savedAs);
                 try
                 {
                     window.ViewModel.SaveAs(savedAs, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
-                    Assert.AreEqual($"{savedAsName} - HEX Editor", window.Title);
+                    AssertNativeCaption(window, $"{savedAsName} - HEX Editor");
                     window.ViewModel.EditByte(0x1000, 0x12, OverlapDecision.OverwriteIncoming);
-                    Assert.AreEqual($"{savedAsName} * - HEX Editor", window.Title);
+                    AssertNativeCaption(window, $"{savedAsName} * - HEX Editor");
                     window.ViewModel.Save();
-                    Assert.AreEqual($"{savedAsName} - HEX Editor", window.Title);
+                    AssertNativeCaption(window, $"{savedAsName} - HEX Editor");
                     var baseDocument = window.ViewModel.Workspace.Document;
                     var first = new CompareWorkspaceTabViewModel(baseDocument.CurrentImage, Image(0x20),
                         savedAsName, "reference-a.hex", baseDocument.SourcePath, "reference-a.hex", baseDocument);
@@ -50,28 +53,28 @@ public sealed class ActiveWindowTitleAcceptanceTests
 
                     tabs.SelectedItem = firstTab;
                     window.UpdateLayout();
-                    Assert.AreEqual($"Compare: {savedAsName} ↔ reference-a.hex - HEX Editor", window.Title);
+                    AssertNativeCaption(window, $"Compare: {savedAsName} ↔ reference-a.hex - HEX Editor");
                     first.BaseDocument!.Editing.EditByte(0x1000, 0x13, OverlapDecision.OverwriteIncoming);
-                    Assert.AreEqual($"Compare: {savedAsName} * ↔ reference-a.hex - HEX Editor", window.Title);
+                    AssertNativeCaption(window, $"Compare: {savedAsName} * ↔ reference-a.hex - HEX Editor");
 
                     var compareBaseAs = Path.Combine(Path.GetTempPath(), $"compare-title-{Guid.NewGuid():N}.hex");
                     try
                     {
                         window.ViewModel.SaveAs(compareBaseAs, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
                         var compareBaseAsName = Path.GetFileName(compareBaseAs);
-                        Assert.AreEqual($"Compare: {compareBaseAsName} ↔ reference-a.hex - HEX Editor", window.Title);
+                        AssertNativeCaption(window, $"Compare: {compareBaseAsName} ↔ reference-a.hex - HEX Editor");
 
                         tabs.SelectedItem = secondTab;
                         window.UpdateLayout();
-                        Assert.AreEqual("Compare: other-base.hex ↔ reference-b.hex - HEX Editor", window.Title);
+                        AssertNativeCaption(window, "Compare: other-base.hex ↔ reference-b.hex - HEX Editor");
                         tabs.SelectedItem = firstTab;
-                        Assert.AreEqual($"Compare: {compareBaseAsName} ↔ reference-a.hex - HEX Editor", window.Title);
+                        AssertNativeCaption(window, $"Compare: {compareBaseAsName} ↔ reference-a.hex - HEX Editor");
                         tabs.SelectedItem = tabs.Items[0];
-                        Assert.AreEqual($"{compareBaseAsName} - HEX Editor", window.Title);
+                        AssertNativeCaption(window, $"{compareBaseAsName} - HEX Editor");
                         window.ViewModel.EditByte(0x1000, 0x14, OverlapDecision.OverwriteIncoming);
-                        Assert.AreEqual($"{compareBaseAsName} * - HEX Editor", window.Title);
+                        AssertNativeCaption(window, $"{compareBaseAsName} * - HEX Editor");
                         window.ViewModel.Save();
-                        Assert.AreEqual($"{compareBaseAsName} - HEX Editor", window.Title);
+                        AssertNativeCaption(window, $"{compareBaseAsName} - HEX Editor");
                     }
                     finally { if (File.Exists(compareBaseAs)) File.Delete(compareBaseAs); }
                 }
@@ -93,4 +96,15 @@ public sealed class ActiveWindowTitleAcceptanceTests
 
     private static MemoryImage Image(byte value) =>
         MemoryImage.FromSegments([new MemorySegment(0x1000, [value])]);
+
+    private static void AssertNativeCaption(Window window, string expected)
+    {
+        Assert.IsTrue(window.IsVisible, "The main window must be visible to verify its native caption.");
+        var caption = new StringBuilder(512);
+        GetWindowText(new WindowInteropHelper(window).Handle, caption, caption.Capacity);
+        Assert.AreEqual(expected, caption.ToString());
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
 }
