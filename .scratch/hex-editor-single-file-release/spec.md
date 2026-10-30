@@ -14,7 +14,7 @@ Publish a self-contained Windows x64 executable for Windows 11 version 24H2 or n
 
 Keep application preferences and bounded diagnostic logs in the user's local application data. First launch supplies defaults: automatic Windows appearance and 16 data bytes per export record. Persist the user's appearance override and most recent export record size. Write an error-only rolling diagnostic log capped at five 1 MiB files. Include the operation and affected address or selection when available; omit firmware byte contents, full file paths, routine successes, and telemetry.
 
-Validate the published executable on the agreed Windows 11 24H2+ x64 development system by copying only the executable and exercising open, compare, edit, save, export, and close. Record the installed .NET Desktop Runtime environment. This host has .NET Desktop Runtimes installed, so the check is not evidence that the executable runs on a machine without those runtimes. The product must remain self-contained even though clean-machine runtime independence is not proven by this acceptance environment.
+Validate the published executable on the available development system by copying only the executable and exercising open, compare, edit, save, export, and close. Record the actual operating-system identity and installed .NET Desktop Runtime environment. The current host is identified as Windows 10 Home 26H2, while the release target remains Windows 11 version 24H2 or newer; the host is therefore not target-OS validation. It also has .NET Desktop Runtimes installed, so a launch check does not prove the executable runs on a machine without those runtimes. The product must remain self-contained even though neither target-OS acceptance nor clean-machine runtime independence is established here.
 
 ## User Stories
 
@@ -56,7 +56,7 @@ Validate the published executable on the agreed Windows 11 24H2+ x64 development
 - Write the Release output to a local directory that contains only the executable. No installer, GitHub Release automation, or other operating-system/architecture target is required.
 - Use the published executable boundary as the primary release acceptance seam: run the executable copied alone into an isolated directory, exercise the public user workflows, and inspect the resulting exported files and user-data preferences/diagnostics.
 - Retain public workspace-operation tests as prior art for open, compare, edit, save, export, and close behavior. Release acceptance focuses on packaging and the behavior of the published executable, not private event handlers or implementation details.
-- Run acceptance on the agreed Windows 11 24H2+ x64 development system. Record its operating-system build and installed .NET Desktop Runtime environment. The user accepts that this host contains .NET Desktop Runtimes 8, 9, and 10; this acceptance does not prove runtime independence on a clean machine.
+- Run acceptance on the available development system and record its operating-system identity, build, architecture, and installed .NET Desktop Runtime environment. The current host is identified as Windows 10 Home 26H2 and has .NET Desktop Runtimes 8, 9, and 10; this host does not satisfy the Windows 11 24H2+ target and cannot prove clean-machine runtime independence.
 
 ## Testing Decisions
 
@@ -81,4 +81,4 @@ Validate the published executable on the agreed Windows 11 24H2+ x64 development
 
 - This focused release spec records decisions from the ongoing Windows HEX Editor UI and workflow enhancement work and refines its single-file release requirement.
 - Release workflow validation depends on the existing UI and responsiveness prerequisites, including tickets 15 and 16. Export preference behavior is covered by the existing export-options ticket.
-- The currently validated development host reported Windows NT 10.0.26300.0 x64 and .NET / Windows Desktop runtimes 8, 9, and 10. The publish artifact has started from an isolated directory containing only the executable, but the full workflow acceptance remains outstanding.
+- The current publish artifact started from an isolated directory containing only the executable. Registry details identify the host as Windows 10 Home 26H2, build 26300.9711, x64, with .NET Desktop Runtimes 8, 9, and 10. The full workflow acceptance and validation on the specified Windows 11 target remain outstanding.

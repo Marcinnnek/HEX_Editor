@@ -2,15 +2,15 @@
 
 **What to build:** A Release publish produces one Windows 11 24H2+ x64 executable that launches the completed WPF UI application without application DLLs beside it or a separately installed .NET desktop runtime.
 
-**Blocked by:** 12: Apply a consistent WPF UI theme; 15: Replace permanent advanced panels with compact commands; 16: Keep comparison and scrolling responsive.
+**Blocked by:** 11: Export chosen occupied data with per-export options; 15: Replace permanent advanced panels with compact commands; 16: Keep comparison and scrolling responsive.
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] Release publishing embeds the required managed application files and supported native components into one distributable executable; trimming is not enabled without compatibility proof.
-- [ ] The executable starts when copied alone into an isolated directory, and it does not require application DLLs, resources, or configuration beside it.
+- [x] Release publishing embeds the required managed application files and supported native components into one distributable executable; trimming is not enabled without compatibility proof.
+- [x] The executable starts when copied alone into an isolated directory, and it does not require application DLLs, resources, or configuration beside it.
 - [ ] Theme and export preferences and diagnostics use user-data locations, with defaults available on first launch.
-- [ ] On the agreed Windows 11 24H2+ x64 development system, launch the executable and exercise open, compare, edit, save, export, and close workflows. Record the installed .NET Desktop Runtime environment and state clearly that this does not prove launch on a machine without those runtimes.
-- [ ] Record the publish command, output location, executable size, environment used for validation, and any clean-machine limitation in the ticket comments.
+- [ ] On the development system, launch the executable and exercise open, compare, edit, save, export, and close workflows. Record its actual OS and installed .NET Desktop Runtime environment. A Windows 10 host is accepted for this validation, but does not establish behavior on the supported Windows 11 24H2+ target or prove launch on a machine without those runtimes.
+- [x] Record the publish command, output location, executable size, environment used for validation, and any clean-machine limitation in the ticket comments.
 
 ## Comments
 
@@ -22,3 +22,5 @@
 - Agreed diagnostics policy: keep an error-only rolling log under `%LOCALAPPDATA%\HexEditor`, retaining at most five 1 MiB files. Include operation and affected address/selection when available; omit firmware bytes, full file paths, routine successes, and telemetry. Defaults and preferences must work on first launch without files beside the executable.
 - Tickets 15 and 16 remain open, so this ticket's dependency chain and completed-UI acceptance are not yet satisfied.
 - Release profile revalidated after integrating tickets 01, 04, 05, 06, 08, 09, 10, 11, 13, and 14 on `integration` (`86f2260`): the publish directory contains only `HexEditor.UI.exe` (67,488,547 bytes), and a copy containing only that executable started for five seconds from an isolated directory. The full test suite passed 128 tests before publishing. Open/compare/edit/save/export/close release workflow acceptance remains pending its blockers and the outstanding WPF visual acceptance checks.
+- Updated release validation after integrating tickets 07, 15, and 16: publish output contains only `HexEditor.UI.exe` (67,491,958 bytes), and an isolated copy started for eight seconds. The host registry identifies Windows 10 Home 26H2, build 26300.9711, x64, with .NET Desktop Runtimes 8, 9, and 10 installed. This confirms only a process-start smoke check on that host; it does not validate the Windows 11 24H2+ target, prove runtime-free-host launch, or exercise the UI workflows.
+- User decision: release workflow verification on the current development system is sufficient; no VM or second machine is required. Updated artifact after the More overflow fix (`5f0ed44`): `artifacts/publish/win-x64/HexEditor.UI.exe`, 67,492,290 bytes, SHA-256 `863437C4D6B512DAA350F52E530045D6B79DE32316CA4AA69C8F8FCB38B55FE7`. The isolated copy remained running after eight seconds. Full workflow and first-launch preference/log checks remain for human acceptance.
