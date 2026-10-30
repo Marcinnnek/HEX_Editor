@@ -811,7 +811,7 @@ public partial class MainWindow : Window
     private void SegmentsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source ||
-            ItemsControl.ContainerFromElement(SegmentsGrid, source) is not DataGridRow)
+            ItemsControl.ContainerFromElement(SegmentsGrid, source) is not ListBoxItem)
         {
             return;
         }

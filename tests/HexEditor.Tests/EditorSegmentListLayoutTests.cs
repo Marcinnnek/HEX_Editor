@@ -1,64 +1,107 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
-using System.Globalization;
+using System.Windows.Threading;
+using HexEditor.Core;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
 
 [TestClass]
+[DoNotParallelize]
 public sealed class EditorSegmentListLayoutTests
 {
     [TestMethod]
-    public void EditorSegmentList_UsesOnlyItsContentWidth()
+    public void EditorBlocksAreOneLineOrderedDescriptionsWithHorizontalScrollingAndExtendedSelection()
     {
-        var alignment = HorizontalAlignment.Stretch;
-        var columnsAreAuto = false;
-        var sortingDisabled = false;
-        var rowHeight = 0d;
-        var renderedGap = double.NaN;
+        Exception? failure = null;
         var thread = new Thread(() =>
         {
-            var window = new MainWindow();
-            window.ViewModel.Segments.Add(new MemorySegmentRow("00001000", "00001000", 1));
-            window.ViewModel.Segments.Add(new MemorySegmentRow("00001010", "00001010", 1));
-            window.Show();
-            window.UpdateLayout();
-            var segmentGrid = (DataGrid)window.FindName("SegmentsGrid");
-            alignment = segmentGrid.HorizontalAlignment;
-            columnsAreAuto = segmentGrid.Columns.All(column => column.Width.IsAuto);
-            sortingDisabled = !segmentGrid.CanUserSortColumns;
-            rowHeight = segmentGrid.RowHeight;
-            renderedGap = MeasureTextGap(segmentGrid);
-            window.Close();
+            try
+            {
+                var window = new MainWindow { Width = 360 };
+                window.ViewModel.LoadImage(MemoryImage.FromSegments([
+                    new MemorySegment(0x08002000, [0x01]),
+                    new MemorySegment(0x08000000, new byte[0x15BC])]), null, null);
+                window.Show();
+                window.UpdateLayout();
+
+                var blocks = (ListBox)window.FindName("SegmentsGrid");
+                Assert.AreEqual(SelectionMode.Extended, blocks.SelectionMode);
+                Assert.AreEqual(ScrollBarVisibility.Auto, ScrollViewer.GetVerticalScrollBarVisibility(blocks));
+                var horizontalScroll = Descendants<ScrollViewer>(blocks).Single();
+                Assert.AreEqual(ScrollBarVisibility.Auto, ScrollViewer.GetHorizontalScrollBarVisibility(blocks));
+                Assert.AreEqual("Block 1 Starts at: 0x08000000 Ends at: 0x080015BB (Length: 0x15BC = 5564)",
+                    ((MemorySegmentRow)blocks.Items[0]).Description);
+                Assert.AreEqual("Block 2 Starts at: 0x08002000 Ends at: 0x08002000 (Length: 0x1 = 1)",
+                    ((MemorySegmentRow)blocks.Items[1]).Description);
+
+                var firstRow = (ListBoxItem)blocks.ItemContainerGenerator.ContainerFromIndex(0);
+                var text = Descendants<TextBlock>(firstRow).Single();
+                Assert.AreEqual(TextWrapping.NoWrap, text.TextWrapping);
+                Assert.AreEqual(((MemorySegmentRow)blocks.Items[0]).Description, text.Text);
+                Assert.IsGreaterThan(0, horizontalScroll.ScrollableWidth,
+                    "The full one-line descriptions should remain reachable when the Editor is narrow.");
+                blocks.SelectedIndex = 1;
+                window.UpdateLayout();
+                var rowsScroll = Descendants<ScrollViewer>(window.FindName("HexRowsView") as DependencyObject ?? window)
+                    .First(viewer => ScrollViewer.GetCanContentScroll(viewer));
+                Assert.IsGreaterThan(0, rowsScroll.VerticalOffset,
+                    "Selecting a Block should scroll the data view to its start address.");
+                blocks.SelectAll();
+                Assert.AreEqual(2, blocks.SelectedItems.Count);
+                window.Close();
+            }
+            catch (Exception exception) { failure = exception; }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-
-        Assert.AreEqual(HorizontalAlignment.Left, alignment);
-        Assert.IsTrue(columnsAreAuto,
-            "Segment columns should size to their displayed address and count content.");
-        Assert.IsTrue(sortingDisabled, "Segment order should remain stable when a header is clicked.");
-        Assert.AreEqual(21d, rowHeight, "Compact segment rows should retain readable text and selection targets.");
-        Assert.IsTrue(renderedGap is >= 0.35 and <= 0.65,
-            $"Expected about half a character of rendered text-to-text gap, got {renderedGap:F2}.");
+        if (failure is not null) throw failure;
     }
 
-    private static double MeasureTextGap(DataGrid grid)
+    [TestMethod]
+    public void DoubleClickingAnEditorBlockOpensItsRelocationDialog()
     {
-        var firstRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
-        var secondRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(1);
-        Assert.IsNotNull(firstRow);
-        Assert.IsNotNull(secondRow);
-        var firstText = Descendants<TextBlock>(firstRow).First();
-        var secondText = Descendants<TextBlock>(secondRow).First();
-        var firstBounds = firstRow.TransformToAncestor(grid).TransformBounds(new Rect(firstRow.RenderSize));
-        var secondBounds = secondRow.TransformToAncestor(grid).TransformBounds(new Rect(secondRow.RenderSize));
-        var lineHeight = new FormattedText(firstText.Text, CultureInfo.CurrentCulture, firstText.FlowDirection,
-            new Typeface(firstText.FontFamily, firstText.FontStyle, firstText.FontWeight, firstText.FontStretch),
-            firstText.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(firstText).PixelsPerDip).Height;
-        return (secondBounds.Top - firstBounds.Top - lineHeight) / firstText.FontSize;
+        Exception? failure = null;
+        var openedRelocation = false;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var window = new MainWindow();
+                window.ViewModel.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x01])]), null, null);
+                window.Show();
+                window.UpdateLayout();
+                var blocks = (ListBox)window.FindName("SegmentsGrid");
+                blocks.SelectedIndex = 0;
+                var item = (ListBoxItem)blocks.ItemContainerGenerator.ContainerFromIndex(0);
+                var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                timer.Tick += (_, _) =>
+                {
+                    var dialog = window.OwnedWindows.OfType<RelocateSegmentDialog>().FirstOrDefault();
+                    if (dialog is null) return;
+                    openedRelocation = true;
+                    timer.Stop();
+                    dialog.Close();
+                };
+                timer.Start();
+                blocks.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = Control.MouseDoubleClickEvent,
+                    Source = item
+                });
+                timer.Stop();
+                window.Close();
+            }
+            catch (Exception exception) { failure = exception; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+        Assert.IsTrue(openedRelocation, "A Block double-click should open the relocation workflow.");
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
