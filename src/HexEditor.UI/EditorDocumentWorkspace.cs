@@ -180,6 +180,10 @@ public sealed class EditorDocumentWorkspace
     public bool Redo() => Document.Editing.Redo();
     public EditRowSession BeginEditRow(uint rowStartAddress, uint selectedAddress, int bytesPerRow) =>
         new(Document, rowStartAddress, selectedAddress, bytesPerRow);
+    public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) =>
+        Document.Editing.PrepareRelocation(segmentIndex, destinationBaseAddress);
+    public bool ApplyRelocation(MemoryRelocationPreview preview, RelocationOverlapDecision decision) =>
+        Document.Editing.ApplyRelocation(preview, decision);
     public void Save() => Document.Save();
     public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
         Document.SaveAsync(cancellationToken, progress);
