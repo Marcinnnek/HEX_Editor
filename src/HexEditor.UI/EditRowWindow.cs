@@ -16,13 +16,13 @@ public sealed class EditRowWindow : Window
     public EditRowWindow(EditRowSession session)
     {
         _session = session ?? throw new ArgumentNullException(nameof(session));
-        Title = "Edit Row"; Width = 850; Height = 380; MinWidth = 600; MinHeight = 250;
+        Title = $"Edit Row — {_session.ImageName}"; Width = 850; Height = 380; MinWidth = 600; MinHeight = 250;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; ShowInTaskbar = false;
         _hex = new TextBox[session.Cells.Count]; _ascii = new TextBox[session.Cells.Count];
         var root = new DockPanel { Margin = new Thickness(12) };
         var heading = new TextBlock
         {
-            Text = $"Row starts at 0x{session.RowStartAddress:X8}     Selected byte: 0x{session.SelectedAddress:X8}",
+            Text = $"{session.ImageName}     Row starts at 0x{session.RowStartAddress:X8}     Selected byte: 0x{session.SelectedAddress:X8}",
             FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 10)
         };
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);

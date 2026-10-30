@@ -188,7 +188,7 @@ public partial class MainWindow : FluentWindow
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.Source, WorkspaceTabs)) return;
-        ViewModel.ActivateComparison((WorkspaceTabs.SelectedContent as CompareView)?.ViewModel);
+        ViewModel.ActivateComparison((WorkspaceTabs.SelectedContent as CompareView)?.Workspace);
     }
 
     private async void CompareImages_Click(object sender, RoutedEventArgs e)
@@ -211,8 +211,14 @@ public partial class MainWindow : FluentWindow
 
             var view = new CompareView(comparison);
             view.StatusRequested += ViewModel.ReportCompareInteraction;
-            view.BaseRowActivated += address =>
-                ViewModel.ReportCompareInteraction($"Base row at 0x{address:X8} selected.");
+            view.BaseRowActivated += (rowStartAddress, address) =>
+            {
+                if (comparison.BaseDocument is not { } baseDocument) return;
+                var edit = ViewModel.Workspace.BeginEditRow(baseDocument, rowStartAddress, address,
+                    comparison.Comparison.BytesPerRow);
+                var dialog = new EditRowWindow(edit) { Owner = this };
+                dialog.ShowDialog();
+            };
             var tab = new TabItem { Content = view };
             tab.Header = CreateCompareTabHeader(comparison, tab);
             ViewModel.Workspace.RegisterComparisonView(comparison);
@@ -439,13 +445,13 @@ public partial class MainWindow : FluentWindow
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.Undo();
-        Title = ViewModel.WindowTitle;
+        if (ReferenceEquals(ActiveDocument, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
         ViewModel.Redo();
-        Title = ViewModel.WindowTitle;
+        if (ReferenceEquals(ActiveDocument, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void EditInsert_Click(object sender, RoutedEventArgs e)

@@ -75,6 +75,45 @@ public sealed class CompareRowActivationTests
         Assert.AreSame(right, workspace.Comparison.FileB);
     }
 
+    [TestMethod]
+    public void EditingActivatedBaseRow_UsesSharedDocumentAndRefreshesEveryComparison()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20])]);
+        workspace.OpenImage(baseImage, "base.hex", null);
+        var document = workspace.Document;
+        var first = new CompareWorkspaceTabViewModel(baseImage,
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20])]), "base.hex", "ref-a.hex", baseDocument: document);
+        var second = new CompareWorkspaceTabViewModel(baseImage,
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x30])]), "base.hex", "ref-b.hex", baseDocument: document);
+        workspace.RegisterComparisonView(first);
+        workspace.RegisterComparisonView(second);
+
+        var activation = first.ActivateRow(ComparePanelSide.Base, 0, 0x1001);
+        Assert.AreEqual(CompareRowActivationKind.EditableRow, activation.Kind);
+        var edit = workspace.BeginEditRow(first.BaseDocument!, 0x1000, activation.Address!.Value, first.Comparison.BytesPerRow);
+        Assert.IsTrue(edit.SetHex(0x1001, "30"));
+        Assert.IsTrue(edit.Commit());
+
+        Assert.AreEqual((byte)0x30, ReadByte(document.CurrentImage, 0x1001));
+        Assert.AreSame(document.CurrentImage, first.Comparison.FileA);
+        Assert.AreSame(document.CurrentImage, second.Comparison.FileA);
+        Assert.AreEqual(0, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+        Assert.AreEqual(1, second.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+        Assert.IsTrue(document.IsModified);
+        Assert.IsTrue(document.Editing.Undo());
+        Assert.AreEqual(1, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+        Assert.AreEqual(0, second.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+        Assert.IsTrue(document.Editing.Redo());
+        Assert.AreEqual(0, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
+    }
+
+    private static byte ReadByte(MemoryImage image, uint address)
+    {
+        Assert.IsTrue(image.TryGetByte(address, out var value));
+        return value;
+    }
+
     [STATestMethod]
     public void HexByteHitTesting_RejectsSeparatorsAndOutsideRow()
     {
