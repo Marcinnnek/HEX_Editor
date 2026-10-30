@@ -43,8 +43,7 @@ public sealed class ImageEditingSession
         if (changes.Count == 0) return;
         if (changes.Keys.Any(address => !_currentImage.TryGetByte(address, out _)))
             throw new InvalidOperationException("Edit Row can change occupied bytes only.");
-        Commit(MemoryImageSparseOverlay.Combine(_currentImage, MemoryImageEdits.FromBytes(changes),
-            (_, hasExisting, existing, hasIncoming, incoming) => hasIncoming ? incoming : existing));
+        Commit(_currentImage.WithByteChanges(changes));
     }
 
     public void InsertBytes(uint address, IReadOnlyList<byte> bytes, OverlapDecision? overlapDecision = null)
@@ -131,29 +130,15 @@ public sealed class ImageEditingSession
     public void DeleteRange(uint startAddress, uint endAddress)
     {
         ValidateRange(startAddress, endAddress);
-        var kept = new List<MemorySegment>();
-        foreach (var segment in _currentImage.Segments)
-        {
-            if (segment.EndAddress < startAddress || segment.StartAddress > endAddress) { kept.Add(segment); continue; }
-            if (segment.StartAddress < startAddress)
-            {
-                var leftLength = checked((int)(startAddress - segment.StartAddress));
-                kept.Add(new MemorySegment(segment.StartAddress, segment.Data.Span[..leftLength]));
-            }
-            if (segment.EndAddress > endAddress)
-            {
-                var rightOffset = checked((int)((ulong)endAddress + 1 - segment.StartAddress));
-                kept.Add(new MemorySegment(checked(endAddress + 1), segment.Data.Span[rightOffset..]));
-            }
-        }
-        Commit(MemoryImage.FromSegments(kept));
+        Commit(_currentImage.WithoutRange(startAddress, endAddress));
     }
 
     public void DeleteSegment(int segmentIndex)
     {
-        if ((uint)segmentIndex >= (uint)_currentImage.Segments.Count)
+        if ((uint)segmentIndex >= (uint)_currentImage.Ranges.Count)
             throw new ArgumentOutOfRangeException(nameof(segmentIndex));
-        Commit(MemoryImage.FromSegments(_currentImage.Segments.Where((_, index) => index != segmentIndex)));
+        var range = _currentImage.Ranges[segmentIndex];
+        Commit(_currentImage.WithoutRange(range.StartAddress, range.EndAddress));
     }
 
     public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
@@ -236,9 +221,9 @@ public sealed class ImageEditingSession
 
     private static bool ImagesEqual(MemoryImage left, MemoryImage right)
     {
-        if (left.Segments.Count != right.Segments.Count) return false;
-        for (var i = 0; i < left.Segments.Count; i++)
-            if (left.Segments[i].StartAddress != right.Segments[i].StartAddress || !left.Segments[i].Data.Span.SequenceEqual(right.Segments[i].Data.Span)) return false;
+        if (left.Ranges.Count != right.Ranges.Count) return false;
+        for (var i = 0; i < left.Ranges.Count; i++)
+            if (!left.Ranges[i].ContentEquals(right.Ranges[i])) return false;
         return true;
     }
 
@@ -256,7 +241,11 @@ public sealed record InsertPreview(MemoryImage ExistingImage, IReadOnlyDictionar
     {
         if (OverlapCount > 0 && decision is null) return null;
         if (decision == OverlapDecision.Cancel) return null;
-        return MemoryImageEdits.Overlay(ExistingImage, MemoryImageEdits.FromBytes(IncomingBytes), decision ?? OverlapDecision.KeepExisting);
+        var applied = decision == OverlapDecision.OverwriteIncoming
+            ? IncomingBytes
+            : IncomingBytes.Where(pair => !ExistingImage.TryGetByte(pair.Key, out _))
+                .ToDictionary(pair => pair.Key, pair => pair.Value);
+        return ExistingImage.WithByteChanges(applied);
     }
 }
 

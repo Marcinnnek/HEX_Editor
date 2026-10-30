@@ -159,7 +159,7 @@ public sealed class EditorDocumentWorkspace
         var imported = preview.Apply(decision);
         if (imported is null) return false;
         OpenImage(imported.Image, imported.SourcePath, imported.DetectedFormat, imported.FormatMetadata,
-            isModified: Document.CurrentImage.Segments.Count > 0);
+            isModified: Document.CurrentImage.OccupiedByteCount > 0);
         return true;
     }
 
@@ -229,7 +229,7 @@ public sealed class EditorDocumentWorkspace
     public int DeleteBlock(int segmentIndex)
     {
         Document.Editing.DeleteSegment(segmentIndex);
-        return Math.Min(segmentIndex, Document.CurrentImage.Segments.Count - 1);
+        return Math.Min(segmentIndex, Document.CurrentImage.Ranges.Count - 1);
     }
     public void Save() => Document.Save();
     public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>

@@ -87,6 +87,92 @@ public sealed class MemoryImage
         return new MemoryImage(Array.Empty<MemorySegment>(), [MemoryImageRange.Repeated(startAddress, endAddress, pattern.ToArray())]);
     }
 
+    public static MemoryImage FromRanges(IEnumerable<MemoryImageRange> ranges)
+    {
+        ArgumentNullException.ThrowIfNull(ranges);
+        var ordered = ranges.OrderBy(range => range.StartAddress).ToArray();
+        for (var i = 1; i < ordered.Length; i++)
+            if (ordered[i].StartAddress <= ordered[i - 1].EndAddress)
+                throw new ArgumentException("Memory ranges must not overlap.", nameof(ranges));
+        var normalized = NormalizeSmallAdjacentRanges(ordered);
+        var segments = normalized.Select(range => range.ToSmallSegment()).Where(segment => segment is not null).Cast<MemorySegment>().ToArray();
+        return normalized.Length == 0 ? Empty : new MemoryImage(segments, normalized);
+    }
+
+    public MemoryImage WithoutRange(uint startAddress, uint endAddress)
+    {
+        if (endAddress < startAddress) throw new ArgumentOutOfRangeException(nameof(endAddress));
+        var remaining = new List<MemoryImageRange>();
+        foreach (var range in _ranges)
+        {
+            if (range.EndAddress < startAddress || range.StartAddress > endAddress) { remaining.Add(range); continue; }
+            if (range.StartAddress < startAddress) remaining.Add(range.Slice(range.StartAddress, startAddress - 1));
+            if (range.EndAddress > endAddress && endAddress < uint.MaxValue)
+                remaining.Add(range.Slice(endAddress + 1, range.EndAddress));
+        }
+        return FromRanges(remaining);
+    }
+
+    /// <summary>Returns an image with the specified occupied bytes added or replaced, preserving untouched logical ranges.</summary>
+    public MemoryImage WithByteChanges(IReadOnlyDictionary<uint, byte> changes)
+    {
+        ArgumentNullException.ThrowIfNull(changes);
+        if (changes.Count == 0) return this;
+        var orderedChanges = changes.OrderBy(pair => pair.Key).ToArray();
+        var output = new List<MemoryImageRange>();
+        var changedAddresses = new HashSet<uint>();
+        foreach (var range in _ranges)
+        {
+            var cursor = (ulong)range.StartAddress;
+            foreach (var change in orderedChanges)
+            {
+                if (change.Key < range.StartAddress || change.Key > range.EndAddress) continue;
+                if (cursor < change.Key) output.Add(range.Slice((uint)cursor, change.Key - 1));
+                output.Add(MemoryImageRange.FromSegment(new MemorySegment(change.Key, [change.Value])));
+                changedAddresses.Add(change.Key);
+                cursor = (ulong)change.Key + 1;
+            }
+            if (cursor <= range.EndAddress) output.Add(range.Slice((uint)cursor, range.EndAddress));
+        }
+
+        foreach (var change in orderedChanges.Where(pair => !changedAddresses.Contains(pair.Key)))
+            output.Add(MemoryImageRange.FromSegment(new MemorySegment(change.Key, [change.Value])));
+
+        return FromRanges(output);
+    }
+
+    private static MemoryImageRange[] NormalizeSmallAdjacentRanges(MemoryImageRange[] ranges)
+    {
+        const ulong maximumMaterializedBytes = 1_048_576;
+        var result = new List<MemoryImageRange>();
+        for (var index = 0; index < ranges.Length;)
+        {
+            var endIndex = index;
+            ulong count = ranges[index].ByteCount;
+            while (endIndex + 1 < ranges.Length && (ulong)ranges[endIndex].EndAddress + 1 == ranges[endIndex + 1].StartAddress &&
+                   count + ranges[endIndex + 1].ByteCount <= maximumMaterializedBytes)
+            {
+                endIndex++;
+                count += ranges[endIndex].ByteCount;
+            }
+            if (endIndex == index)
+            {
+                result.Add(ranges[index++]);
+                continue;
+            }
+            var data = new byte[(int)count];
+            var offset = 0;
+            for (var part = index; part <= endIndex; part++)
+                for (var address = (ulong)ranges[part].StartAddress; address <= ranges[part].EndAddress; address++)
+                {
+                    ranges[part].TryGetByte((uint)address, out data[offset++]);
+                }
+            result.Add(MemoryImageRange.FromSegment(new MemorySegment(ranges[index].StartAddress, data)));
+            index = endIndex + 1;
+        }
+        return result.ToArray();
+    }
+
     public bool TryGetByte(uint address, out byte value)
     {
         var low = 0;

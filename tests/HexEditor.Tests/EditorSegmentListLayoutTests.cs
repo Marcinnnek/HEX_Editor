@@ -104,6 +104,40 @@ public sealed class EditorSegmentListLayoutTests
         Assert.IsTrue(openedRelocation, "A Block double-click should open the relocation workflow.");
     }
 
+    [TestMethod]
+    public void EditorBlockListDisplaysAndNavigatesAFullLogicalRange()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var window = new MainWindow();
+                window.ViewModel.LoadImage(MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xA5), null, null);
+                window.Show();
+                window.UpdateLayout();
+
+                var blocks = (ListBox)window.FindName("SegmentsGrid");
+                Assert.HasCount(1, blocks.Items);
+                var block = (MemorySegmentRow)blocks.Items[0];
+                Assert.AreEqual("Block 1 Starts at: 0x00000000 Ends at: 0xFFFFFFFF (Length: 0x100000000 = 4294967296)",
+                    block.Description);
+                Assert.IsTrue(window.ViewModel.ImageView.TryNavigateToAddress(uint.MaxValue, out var rowIndex));
+                Assert.AreEqual("FFFFFFF0", window.ViewModel.ImageView.Rows[rowIndex].Address);
+                Assert.AreEqual("A5", window.ViewModel.ImageView.Rows[rowIndex].Cells[15].Hex);
+
+                blocks.SelectedIndex = 0;
+                Assert.AreEqual("00000000", window.ViewModel.ImageView.Rows[0].Address);
+                window.Close();
+            }
+            catch (Exception exception) { failure = exception; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {
         for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)

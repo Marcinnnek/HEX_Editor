@@ -43,6 +43,32 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void Editor_RendersLogicalRangeAtBoth32BitEndsAndKeepsEditsUndoable()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        var image = MemoryImage.FromRepeatedRange(0x00000000, 0xFFFFFFFF, 0xA5);
+        workspace.OpenImage(image, null, null);
+        var view = new HexImageViewModel(workspace.Document.CurrentImage, bytesPerRow: 8);
+
+        Assert.AreEqual(4_294_967_296UL, workspace.Document.CurrentImage.OccupiedByteCount);
+        Assert.IsTrue(view.TryNavigateToAddress(0x00000000, out var firstRowIndex));
+        Assert.AreEqual("00000000", view.Rows[firstRowIndex].Address);
+        Assert.AreEqual("A5", view.Rows[firstRowIndex].Cells[0].Hex);
+        Assert.IsTrue(view.TryNavigateToAddress(0xFFFFFFFF, out var finalRowIndex));
+        Assert.AreEqual("FFFFFFF8", view.Rows[finalRowIndex].Address);
+        Assert.AreEqual("A5", view.Rows[finalRowIndex].Cells[7].Hex);
+
+        workspace.EditByte(0xFFFFFFFF, 0x5A, OverlapDecision.OverwriteIncoming);
+        Assert.AreEqual(4_294_967_296UL, workspace.Document.CurrentImage.OccupiedByteCount);
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x00000000, out var first));
+        Assert.AreEqual((byte)0xA5, first);
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0xFFFFFFFF, out var last));
+        Assert.AreEqual((byte)0x5A, last);
+        Assert.IsTrue(workspace.Undo());
+        Assert.AreSame(image, workspace.Document.CurrentImage);
+    }
+
+    [TestMethod]
     public void EditorAndComparison_ShareSparseLayoutAndCompareCanNavigateIntoGaps()
     {
         var image = MemoryImage.FromSegments([

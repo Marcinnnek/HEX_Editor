@@ -77,12 +77,12 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex)
     {
-        if ((uint)segmentIndex >= (uint)Image.Segments.Count)
+        if ((uint)segmentIndex >= (uint)Image.Ranges.Count)
         {
             rowIndex = -1;
             return false;
         }
-        return TryNavigateToAddress(Image.Segments[segmentIndex].StartAddress, out rowIndex);
+        return TryNavigateToAddress(Image.Ranges[segmentIndex].StartAddress, out rowIndex);
     }
 
     private void RebuildRows()
@@ -119,12 +119,12 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
     private static IReadOnlyList<SparseRowSpan> BuildRanges(MemoryImage image, int bytesPerRow)
     {
-        if (image.Segments.Count == 0) return Array.Empty<SparseRowSpan>();
+        if (image.Ranges.Count == 0) return Array.Empty<SparseRowSpan>();
         var width = (uint)bytesPerRow;
-        var rowRanges = image.Segments.Select(segment =>
+        var rowRanges = image.Ranges.Select(range =>
         {
-            var first = (ulong)(segment.StartAddress / width) * width;
-            var last = (ulong)(segment.EndAddress / width) * width;
+            var first = (ulong)(range.StartAddress / width) * width;
+            var last = (ulong)(range.EndAddress / width) * width;
             return (First: first, Last: last);
         }).ToArray();
 
