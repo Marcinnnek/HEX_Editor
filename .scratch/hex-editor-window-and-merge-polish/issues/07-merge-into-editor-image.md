@@ -20,4 +20,4 @@ Merge now uses the Editor document as a fixed in-memory destination whenever it 
 
 ## Comments
 
-- Automated test execution is currently blocked because MSBuild cannot access `C:\Users\Marcin\AppData\Local\Microsoft SDKs` in this environment.
+- Focused tests run with `-p:IsTestProject=true`: 4 passed, 0 failed. This includes the rendered fixed-destination merge acceptance test and same-path disk-loader coverage.

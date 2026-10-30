@@ -265,9 +265,12 @@ public partial class MainWindow : Window
                 ? new LoadedMemoryImage(editorDocument.CurrentImage, editorDocument.SourcePath, editorDocument.SourceFormat)
                 : diskImages.First!;
             var imageB = diskImages.Second;
+            var destinationName = editorHasImage
+                ? (editorDocument.SourcePath is null ? "Untitled" : System.IO.Path.GetFileName(editorDocument.SourcePath) ?? "Editor")
+                : System.IO.Path.GetFileName(destinationPath!) ?? "Destination";
+            var sourceName = System.IO.Path.GetFileName(sourcePath) ?? sourcePath;
             var dialog = new MergeWindow(imageA.Image, imageB.Image,
-                editorHasImage && imageA.Path is not null ? System.IO.Path.GetFileName(imageA.Path) : System.IO.Path.GetFileName(destinationPath),
-                System.IO.Path.GetFileName(sourcePath), fixedDestination: editorHasImage) { Owner = this };
+                destinationName, sourceName, fixedDestination: editorHasImage) { Owner = this };
             if (dialog.ShowDialog() != true) return;
 
             var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;

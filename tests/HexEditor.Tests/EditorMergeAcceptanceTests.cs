@@ -32,7 +32,7 @@ public sealed class EditorMergeAcceptanceTests
                 merge.Show();
                 merge.UpdateLayout();
                 Assert.IsTrue(merge.IsFixedDestination);
-                Assert.AreEqual(1, merge.DirectionOptions.Length, "A fixed destination must expose no reverse direction.");
+                Assert.HasCount(1, merge.DirectionOptions, "A fixed destination must expose no reverse direction.");
                 Assert.AreSame(editorDocument.CurrentImage, merge.DestinationImage);
                 Assert.AreEqual((byte)0x12, merge.Preview.Destination.TryGetByte(0x10, out var unsaved) ? unsaved : (byte)0);
                 Assert.AreEqual((byte)0x55, merge.Preview.Resolve(MemoryImageMergeChoice.KeepSource)!.TryGetByte(0x20, out var added) ? added : (byte)0);
