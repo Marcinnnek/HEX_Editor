@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _fileOperationCancellation;
     private uint? _selectionStart;
     private uint? _selectionEnd;
+    private bool _suppressSegmentNavigation;
 
     public MainWindow()
     {
@@ -792,8 +793,22 @@ public partial class MainWindow : Window
         }
 
         var segment = ViewModel.CurrentImage.Segments[segmentIndex];
-        var dialog = new RelocateSegmentDialog(segment.StartAddress, segment.EndAddress, segment.ByteCount) { Owner = this };
+        var dialog = new RelocateSegmentDialog(segment.StartAddress, segment.EndAddress, segment.ByteCount,
+            canDelete: SegmentsGrid.SelectedItems.Count == 1) { Owner = this };
         if (dialog.ShowDialog() != true) return;
+
+        if (dialog.DeleteRequested)
+        {
+            var nextSegmentIndex = ViewModel.Workspace.DeleteBlock(segmentIndex);
+            _suppressSegmentNavigation = true;
+            try
+            {
+                SegmentsGrid.SelectedIndex = nextSegmentIndex;
+                ViewModel.SelectedSegmentIndex = nextSegmentIndex;
+            }
+            finally { _suppressSegmentNavigation = false; }
+            return;
+        }
 
         try
         {
@@ -837,7 +852,7 @@ public partial class MainWindow : Window
     private void SegmentsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         ViewModel.SelectedSegmentIndex = SegmentsGrid.SelectedIndex;
-        if (SegmentsGrid.SelectedIndex >= 0 &&
+        if (!_suppressSegmentNavigation && SegmentsGrid.SelectedIndex >= 0 &&
             ViewModel.TryNavigateToSegment(SegmentsGrid.SelectedIndex, out var rowIndex))
         {
             SelectRow(rowIndex);

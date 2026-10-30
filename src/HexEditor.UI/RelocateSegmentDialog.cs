@@ -11,10 +11,17 @@ public sealed class RelocateSegmentDialog : Window
     private readonly TextBox _destination;
     private readonly TextBlock _preview = new() { Margin = new Thickness(0, 8, 0, 12) };
     private readonly int _byteCount;
+    private readonly uint _startAddress;
+    private readonly uint _endAddress;
+    private readonly Func<string, bool> _confirmDelete;
 
-    public RelocateSegmentDialog(uint startAddress, uint endAddress, int byteCount)
+    public RelocateSegmentDialog(uint startAddress, uint endAddress, int byteCount, bool canDelete = true,
+        Func<string, bool>? confirmDelete = null)
     {
         _byteCount = byteCount;
+        _startAddress = startAddress;
+        _endAddress = endAddress;
+        _confirmDelete = confirmDelete ?? ConfirmDelete;
         _destination = new TextBox {  
             MinWidth = 190,
             MaxLength = 10,
@@ -37,8 +44,19 @@ public sealed class RelocateSegmentDialog : Window
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(0, 0, 8, 0) };
         var apply = new Button { Content = "Continue", IsDefault = true, MinWidth = 80 };
-        apply.Click += (_, _) => { if (TryGetDestination(out _)) DialogResult = true; };
+        apply.Click += (_, _) => { if (TryGetDestination(out _)) { Action = RelocateSegmentDialogAction.Continue; DialogResult = true; } };
         buttons.Children.Add(cancel);
+        if (canDelete)
+        {
+            var delete = new Button { Content = "Delete", MinWidth = 80, Margin = new Thickness(0, 0, 8, 0) };
+            delete.Click += (_, _) =>
+            {
+                if (!_confirmDelete(DeleteConfirmationMessage)) return;
+                Action = RelocateSegmentDialogAction.Delete;
+                DialogResult = true;
+            };
+            buttons.Children.Add(delete);
+        }
         buttons.Children.Add(apply);
         panel.Children.Add(buttons);
         Content = panel;
@@ -53,6 +71,14 @@ public sealed class RelocateSegmentDialog : Window
 
     public uint DestinationAddress { get; private set; }
     public string DestinationAddressText => _destination.Text;
+    public RelocateSegmentDialogAction Action { get; private set; }
+    public bool DeleteRequested => Action == RelocateSegmentDialogAction.Delete;
+    public string DeleteConfirmationMessage =>
+        $"Delete Block 0x{_startAddress:X8}–0x{_endAddress:X8} (Length: 0x{_byteCount:X} = {_byteCount:N0} bytes)?";
+
+    private bool ConfirmDelete(string message) =>
+        ThemedMessageBox.Show(this, message, "Confirm Block deletion", MessageBoxButton.YesNo,
+            MessageBoxImage.Warning) == MessageBoxResult.Yes;
 
     private void Destination_PreviewTextInput(object sender, TextCompositionEventArgs e)
     {
@@ -110,4 +136,10 @@ public sealed class RelocateSegmentDialog : Window
             _preview.Text = "Enter a valid 32-bit address with room for the entire segment.";
         }
     }
+}
+
+public enum RelocateSegmentDialogAction
+{
+    Continue,
+    Delete
 }

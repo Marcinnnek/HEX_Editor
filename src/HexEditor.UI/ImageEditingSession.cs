@@ -149,6 +149,13 @@ public sealed class ImageEditingSession
         Commit(MemoryImage.FromSegments(kept));
     }
 
+    public void DeleteSegment(int segmentIndex)
+    {
+        if ((uint)segmentIndex >= (uint)_currentImage.Segments.Count)
+            throw new ArgumentOutOfRangeException(nameof(segmentIndex));
+        Commit(MemoryImage.FromSegments(_currentImage.Segments.Where((_, index) => index != segmentIndex)));
+    }
+
     public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
         FillPolicy policy = FillPolicy.KeepExisting)
     {
