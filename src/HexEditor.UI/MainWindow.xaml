@@ -155,19 +155,25 @@
                         <RowDefinition Height="6" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <ui:DataGrid Grid.Row="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
-                              HorizontalAlignment="Left"
-                              AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                              CanUserSortColumns="False" RowHeight="21" CellStyle="{DynamicResource SegmentListCellStyle}"
-                              HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
-                              MouseDoubleClick="SegmentsGrid_MouseDoubleClick"
-                              MaxHeight="150" MinHeight="72" VerticalScrollBarVisibility="Auto">
-                        <ui:DataGrid.Columns>
-                            <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                            <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                            <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCountText}" Width="Auto" ElementStyle="{DynamicResource SegmentListTextBlockStyle}" />
-                        </ui:DataGrid.Columns>
-                    </ui:DataGrid>
+                    <ListBox Grid.Row="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
+                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                             SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
+                             MouseDoubleClick="SegmentsGrid_MouseDoubleClick"
+                             MaxHeight="150" MinHeight="72"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                             ScrollViewer.CanContentScroll="False">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Description}" TextWrapping="NoWrap" MinWidth="680" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                     <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                     <local:HexViewControl Grid.Row="2" x:Name="HexRowsView"
                                           ItemsSource="{Binding ViewModel.ImageView.Rows}"

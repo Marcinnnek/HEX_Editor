@@ -16,6 +16,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _windowTitle = "HEX Editor";
     private CompareViewModel? _activeComparison;
     private EditorDocument? _activeComparisonDocument;
+    private CompareWorkspaceTabViewModel? _activeComparisonWorkspace;
     private int _selectedSegmentIndex = -1;
 
     public MainViewModel(MemoryImage? image = null)
@@ -81,21 +82,38 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void ActivateEditor()
     {
         SetActiveComparisonDocument(null);
+        if (_activeComparisonWorkspace is not null)
+            _activeComparisonWorkspace.PropertyChanged -= OnActiveComparisonWorkspacePropertyChanged;
+        _activeComparisonWorkspace = null;
         _activeComparison = null;
+        RefreshTitle();
         Raise(nameof(ActiveDocument), nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave),
             nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveHasSelection),
             nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
     }
     public void ActivateComparison(CompareWorkspaceTabViewModel? comparison)
-        => ActivateComparison(comparison?.Comparison, comparison?.BaseDocument);
+    {
+        if (_activeComparisonWorkspace is not null)
+            _activeComparisonWorkspace.PropertyChanged -= OnActiveComparisonWorkspacePropertyChanged;
+        _activeComparisonWorkspace = comparison;
+        if (_activeComparisonWorkspace is not null)
+            _activeComparisonWorkspace.PropertyChanged += OnActiveComparisonWorkspacePropertyChanged;
+        ActivateComparison(comparison?.Comparison, comparison?.BaseDocument);
+    }
     public void ActivateComparison(CompareViewModel? comparison)
-        => ActivateComparison(comparison, null);
+    {
+        if (_activeComparisonWorkspace is not null)
+            _activeComparisonWorkspace.PropertyChanged -= OnActiveComparisonWorkspacePropertyChanged;
+        _activeComparisonWorkspace = null;
+        ActivateComparison(comparison, null);
+    }
     private void ActivateComparison(CompareViewModel? comparison, EditorDocument? document)
     {
         if (_activeComparison is not null) _activeComparison.PropertyChanged -= OnActiveComparisonPropertyChanged;
         _activeComparison = comparison;
         if (_activeComparison is not null) _activeComparison.PropertyChanged += OnActiveComparisonPropertyChanged;
         SetActiveComparisonDocument(document);
+        RefreshTitle();
         Raise(nameof(ActiveDocument), nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave),
             nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate), nameof(ActiveHasSelection),
             nameof(ActiveCanPaste), nameof(ActiveBytesPerRow), nameof(ActiveShowAscii));
@@ -114,8 +132,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
             Raise(nameof(ActiveCanUndo), nameof(ActiveCanRedo));
         if (e.PropertyName is nameof(EditorDocument.CurrentImage) or nameof(EditorDocument.SourcePath) or
             nameof(EditorDocument.SourceFormat) or nameof(EditorDocument.IsModified))
+        {
+            RefreshTitle();
             Raise(nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs),
                 nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
+        }
+    }
+    private void OnActiveComparisonWorkspacePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CompareWorkspaceTabViewModel.NameA)) RefreshTitle();
     }
     private void OnActiveComparisonPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -311,13 +336,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
         EditorStatus.ClearSelection();
         ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
         Segments.Clear();
-        foreach (var segment in CurrentImage.Segments)
-            Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount));
+        foreach (var (segment, index) in CurrentImage.Segments.OrderBy(segment => segment.StartAddress).Select((segment, index) => (segment, index)))
+            Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount, index + 1));
     }
 
     private void RefreshEditorStatus() => EditorStatus.UpdateImageState(SourceFormat, IsModified);
 
-    private void RefreshTitle() => WindowTitle = $"{(string.IsNullOrWhiteSpace(SourcePath) ? "Untitled" : Path.GetFileName(SourcePath))}{(IsModified ? " *" : "")} - HEX Editor";
+    private void RefreshTitle()
+    {
+        if (_activeComparisonWorkspace is { } comparison)
+        {
+            var dirtyMarker = _activeComparisonDocument?.IsModified == true ? " *" : string.Empty;
+            WindowTitle = $"Compare: {comparison.NameA}{dirtyMarker} ↔ {comparison.NameB} - HEX Editor";
+            return;
+        }
+
+        WindowTitle = $"{(string.IsNullOrWhiteSpace(SourcePath) ? "Untitled" : Path.GetFileName(SourcePath))}{(IsModified ? " *" : "")} - HEX Editor";
+    }
     private void RefreshModifiedTitle() => RefreshTitle();
 
     private string DescribeImage(string? format)
@@ -340,7 +375,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
 }
 
-public sealed record MemorySegmentRow(string StartAddress, string EndAddress, int ByteCount)
+public sealed record MemorySegmentRow(string StartAddress, string EndAddress, int ByteCount, int Number = 0)
 {
     public string ByteCountText => SegmentByteCountFormatter.Format(ByteCount);
+    public string Description => SegmentBlockFormatter.Format(Number, StartAddress, EndAddress, ByteCount);
 }

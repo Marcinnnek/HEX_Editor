@@ -41,6 +41,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
+        ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.WindowTitle)) Title = ViewModel.WindowTitle;
+        };
         _imageEdits = new ImageEditWorkflow(ViewModel);
         _checksums = new ChecksumWorkflow(ViewModel);
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
@@ -642,7 +646,10 @@ public partial class MainWindow : Window
     private bool ConfirmCloseImage(EditorDocument document)
     {
         if (!document.IsModified) return true;
-        var choice = MessageBox.Show(this, "Save changes to this memory image before closing?", "Unsaved changes", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        var imageName = string.IsNullOrWhiteSpace(document.SourcePath)
+            ? "Untitled image"
+            : System.IO.Path.GetFileName(document.SourcePath);
+        var choice = SaveChangesDialog.Show(this, imageName);
         if (choice == MessageBoxResult.Cancel) return false;
         if (choice == MessageBoxResult.No) return true;
         if (document.SourcePath is null || document.SourceFormat is null) return TrySaveAs(document);
@@ -811,7 +818,7 @@ public partial class MainWindow : Window
     private void SegmentsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source ||
-            ItemsControl.ContainerFromElement(SegmentsGrid, source) is not DataGridRow)
+            ItemsControl.ContainerFromElement(SegmentsGrid, source) is not ListBoxItem)
         {
             return;
         }
