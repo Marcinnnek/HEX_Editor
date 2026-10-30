@@ -16,8 +16,9 @@
                 <ui:MenuItem Header="Save As..." Click="SaveAs_Click" />
                 <ui:MenuItem Header="Close Image" Click="CloseImage_Click" />
                 <Separator />
-                <ui:MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
-                <ui:MenuItem Header="Export address range..." Click="ExportRange_Click" />
+                <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" />
+                <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" />
+                <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Edit">
                 <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.CanUndo}" />
@@ -56,8 +57,9 @@
                 <ui:MenuItem x:Name="DarkAppearanceItem" Header="Dark" IsCheckable="True" Click="DarkAppearance_Click" />
             </ui:MenuItem>
             <ui:MenuItem Header="E_xport">
-                <ui:MenuItem Header="Export selected segments..." Click="ExportSegments_Click" />
-                <ui:MenuItem Header="Export address range..." Click="ExportRange_Click" />
+                <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" />
+                <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" />
+                <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" />
             </ui:MenuItem>
         </Menu>
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
@@ -140,18 +142,6 @@
             </WrapPanel>
             <TextBlock Text="{Binding ViewModel.Checksum.Summary}" Margin="0,4,0,0" FontWeight="SemiBold" />
             <TextBlock Text="{Binding ViewModel.Checksum.Result.Parameters}" />
-            <WrapPanel VerticalAlignment="Center" Margin="0,0,0,6">
-                <TextBlock Text="Export as" VerticalAlignment="Center" Margin="0,0,6,0" />
-                <ComboBox x:Name="ExportFormatInput" Width="150" ItemsSource="{Binding ViewModel.ExportFormats}" SelectedIndex="0" />
-                <TextBlock Text="Max record bytes" VerticalAlignment="Center" Margin="12,0,6,0" />
-                <ComboBox x:Name="ExportPayloadInput" Width="64" ItemsSource="{Binding ViewModel.ExportPayloadSizes}" SelectedIndex="1" />
-                <ui:Button Content="Export selected segments" Padding="10,4" Margin="12,0,0,0" Click="ExportSegments_Click" />
-                <TextBlock Text="or range" VerticalAlignment="Center" Margin="12,0,6,0" />
-                <ui:TextBox x:Name="ExportRangeStartInput" Width="90" ToolTip="Start address (hex)" VerticalContentAlignment="Center" />
-                <TextBlock Text="to" VerticalAlignment="Center" Margin="6,0" />
-                <ui:TextBox x:Name="ExportRangeEndInput" Width="90" ToolTip="End address (hex)" VerticalContentAlignment="Center" />
-                <ui:Button Content="Export range" Padding="10,4" Margin="6,0,0,0" Click="ExportRange_Click" />
-            </WrapPanel>
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock>

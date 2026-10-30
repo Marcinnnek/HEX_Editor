@@ -146,14 +146,20 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
         viewModel.SaveAsAsync(path, format, overwriteExisting, cancellationToken, progress);
 
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int payloadSize, Stream output,
-        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
-        _fileService.ExportSegments(viewModel.CurrentImage, segmentIndexes, format, payloadSize, output,
-            viewModel.SourceFormatMetadata, cancellationToken, progress);
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress, EditorDocument? document = null) =>
+        _fileService.ExportSegments(document?.CurrentImage ?? viewModel.CurrentImage, segmentIndexes, format, payloadSize, output,
+            document is null ? viewModel.SourceFormatMetadata : document.SourceFormatMetadata, cancellationToken, progress);
+
+    public void ExportImage(MemoryImageExportFormat format, int payloadSize, Stream output,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress, EditorDocument? document = null) =>
+        _fileService.Export(document?.CurrentImage ?? viewModel.CurrentImage, format, payloadSize, output,
+            document is null ? viewModel.SourceFormatMetadata : document.SourceFormatMetadata,
+            cancellationToken, progress);
 
     public void ExportAddressRange(uint start, uint end, MemoryImageExportFormat format, int payloadSize, Stream output,
-        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
-        _fileService.ExportAddressRange(viewModel.CurrentImage, start, end, format, payloadSize, output,
-            viewModel.SourceFormatMetadata, cancellationToken, progress);
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress, EditorDocument? document = null) =>
+        _fileService.ExportAddressRange(document?.CurrentImage ?? viewModel.CurrentImage, start, end, format, payloadSize, output,
+            document is null ? viewModel.SourceFormatMetadata : document.SourceFormatMetadata, cancellationToken, progress);
 
     public bool ApplyMerge(LoadedMemoryImage destination, MemoryImageMergePreview preview,
         MemoryImageMergeChoice? defaultChoice, IEnumerable<MemoryImageMergeRangeOverride> rangeOverrides,

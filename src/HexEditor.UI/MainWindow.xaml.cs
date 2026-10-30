@@ -27,6 +27,7 @@ namespace HexEditor.UI;
 public partial class MainWindow : FluentWindow
 {
     private readonly AppearanceSettings _appearanceSettings = new();
+    private readonly ExportSettings _exportSettings = new();
     private readonly UserDataDiagnostics _diagnostics = new();
     private bool _watchingSystemTheme;
     private readonly ImageEditWorkflow _imageEdits;
@@ -653,63 +654,45 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    private async void ExportSegments_Click(object sender, RoutedEventArgs e)
+    private async void ExportImage_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.EntireImage);
+    private async void ExportSegments_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.SelectedSegments);
+    private async void ExportRange_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.AddressRange);
+
+    private async Task ExportToFileAsync(ExportScope initialScope)
     {
-        var segmentIndexes = SegmentsGrid.SelectedItems
-            .Cast<MemorySegmentRow>()
-            .Select(ViewModel.Segments.IndexOf)
-            .ToArray();
-        await ExportToFileAsync((format, payloadSize, output, token, progress) =>
-            _files.ExportSegments(segmentIndexes, format, payloadSize, output, token, progress));
-    }
-
-    private async void ExportRange_Click(object sender, RoutedEventArgs e)
-    {
-        if (!HexAddressParser.TryParse(ExportRangeStartInput.Text, out var startAddress) ||
-            !HexAddressParser.TryParse(ExportRangeEndInput.Text, out var endAddress))
-        {
-            MessageBox.Show(this, "Enter both range bounds as 32-bit hexadecimal addresses (for example, 0x08000000).",
-                "Invalid export range", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        await ExportToFileAsync((format, payloadSize, output, token, progress) =>
-            _files.ExportAddressRange(startAddress, endAddress, format, payloadSize, output, token, progress));
-    }
-
-    private async Task ExportToFileAsync(Action<MemoryImageExportFormat, int, Stream, CancellationToken, IProgress<MemoryImageFileProgress>?> export)
-    {
-        if (ExportFormatInput.SelectedItem is not MemoryImageExportFormat format ||
-            ExportPayloadInput.SelectedItem is not int payloadSize)
-        {
-            MessageBox.Show(this, "Choose an output format and a record payload size of 8, 16, or 32 bytes.",
-                "Export options required", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
-        var isIntelHex = format == MemoryImageExportFormat.IntelHex;
-        var dialog = new Microsoft.Win32.SaveFileDialog
-        {
-            Title = "Export selected memory data",
-            Filter = isIntelHex
-                ? "Intel HEX (*.hex)|*.hex|All files (*.*)|*.*"
-                : "Motorola S-Record (*.srec)|*.srec|All files (*.*)|*.*",
-            DefaultExt = isIntelHex ? ".hex" : ".srec",
-            AddExtension = true,
-            OverwritePrompt = true
-        };
-
-        if (dialog.ShowDialog(this) != true)
-        {
-            return;
-        }
+        var compareView = WorkspaceTabs.SelectedContent as CompareView;
+        var document = compareView?.Workspace.BaseDocument ?? ViewModel.Workspace.Document;
+        var exportSegments = document.CurrentImage.Segments.Select(segment => new MemorySegmentRow(
+            segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount)).ToArray();
+        var selectedSegments = compareView is null
+            ? SegmentsGrid.SelectedItems.Cast<MemorySegmentRow>().Select(ViewModel.Segments.IndexOf).ToArray()
+            : compareView.SelectedBaseSegmentIndexes;
+        var dialog = new ExportOptionsDialog(exportSegments, selectedSegments,
+            _exportSettings.MaxDataBytesPerRecord, initialScope) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Options is not { } options) return;
 
         try
         {
+            _exportSettings.SetMaxDataBytesPerRecord(options.MaxDataBytesPerRecord);
             await RunFileOperationAsync((token, progress) => Task.Run(() =>
-                _files.Export(dialog.FileName, (output, operationToken, operationProgress) =>
-                    export(format, payloadSize, output, operationToken, operationProgress), token, progress), token));
-            ViewModel.ReportExported(System.IO.Path.GetFileName(dialog.FileName));
+                _files.Export(options.Path, (output, operationToken, operationProgress) =>
+                {
+                    switch (options.Scope)
+                    {
+                        case ExportScope.EntireImage:
+                            _files.ExportImage(options.Format, options.MaxDataBytesPerRecord, output, operationToken, operationProgress, document);
+                            break;
+                        case ExportScope.SelectedSegments:
+                            _files.ExportSegments(options.SegmentIndexes, options.Format, options.MaxDataBytesPerRecord, output, operationToken, operationProgress, document);
+                            break;
+                        case ExportScope.AddressRange:
+                            _files.ExportAddressRange(options.RangeStart, options.RangeEnd, options.Format, options.MaxDataBytesPerRecord, output, operationToken, operationProgress, document);
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(options.Scope));
+                    }
+                }, token, progress), token));
+            ViewModel.ReportExported(System.IO.Path.GetFileName(options.Path));
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Export"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
