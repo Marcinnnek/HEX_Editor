@@ -143,8 +143,7 @@ public partial class CompareView : UserControl
 
     private void NextDifference_Click(object sender, RoutedEventArgs e)
     {
-        if (ViewModel.TryFindNextDifferenceFromSelection(SelectedAddress(), out var address)) Navigate(address);
-        else MessageBox.Show(Window.GetWindow(this), "No later differences were found.", "Comparison", MessageBoxButton.OK, MessageBoxImage.Information);
+        NavigateDifference(forward: true);
     }
 
     private void Block_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -156,13 +155,58 @@ public partial class CompareView : UserControl
 
     private void PreviousDifference_Click(object sender, RoutedEventArgs e)
     {
-        if (ViewModel.TryFindPreviousDifferenceFromSelection(SelectedAddress(), out var address)) Navigate(address);
-        else MessageBox.Show(Window.GetWindow(this), "No earlier differences were found.", "Comparison", MessageBoxButton.OK, MessageBoxImage.Information);
+        NavigateDifference(forward: false);
+    }
+
+    private void NavigateDifference(bool forward)
+    {
+        var selected = SelectedAddress();
+        var hasAddressText = !string.IsNullOrWhiteSpace(AddressBox.Text);
+        var hasValidAnchor = HexAddressParser.TryParse(AddressBox.Text, out var parsedAddress);
+        if (selected is null && hasAddressText && !hasValidAnchor)
+        {
+            StatusRequested?.Invoke("Enter a valid hexadecimal address to navigate differences.");
+            return;
+        }
+        uint? anchor = hasValidAnchor ? parsedAddress : null;
+        try
+        {
+            var found = forward
+                ? ViewModel.TryFindNextDifferenceFromAddress(selected, anchor, out var address)
+                : ViewModel.TryFindPreviousDifferenceFromAddress(selected, anchor, out address);
+            if (found)
+            {
+                Navigate(address);
+                return;
+            }
+
+            StatusRequested?.Invoke(forward ? "No later differences were found." : "No earlier differences were found.");
+        }
+        catch (Exception exception)
+        {
+            var operation = forward ? "Next Difference" : "Previous Difference";
+            var context = selected ?? anchor;
+            var addressText = context is uint value ? $"0x{value:X8}" : "no address";
+            Trace.TraceError($"Compare {operation} navigation failed from {addressText}: " +
+                $"exception={exception.GetType().Name}, hresult=0x{exception.HResult:X8}");
+            try { StatusRequested?.Invoke($"Unable to navigate to the {operation.ToLowerInvariant()}."); }
+            catch (Exception notificationException)
+            {
+                Trace.TraceError($"Compare {operation} status notification failed: " +
+                    $"exception={notificationException.GetType().Name}, hresult=0x{notificationException.HResult:X8}");
+            }
+        }
     }
 
     private uint? SelectedAddress()
     {
-        if (FileAView.ItemsGrid.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var address)) return address;
+        if (FileAView.ItemsGrid.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var rowAddress))
+        {
+            if (HexAddressParser.TryParse(AddressBox.Text, out var byteAddress) &&
+                (ulong)byteAddress >= rowAddress && (ulong)byteAddress < (ulong)rowAddress + (uint)ViewModel.BytesPerRow)
+                return byteAddress;
+            return rowAddress;
+        }
         return null;
     }
 

@@ -407,6 +407,49 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public void DifferenceNavigation_FromAddressAnchorWithoutSelectedRowSearchesStrictlyInRequestedDirectionAcrossSparseFiles()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x90000000, [0x20])]),
+            MemoryImage.FromSegments([new MemorySegment(0x2000, [0x11]), new MemorySegment(0x90000000, [0x21])]));
+
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(null, 0x1000, out var next));
+        Assert.AreEqual(0x2000u, next);
+        Assert.IsTrue(comparison.TryFindPreviousDifferenceFromAddress(null, 0x90000000, out var previous));
+        Assert.AreEqual(0x2000u, previous);
+        Assert.IsFalse(comparison.TryFindNextDifferenceFromAddress(null, 0x90000000, out _));
+        Assert.IsFalse(comparison.TryFindPreviousDifferenceFromAddress(null, 0x1000, out _));
+    }
+
+    [TestMethod]
+    public void DifferenceNavigation_FromSelectedByteFindsNextDifferenceAcrossDifferentSparseFiles()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20]), new MemorySegment(0x90000000, [0x30])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x21]), new MemorySegment(0x70000000, [0x40])]));
+
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(0x1000, 0x70000000, out var next));
+        Assert.AreEqual(0x1001u, next);
+        Assert.IsTrue(comparison.TryFindPreviousDifferenceFromAddress(0x90000000, 0, out var previous));
+        Assert.AreEqual(0x70000000u, previous);
+    }
+
+    [TestMethod]
+    public void DifferenceNavigation_NoDifferenceBeyondAnchorLeavesComparisonRowsAndAddressNavigationUnchanged()
+    {
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x2000, [0x20])]),
+            MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11]), new MemorySegment(0x2000, [0x20])]));
+        comparison.TryNavigateToAddress(0x1000, out var originalRow);
+        var originalAddress = comparison.Rows[originalRow].Address;
+
+        Assert.IsFalse(comparison.TryFindNextDifferenceFromAddress(null, 0x1000, out _));
+        Assert.AreEqual(originalAddress, comparison.Rows[originalRow].Address);
+        Assert.IsTrue(comparison.TryNavigateToAddress(0x1000, out var sameRow));
+        Assert.AreEqual(originalRow, sameRow);
+    }
+
+    [TestMethod]
     public void SparseRegions_CollapseLargeGapsAndRangeViewDoesNotExpandThem()
     {
         var fileA = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11]), new MemorySegment(0x90000000, [0x22])]);
