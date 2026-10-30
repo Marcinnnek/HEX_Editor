@@ -87,13 +87,14 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
 
     public async Task<CompareWorkspaceTabViewModel?> StartAsync(
         Func<string, string?, string?> chooseFile, Action baseOpened,
-        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress,
+        EditorDocument? baseDocument = null)
     {
         ArgumentNullException.ThrowIfNull(chooseFile);
         ArgumentNullException.ThrowIfNull(baseOpened);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (viewModel.SourcePath is null && viewModel.CurrentImage.Segments.Count == 0)
+        if (baseDocument is null && viewModel.SourcePath is null && viewModel.CurrentImage.Segments.Count == 0)
         {
             var basePath = chooseFile("Select the base firmware image", null);
             if (basePath is null) return null;
@@ -103,7 +104,9 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
             baseOpened();
         }
 
-        var document = viewModel.Workspace.Document;
+        var document = baseDocument ?? viewModel.Workspace.Document;
+        if (document.CurrentImage.Segments.Count == 0)
+            throw new InvalidOperationException("The selected base document has no occupied bytes.");
         var referencePath = chooseFile("Select the reference firmware image",
             document.SourcePath is null ? null : Path.GetDirectoryName(document.SourcePath));
         if (referencePath is null) return null;
@@ -112,7 +115,7 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
         cancellationToken.ThrowIfCancellationRequested();
         var baseName = document.SourcePath is null ? "Untitled" : Path.GetFileName(document.SourcePath);
         return new CompareWorkspaceTabViewModel(document.CurrentImage, reference.Image,
-            baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path);
+            baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path, document);
     }
 }
 
