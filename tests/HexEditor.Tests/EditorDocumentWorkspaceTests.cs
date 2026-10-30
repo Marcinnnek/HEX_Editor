@@ -185,8 +185,10 @@ public sealed class EditorDocumentWorkspaceTests
         {
             var comparison = new CompareWorkspaceTabViewModel(baseDocument.CurrentImage,
                 MemoryImage.FromSegments([new MemorySegment(0x10, [0xB2])]), "Untitled", "reference.hex", baseDocument: baseDocument);
-            var referenceDocument = new EditorDocument(MemoryImage.FromSegments([new MemorySegment(0x10, [0xB2])]),
+            var referenceWorkspace = new EditorDocumentWorkspace();
+            referenceWorkspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xB2])]),
                 null, MemoryImageExportFormat.IntelHex);
+            var referenceDocument = referenceWorkspace.Document;
             baseDocument.Editing.EditByte(0x10, 0xA2, OverlapDecision.OverwriteIncoming);
             await baseDocument.SaveAsAsync(path, MemoryImageExportFormat.IntelHex, false, CancellationToken.None, null);
 
@@ -206,8 +208,10 @@ public sealed class EditorDocumentWorkspaceTests
     [TestMethod]
     public void CanceledSaveAsDoesNotChangeBaseAssociationOrSavedState()
     {
-        var document = new EditorDocument(MemoryImage.FromSegments([new MemorySegment(0x10, [0xA1])]),
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xA1])]),
             null, MemoryImageExportFormat.IntelHex);
+        var document = workspace.Document;
         document.Editing.EditByte(0x10, 0xA2, OverlapDecision.OverwriteIncoming);
         var path = Path.Combine(Path.GetTempPath(), $"hex-editor-canceled-{Guid.NewGuid():N}.hex");
         using var cancellation = new CancellationTokenSource();
@@ -245,13 +249,15 @@ public sealed class EditorDocumentWorkspaceTests
         workspace.OpenImage(unrelatedImage, "unrelated.hex", MemoryImageExportFormat.IntelHex);
         Assert.AreSame(workspace.Document, workspace.GetActiveDocument(null));
         Assert.AreSame(sharedBase, workspace.GetActiveDocument(secondCompare));
+        Assert.IsFalse(workspace.IsLastView(sharedBase, secondCompare));
+        Assert.IsTrue(workspace.CloseView(thirdCompare));
         Assert.IsTrue(workspace.IsLastView(sharedBase, secondCompare));
         var unrelatedCompare = new CompareWorkspaceTabViewModel(unrelatedImage, unrelatedImage,
             "unrelated.hex", "ref-c.hex", baseDocument: workspace.Document);
         workspace.RegisterComparisonView(unrelatedCompare);
 
         var closed = workspace.CloseImage(sharedBase);
-        CollectionAssert.AreEqual(new[] { secondCompare, thirdCompare }, closed.ToArray());
+        CollectionAssert.AreEqual(new[] { secondCompare }, closed.ToArray());
         CollectionAssert.AreEqual(new[] { unrelatedCompare }, workspace.ComparisonViews.ToArray());
         Assert.AreSame(unrelatedImage, workspace.Document.CurrentImage);
     }

@@ -367,7 +367,7 @@ public partial class MainWindow : FluentWindow
             Title = "Save memory image as",
             Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
             FilterIndex = document.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
-            FileName = document.SourcePath is null ? string.Empty : Path.GetFileName(document.SourcePath),
+            FileName = document.SourcePath is null ? string.Empty : System.IO.Path.GetFileName(document.SourcePath),
             AddExtension = true,
             OverwritePrompt = false
         };
