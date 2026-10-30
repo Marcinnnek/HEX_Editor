@@ -92,6 +92,7 @@ public sealed class EditorDocument : INotifyPropertyChanged
 public sealed class EditorDocumentWorkspace
 {
     private readonly MemoryImageFileService _files = new();
+    private readonly List<CompareWorkspaceTabViewModel> _comparisonViews = [];
 
     public EditorDocumentWorkspace()
     {
@@ -100,7 +101,11 @@ public sealed class EditorDocumentWorkspace
     }
 
     public EditorDocument Document { get; private set; }
+    public IReadOnlyList<CompareWorkspaceTabViewModel> ComparisonViews => _comparisonViews;
     public event Action<MemoryImage, MemoryImage>? ImageChanged;
+
+    public EditorDocument GetActiveDocument(CompareWorkspaceTabViewModel? activeComparison) =>
+        activeComparison?.BaseDocument ?? Document;
 
     public MemoryImageImportPreview PrepareOpen(string path)
     {
@@ -143,6 +148,33 @@ public sealed class EditorDocumentWorkspace
     }
 
     public void CloseImage() => OpenImage(MemoryImage.Empty, null, null);
+
+    public void RegisterComparisonView(CompareWorkspaceTabViewModel view)
+    {
+        ArgumentNullException.ThrowIfNull(view);
+        if (view.BaseDocument is null) throw new ArgumentException("A comparison view must reference its editable base document.", nameof(view));
+        if (_comparisonViews.Contains(view)) throw new InvalidOperationException("The comparison view is already open.");
+        _comparisonViews.Add(view);
+    }
+
+    public bool IsLastView(EditorDocument document, CompareWorkspaceTabViewModel closingView)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(closingView);
+        var otherViews = _comparisonViews.Count(view => !ReferenceEquals(view, closingView) && ReferenceEquals(view.BaseDocument, document));
+        if (ReferenceEquals(Document, document)) otherViews++;
+        return otherViews == 0;
+    }
+
+    public bool CloseView(CompareWorkspaceTabViewModel view) => _comparisonViews.Remove(view);
+
+    public IReadOnlyList<CompareWorkspaceTabViewModel> CloseImage(EditorDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var views = _comparisonViews.Where(view => ReferenceEquals(view.BaseDocument, document)).ToArray();
+        foreach (var view in views) _comparisonViews.Remove(view);
+        return views;
+    }
     public void EditByte(uint address, byte value, OverlapDecision? decision = null) => Document.Editing.EditByte(address, value, decision);
     public bool Undo() => Document.Editing.Undo();
     public bool Redo() => Document.Editing.Redo();

@@ -172,4 +172,87 @@ public sealed class EditorDocumentWorkspaceTests
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
+
+    [TestMethod]
+    public async Task SaveTargetsTheSuppliedBaseDocumentAndSaveAsUpdatesItsAssociation()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(MemoryImage.FromSegments([new MemorySegment(0x10, [0xA1])]), null,
+            MemoryImageExportFormat.IntelHex);
+        var baseDocument = workspace.Document;
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-base-{Guid.NewGuid():N}.hex");
+        try
+        {
+            var comparison = new CompareWorkspaceTabViewModel(baseDocument.CurrentImage,
+                MemoryImage.FromSegments([new MemorySegment(0x10, [0xB2])]), "Untitled", "reference.hex", baseDocument: baseDocument);
+            var referenceDocument = new EditorDocument(MemoryImage.FromSegments([new MemorySegment(0x10, [0xB2])]),
+                null, MemoryImageExportFormat.IntelHex);
+            baseDocument.Editing.EditByte(0x10, 0xA2, OverlapDecision.OverwriteIncoming);
+            await baseDocument.SaveAsAsync(path, MemoryImageExportFormat.IntelHex, false, CancellationToken.None, null);
+
+            Assert.AreEqual(Path.GetFullPath(path), baseDocument.SourcePath);
+            Assert.AreEqual(Path.GetFileName(path), comparison.NameA);
+            Assert.IsFalse(baseDocument.IsModified);
+            Assert.IsNull(referenceDocument.SourcePath);
+            using var input = File.OpenRead(path);
+            var imported = new MemoryImageFileService().PrepareImport(input, MemoryImage.Empty, path)
+                .Apply(OverlapDecision.OverwriteIncoming)!.Image;
+            Assert.IsTrue(imported.TryGetByte(0x10, out var saved));
+            Assert.AreEqual((byte)0xA2, saved);
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    [TestMethod]
+    public void CanceledSaveAsDoesNotChangeBaseAssociationOrSavedState()
+    {
+        var document = new EditorDocument(MemoryImage.FromSegments([new MemorySegment(0x10, [0xA1])]),
+            null, MemoryImageExportFormat.IntelHex);
+        document.Editing.EditByte(0x10, 0xA2, OverlapDecision.OverwriteIncoming);
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-canceled-{Guid.NewGuid():N}.hex");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsExactlyAsync<TaskCanceledException>(async () => await document.SaveAsAsync(path,
+            MemoryImageExportFormat.IntelHex, false, cancellation.Token, null)).GetAwaiter().GetResult();
+
+        Assert.IsNull(document.SourcePath);
+        Assert.IsTrue(document.IsModified);
+        Assert.IsFalse(File.Exists(path));
+    }
+
+    [TestMethod]
+    public void ClosingOneViewKeepsSharedBaseAndCloseImageReturnsOnlyItsComparisonViews()
+    {
+        var workspace = new EditorDocumentWorkspace();
+        var firstImage = MemoryImage.FromSegments([new MemorySegment(0x10, [0xA1])]);
+        workspace.OpenImage(firstImage, "first.hex", MemoryImageExportFormat.IntelHex);
+        var sharedBase = workspace.Document;
+        var firstCompare = new CompareWorkspaceTabViewModel(firstImage, firstImage, "first.hex", "ref-a.hex", baseDocument: sharedBase);
+        var secondCompare = new CompareWorkspaceTabViewModel(firstImage, firstImage, "first.hex", "ref-b.hex", baseDocument: sharedBase);
+        var thirdCompare = new CompareWorkspaceTabViewModel(firstImage, firstImage, "first.hex", "ref-c.hex", baseDocument: sharedBase);
+        workspace.RegisterComparisonView(firstCompare);
+        workspace.RegisterComparisonView(secondCompare);
+        workspace.RegisterComparisonView(thirdCompare);
+        Assert.AreSame(sharedBase, workspace.GetActiveDocument(secondCompare));
+
+        Assert.IsFalse(workspace.IsLastView(sharedBase, firstCompare));
+        Assert.IsTrue(workspace.CloseView(firstCompare));
+        Assert.AreSame(sharedBase, workspace.Document);
+        Assert.HasCount(2, workspace.ComparisonViews);
+
+        var unrelatedImage = MemoryImage.FromSegments([new MemorySegment(0x20, [0xB2])]);
+        workspace.OpenImage(unrelatedImage, "unrelated.hex", MemoryImageExportFormat.IntelHex);
+        Assert.AreSame(workspace.Document, workspace.GetActiveDocument(null));
+        Assert.AreSame(sharedBase, workspace.GetActiveDocument(secondCompare));
+        Assert.IsTrue(workspace.IsLastView(sharedBase, secondCompare));
+        var unrelatedCompare = new CompareWorkspaceTabViewModel(unrelatedImage, unrelatedImage,
+            "unrelated.hex", "ref-c.hex", baseDocument: workspace.Document);
+        workspace.RegisterComparisonView(unrelatedCompare);
+
+        var closed = workspace.CloseImage(sharedBase);
+        CollectionAssert.AreEqual(new[] { secondCompare, thirdCompare }, closed.ToArray());
+        CollectionAssert.AreEqual(new[] { unrelatedCompare }, workspace.ComparisonViews.ToArray());
+        Assert.AreSame(unrelatedImage, workspace.Document.CurrentImage);
+    }
 }

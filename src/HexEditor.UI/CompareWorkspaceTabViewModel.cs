@@ -1,10 +1,11 @@
 using HexEditor.Core;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.ComponentModel;
 
 namespace HexEditor.UI;
 
-public sealed class CompareWorkspaceTabViewModel
+public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
 {
     public CompareWorkspaceTabViewModel(MemoryImage fileA, MemoryImage fileB, string nameA, string nameB,
         string? pathA = null, string? pathB = null, EditorDocument? baseDocument = null)
@@ -18,13 +19,18 @@ public sealed class CompareWorkspaceTabViewModel
         _pathA = NormalizePath(pathA);
         _pathB = NormalizePath(pathB);
         BaseDocument = baseDocument;
-        if (BaseDocument is not null) BaseDocument.ImageChanged += OnBaseDocumentChanged;
+        if (BaseDocument is not null)
+        {
+            BaseDocument.ImageChanged += OnBaseDocumentChanged;
+            BaseDocument.PropertyChanged += OnBaseDocumentPropertyChanged;
+        }
         Comparison = new CompareViewModel(fileA, fileB);
         BlocksA = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileA));
         BlocksB = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileB));
     }
 
-    public string NameA { get; }
+    public string NameA { get; private set; }
+    public event PropertyChangedEventHandler? PropertyChanged;
     public string NameB { get; }
     public EditorDocument? BaseDocument { get; }
     public CompareViewModel Comparison { get; }
@@ -76,6 +82,13 @@ public sealed class CompareWorkspaceTabViewModel
     }
 
     private void OnBaseDocumentChanged(MemoryImage previous, MemoryImage updated) => RefreshImage(previous, updated);
+
+    private void OnBaseDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(EditorDocument.SourcePath) || BaseDocument?.SourcePath is not { } path) return;
+        NameA = Path.GetFileName(path);
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameA)));
+    }
 
     private void RefreshImages(MemoryImage updatedImage, bool updateA, bool updateB)
     {

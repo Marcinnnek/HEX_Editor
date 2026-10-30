@@ -211,7 +211,9 @@ public partial class MainWindow : FluentWindow
             view.StatusRequested += ViewModel.ReportCompareInteraction;
             view.BaseRowActivated += address =>
                 ViewModel.ReportCompareInteraction($"Base row at 0x{address:X8} selected.");
-            var tab = new TabItem { Header = $"Compare: {comparison.NameA} ↔ {comparison.NameB}", Content = view };
+            var tab = new TabItem { Content = view };
+            tab.Header = CreateCompareTabHeader(comparison, tab);
+            ViewModel.Workspace.RegisterComparisonView(comparison);
             WorkspaceTabs.Items.Add(tab);
             WorkspaceTabs.SelectedItem = tab;
         }
@@ -241,7 +243,8 @@ public partial class MainWindow : FluentWindow
             if (dialog.ShowDialog() != true) return;
 
             var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
-            if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides, ConfirmCloseImage)) return;
+            if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides,
+                    () => ConfirmCloseImage(ActiveDocument))) return;
             Title = ViewModel.WindowTitle;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
@@ -295,11 +298,12 @@ public partial class MainWindow : FluentWindow
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
+        var document = ActiveDocument;
         try
         {
-            if (ViewModel.SourcePath is null || ViewModel.SourceFormat is null) { await TrySaveAsAsync(); return; }
-            await RunFileOperationAsync((token, progress) => _files.SaveAsync(token, progress));
-            Title = ViewModel.WindowTitle;
+            if (document.SourcePath is null || document.SourceFormat is null) { await TrySaveAsAsync(document); return; }
+            await RunFileOperationAsync((token, progress) => document.SaveAsync(token, progress));
+            RefreshSavedDocumentTabs(document);
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -311,17 +315,20 @@ public partial class MainWindow : FluentWindow
 
     private async void SaveAs_Click(object sender, RoutedEventArgs e)
     {
-        await TrySaveAsAsync();
+        await TrySaveAsAsync(ActiveDocument);
     }
 
-    private async Task<bool> TrySaveAsAsync()
+    private EditorDocument ActiveDocument => ViewModel.Workspace.GetActiveDocument(
+        (WorkspaceTabs.SelectedContent as CompareView)?.Workspace);
+
+    private async Task<bool> TrySaveAsAsync(EditorDocument document)
     {
-        if (!TryGetSaveAsSelection(out var selection)) return false;
+        if (!TryGetSaveAsSelection(document, out var selection)) return false;
         try
         {
-            await RunFileOperationAsync((token, progress) => _files.SaveAsAsync(selection.Path, selection.Format, selection.Overwrite,
+            await RunFileOperationAsync((token, progress) => document.SaveAsAsync(selection.Path, selection.Format, selection.Overwrite,
                 token, progress));
-            Title = ViewModel.WindowTitle;
+            RefreshSavedDocumentTabs(document);
             return true;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); return false; }
@@ -333,13 +340,13 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    private bool TrySaveAs()
+    private bool TrySaveAs(EditorDocument document)
     {
-        if (!TryGetSaveAsSelection(out var selection)) return false;
+        if (!TryGetSaveAsSelection(document, out var selection)) return false;
         try
         {
-            _files.SaveAs(selection.Path, selection.Format, selection.Overwrite);
-            Title = ViewModel.WindowTitle;
+            document.SaveAs(selection.Path, selection.Format, selection.Overwrite);
+            RefreshSavedDocumentTabs(document);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
@@ -350,14 +357,15 @@ public partial class MainWindow : FluentWindow
         }
     }
 
-    private bool TryGetSaveAsSelection(out SaveAsSelection selection)
+    private bool TryGetSaveAsSelection(EditorDocument document, out SaveAsSelection selection)
     {
         selection = default;
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Save memory image as",
             Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
-            FilterIndex = ViewModel.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
+            FilterIndex = document.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
+            FileName = document.SourcePath is null ? string.Empty : Path.GetFileName(document.SourcePath),
             AddExtension = true,
             OverwritePrompt = false
         };
@@ -378,11 +386,52 @@ public partial class MainWindow : FluentWindow
 
     private readonly record struct SaveAsSelection(string Path, MemoryImageExportFormat Format, bool Overwrite);
 
+    private object CreateCompareTabHeader(CompareWorkspaceTabViewModel comparison, TabItem tab)
+    {
+        var header = new StackPanel { Orientation = Orientation.Horizontal };
+        header.Children.Add(new TextBlock { Text = $"Compare: {comparison.NameA} ↔ {comparison.NameB}", VerticalAlignment = VerticalAlignment.Center });
+        var close = new Button { Content = "×", Padding = new Thickness(5, 0, 5, 0), Margin = new Thickness(8, 0, 0, 0), ToolTip = "Close this comparison view" };
+        if (tab is not null) close.Click += (_, _) => CloseCompareView(tab);
+        header.Children.Add(close);
+        return header;
+    }
+
+    private void CloseCompareView(TabItem tab)
+    {
+        if (tab.Content is not CompareView view || view.Workspace.BaseDocument is not { } document) return;
+        if (ViewModel.Workspace.IsLastView(document, view.Workspace) && !ConfirmCloseImage(document)) return;
+        ViewModel.Workspace.CloseView(view.Workspace);
+        var wasSelected = ReferenceEquals(WorkspaceTabs.SelectedItem, tab);
+        WorkspaceTabs.Items.Remove(tab);
+        if (wasSelected && WorkspaceTabs.SelectedItem is null && WorkspaceTabs.Items.Count > 0)
+            WorkspaceTabs.SelectedIndex = 0;
+    }
+
+    private void CloseDocumentViews(EditorDocument document)
+    {
+        var views = ViewModel.Workspace.CloseImage(document);
+        foreach (var tab in WorkspaceTabs.Items.OfType<TabItem>().Where(item => item.Content is CompareView view &&
+                     views.Contains(view.Workspace)).ToArray())
+            WorkspaceTabs.Items.Remove(tab);
+    }
+
     private void CloseImage_Click(object sender, RoutedEventArgs e)
     {
-        if (!ConfirmCloseImage()) return;
-        ViewModel.CloseImage();
+        var document = ActiveDocument;
+        if (!ConfirmCloseImage(document)) return;
+        CloseDocumentViews(document);
+        if (ReferenceEquals(document, ViewModel.Workspace.Document)) ViewModel.CloseImage();
         Title = ViewModel.WindowTitle;
+    }
+
+    private void RefreshSavedDocumentTabs(EditorDocument document)
+    {
+        foreach (var tab in WorkspaceTabs.Items.OfType<TabItem>())
+        {
+            if (tab.Content is not CompareView view || !ReferenceEquals(view.Workspace.BaseDocument, document)) continue;
+            tab.Header = CreateCompareTabHeader(view.Workspace, tab);
+        }
+        if (ReferenceEquals(document, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void Undo_Click(object sender, RoutedEventArgs e)
@@ -585,20 +634,20 @@ public partial class MainWindow : FluentWindow
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        e.Cancel = !ConfirmCloseImage();
+        e.Cancel = !ConfirmCloseImage(ActiveDocument);
     }
 
-    private bool ConfirmCloseImage()
+    private bool ConfirmCloseImage(EditorDocument document)
     {
-        if (!ViewModel.IsModified) return true;
+        if (!document.IsModified) return true;
         var choice = MessageBox.Show(this, "Save changes to this memory image before closing?", "Unsaved changes", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
         if (choice == MessageBoxResult.Cancel) return false;
         if (choice == MessageBoxResult.No) return true;
-        if (ViewModel.SourcePath is null || ViewModel.SourceFormat is null) return TrySaveAs();
+        if (document.SourcePath is null || document.SourceFormat is null) return TrySaveAs(document);
         try
         {
-            _files.Save();
-            Title = ViewModel.WindowTitle;
+            document.Save();
+            RefreshSavedDocumentTabs(document);
             return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
