@@ -12,6 +12,7 @@ namespace HexEditor.UI;
 public partial class CompareView : UserControl
 {
     private bool _syncingScroll;
+    private ComparePanelSide _lastSelectedSide = ComparePanelSide.Base;
 
     public CompareView(CompareWorkspaceTabViewModel workspace)
     {
@@ -21,6 +22,10 @@ public partial class CompareView : UserControl
         RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
+        FileAView.ItemsGrid.SelectionUnit = DataGridSelectionUnit.FullRow;
+        FileBView.ItemsGrid.SelectionUnit = DataGridSelectionUnit.FullRow;
+        FileAView.ItemsGrid.SelectionMode = DataGridSelectionMode.Single;
+        FileBView.ItemsGrid.SelectionMode = DataGridSelectionMode.Single;
         FileAView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
         FileBView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
         FileAView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
@@ -39,7 +44,7 @@ public partial class CompareView : UserControl
     public CompareViewMode[] ViewModes { get; }
     public event Action<uint, uint>? BaseRowActivated;
     public event Action<string>? StatusRequested;
-    public event Action<Exception, ComparePanelSide, int, uint?>? ActivationFailed;
+    public event Action<string, Exception, ComparePanelSide, int, uint?>? InteractionFailed;
 
     public void RefreshImage(MemoryImage previousImage, MemoryImage updatedImage)
     {
@@ -55,57 +60,50 @@ public partial class CompareView : UserControl
 
     private void Panel_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ClickCount != 2 || sender is not DataGrid grid) return;
-        e.Handled = true;
+        if (sender is not DataGrid grid || e.ClickCount is not (1 or 2)) return;
 
         var side = ReferenceEquals(grid, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
         var rowIndex = -1;
         uint? address = null;
+        uint? rowStart = null;
         try
         {
-            uint? rowStartAddress = null;
-            if (side == ComparePanelSide.Base)
+            var source = e.OriginalSource as DependencyObject;
+            var row = FindAncestor<DataGridRow>(source);
+            var cell = FindAncestor<DataGridCell>(source);
+            if (row?.Item is not HexViewRow viewRow || cell is null || viewRow.IsGapMarker ||
+                !HexAddressParser.TryParse(viewRow.Address, out var rowStartAddress)) return;
+            rowStart = rowStartAddress;
+            rowIndex = row.GetIndex();
+            if (!ReferenceEquals(cell.Column, grid.Columns[0]))
             {
-                var source = e.OriginalSource as DependencyObject;
-                var row = FindAncestor<DataGridRow>(source);
-                var cell = FindAncestor<DataGridCell>(source);
-                if (row?.Item is not HexViewRow || cell is null) return;
-                rowIndex = row.GetIndex();
-                if (!HexAddressParser.TryParse(((HexViewRow)row.Item).Address, out var parsedRowStart)) return;
-                rowStartAddress = parsedRowStart;
-
-                if (!ReferenceEquals(cell.Column, grid.Columns[0]))
-                {
-                    var byteRow = FindAncestor<HexByteRowControl>(source);
-                    if (byteRow is null || !ReferenceEquals(byteRow.Row, row.Item) ||
-                        !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var hitAddress)) return;
-                    address = hitAddress;
-                }
+                var byteRow = FindAncestor<HexByteRowControl>(source);
+                if (byteRow is null || !ReferenceEquals(byteRow.Row, row.Item) ||
+                    !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var hitAddress)) return;
+                address = hitAddress;
             }
 
+            _lastSelectedSide = side;
+            if (e.ClickCount == 1)
+            {
+                // Byte clicks are handled by HexViewControl, which retains shift-range selection.
+                if (address is not null) return;
+                e.Handled = true;
+                Navigate(rowStartAddress);
+                return;
+            }
+            e.Handled = true;
+
             var activation = Workspace.ActivateRow(side, rowIndex, address);
-            if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected && rowStartAddress is uint rowStart)
-                BaseRowActivated?.Invoke(rowStart, selected);
+            if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected)
+                BaseRowActivated?.Invoke(rowStartAddress, selected);
             else if (activation.StatusMessage is { } message)
                 StatusRequested?.Invoke(message);
         }
         catch (Exception exception)
         {
-            var context = address is uint selected ? $"0x{selected:X8}" : "unknown address";
-            Trace.TraceError($"Compare row activation failed: side={side}, rowIndex={rowIndex}, address={context}, " +
-                $"exception={exception.GetType().Name}, hresult=0x{exception.HResult:X8}");
-            try { ActivationFailed?.Invoke(exception, side, rowIndex, address); }
-            catch (Exception diagnosticException)
-            {
-                Trace.TraceError($"Compare row diagnostic callback failed: side={side}, rowIndex={rowIndex}, " +
-                    $"exception={diagnosticException.GetType().Name}, hresult=0x{diagnosticException.HResult:X8}");
-            }
-            try { StatusRequested?.Invoke($"Unable to activate Compare row at {context}."); }
-            catch (Exception notificationException)
-            {
-                Trace.TraceError($"Compare row failure notification failed: side={side}, address={context}, " +
-                    $"exception={notificationException.GetType().Name}, hresult=0x{notificationException.HResult:X8}");
-            }
+            ReportInteractionFailure(e.ClickCount == 2 ? "double-click" : "single-click", side, rowIndex,
+                address ?? rowStart, exception);
         }
     }
 
@@ -160,17 +158,19 @@ public partial class CompareView : UserControl
 
     private void NavigateDifference(bool forward)
     {
-        var selected = SelectedAddress();
-        var hasAddressText = !string.IsNullOrWhiteSpace(AddressBox.Text);
-        var hasValidAnchor = HexAddressParser.TryParse(AddressBox.Text, out var parsedAddress);
-        if (selected is null && hasAddressText && !hasValidAnchor)
-        {
-            StatusRequested?.Invoke("Enter a valid hexadecimal address to navigate differences.");
-            return;
-        }
-        uint? anchor = hasValidAnchor ? parsedAddress : null;
+        uint? context = null;
         try
         {
+            var selected = SelectedAddress();
+            var hasAddressText = !string.IsNullOrWhiteSpace(AddressBox.Text);
+            var hasValidAnchor = HexAddressParser.TryParse(AddressBox.Text, out var parsedAddress);
+            if (selected is null && hasAddressText && !hasValidAnchor)
+            {
+                StatusRequested?.Invoke("Enter a valid hexadecimal address to navigate differences.");
+                return;
+            }
+            uint? anchor = hasValidAnchor ? parsedAddress : null;
+            context = selected ?? anchor;
             var found = forward
                 ? ViewModel.TryFindNextDifferenceFromAddress(selected, anchor, out var address)
                 : ViewModel.TryFindPreviousDifferenceFromAddress(selected, anchor, out address);
@@ -184,17 +184,8 @@ public partial class CompareView : UserControl
         }
         catch (Exception exception)
         {
-            var operation = forward ? "Next Difference" : "Previous Difference";
-            var context = selected ?? anchor;
-            var addressText = context is uint value ? $"0x{value:X8}" : "no address";
-            Trace.TraceError($"Compare {operation} navigation failed from {addressText}: " +
-                $"exception={exception.GetType().Name}, hresult=0x{exception.HResult:X8}");
-            try { StatusRequested?.Invoke($"Unable to navigate to the {operation.ToLowerInvariant()}."); }
-            catch (Exception notificationException)
-            {
-                Trace.TraceError($"Compare {operation} status notification failed: " +
-                    $"exception={notificationException.GetType().Name}, hresult=0x{notificationException.HResult:X8}");
-            }
+            ReportInteractionFailure(forward ? "Next Difference" : "Previous Difference",
+                _lastSelectedSide, -1, context, exception);
         }
     }
 
@@ -220,42 +211,89 @@ public partial class CompareView : UserControl
     {
         if ((uint)index >= (uint)ViewModel.FileARows.Count) return;
         _syncingScroll = true;
-        FileAView.ItemsGrid.SelectedIndex = index;
-        FileBView.ItemsGrid.SelectedIndex = index;
-        FileAView.ItemsGrid.ScrollIntoView(FileAView.ItemsGrid.Items[index]);
-        FileBView.ItemsGrid.ScrollIntoView(FileBView.ItemsGrid.Items[index]);
-        _syncingScroll = false;
+        try
+        {
+            FileAView.ItemsGrid.SelectedIndex = index;
+            FileBView.ItemsGrid.SelectedIndex = index;
+            FileAView.ItemsGrid.ScrollIntoView(FileAView.ItemsGrid.Items[index]);
+            FileBView.ItemsGrid.ScrollIntoView(FileBView.ItemsGrid.Items[index]);
+        }
+        finally { _syncingScroll = false; }
     }
 
     private void Panel_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncingScroll || sender is not DataGrid source || source.SelectedItem is not HexViewRow) return;
-        _syncingScroll = true;
-        var target = ReferenceEquals(source, FileAView.ItemsGrid) ? FileBView.ItemsGrid : FileAView.ItemsGrid;
-        if ((uint)source.SelectedIndex < (uint)target.Items.Count)
+        var side = ReferenceEquals(source, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        try
         {
-            var targetRow = target.Items[source.SelectedIndex];
-            target.SelectedIndex = source.SelectedIndex;
-            target.ScrollIntoView(targetRow);
+            _lastSelectedSide = side;
+            _syncingScroll = true;
+            var target = side == ComparePanelSide.Base ? FileBView.ItemsGrid : FileAView.ItemsGrid;
+            if ((uint)source.SelectedIndex < (uint)target.Items.Count)
+            {
+                var targetRow = target.Items[source.SelectedIndex];
+                target.SelectedIndex = source.SelectedIndex;
+                target.ScrollIntoView(targetRow);
+                if (source.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var address))
+                    AddressBox.Text = address.ToString("X8");
+            }
         }
-        _syncingScroll = false;
+        catch (Exception exception)
+        {
+            var address = source.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var parsed)
+                ? parsed : (uint?)null;
+            ReportInteractionFailure("selection", side, source.SelectedIndex, address, exception);
+        }
+        finally { _syncingScroll = false; }
     }
 
     private void ByteAddressSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        Navigate(e.EndAddress);
+        var side = ReferenceEquals(sender, FileAView) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        _lastSelectedSide = side;
+        try { Navigate(e.EndAddress); }
+        catch (Exception exception) { ReportInteractionFailure("single-click", side, -1, e.EndAddress, exception); }
     }
 
     private void Grid_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (_syncingScroll || sender is not DataGrid source || e.VerticalChange == 0) return;
-        var target = ReferenceEquals(source, FileAView.ItemsGrid) ? FileBView.ItemsGrid : FileAView.ItemsGrid;
-        var sourceScroll = FindScrollViewer(source);
-        var targetScroll = FindScrollViewer(target);
-        if (sourceScroll is null || targetScroll is null) return;
-        _syncingScroll = true;
-        targetScroll.ScrollToVerticalOffset(sourceScroll.VerticalOffset);
-        _syncingScroll = false;
+        var side = ReferenceEquals(source, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        try
+        {
+            var target = side == ComparePanelSide.Base ? FileBView.ItemsGrid : FileAView.ItemsGrid;
+            var sourceScroll = FindScrollViewer(source);
+            var targetScroll = FindScrollViewer(target);
+            if (sourceScroll is null || targetScroll is null) return;
+            _syncingScroll = true;
+            targetScroll.ScrollToVerticalOffset(sourceScroll.VerticalOffset);
+        }
+        catch (Exception exception)
+        {
+            uint? address = HexAddressParser.TryParse(AddressBox.Text, out var parsed) ? parsed : null;
+            ReportInteractionFailure("scroll", side, source.SelectedIndex, address, exception);
+        }
+        finally { _syncingScroll = false; }
+    }
+
+    private void ReportInteractionFailure(string operation, ComparePanelSide side, int rowIndex, uint? address, Exception exception)
+    {
+        var context = address is uint selected ? $"0x{selected:X8}" : $"row {rowIndex}";
+        Trace.TraceError($"Compare {operation} failed: panel={side}, address={context}, " +
+            $"exception={exception.GetType().Name}, hresult=0x{exception.HResult:X8}");
+        try { InteractionFailed?.Invoke(operation, exception, side, rowIndex, address); }
+        catch (Exception diagnosticException)
+        {
+            Trace.TraceError($"Compare {operation} diagnostic callback failed: panel={side}, address={context}, " +
+                $"exception={diagnosticException.GetType().Name}, hresult=0x{diagnosticException.HResult:X8}");
+        }
+        try { StatusRequested?.Invoke($"Compare {side} {operation} failed at {context}."); }
+        catch (Exception notificationException)
+        {
+            Trace.TraceError($"Compare {operation} status notification failed: panel={side}, address={context}, " +
+                $"exception={notificationException.GetType().Name}, hresult=0x{notificationException.HResult:X8}");
+        }
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject parent)

@@ -69,6 +69,9 @@ public sealed class MemoryComparisonModel
         }
 
         _navigationAddress = address;
+        if (_rows.TryGetRowIndex(address, out rowIndex))
+            return !_rows[rowIndex].IsGapMarker;
+
         RebuildRows();
         return _rows.TryGetRowIndex(address, out rowIndex) && !_rows[rowIndex].IsGapMarker;
     }
