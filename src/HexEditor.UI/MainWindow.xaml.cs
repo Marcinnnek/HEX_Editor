@@ -1028,18 +1028,16 @@ public partial class MainWindow : Window
     private void RelocateSegment_Click(object sender, RoutedEventArgs e)
     {
         var rangeIndex = SegmentsGrid.SelectedIndex;
-        if ((uint)rangeIndex >= (uint)ViewModel.CurrentImage.Ranges.Count)
+        if ((uint)rangeIndex >= (uint)ViewModel.CurrentImage.Blocks.Count)
         {
             MessageBox.Show(this, "Select an occupied segment to relocate.", "No segment selected",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        var range = ViewModel.CurrentImage.Ranges[rangeIndex];
-        var segmentIndex = ViewModel.CurrentImage.Segments.ToList().FindIndex(segment =>
-            segment.StartAddress == range.StartAddress && segment.EndAddress == range.EndAddress);
-        var dialog = new RelocateSegmentDialog(range.StartAddress, range.EndAddress, checked((long)range.ByteCount),
-            canDelete: SegmentsGrid.SelectedItems.Count == 1, canRelocate: segmentIndex >= 0) { Owner = this };
+        var block = ViewModel.CurrentImage.Blocks[rangeIndex];
+        var dialog = new RelocateSegmentDialog(block.StartAddress, block.EndAddress, checked((long)block.ByteCount),
+            canDelete: SegmentsGrid.SelectedItems.Count == 1) { Owner = this };
         if (dialog.ShowDialog() != true) return;
 
         if (dialog.DeleteRequested)
@@ -1057,7 +1055,7 @@ public partial class MainWindow : Window
 
         try
         {
-            if (_imageEdits.Relocate(segmentIndex, dialog.DestinationAddress, AskRelocationOverlap) &&
+            if (_imageEdits.Relocate(rangeIndex, dialog.DestinationAddress, AskRelocationOverlap) &&
                 ViewModel.TryNavigateToAddress(dialog.DestinationAddress, out var rowIndex))
             {
                 SelectRow(rowIndex);

@@ -542,6 +542,28 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void ExportSelectedBlock_IncludesAllAdjacentBackingRanges()
+    {
+        var first = MemoryImage.FromRepeatedRange(0x1000, 0x1000 + 600_000 - 1, 0xA1).Ranges[0];
+        var second = MemoryImage.FromRepeatedRange(0x1000 + 600_000, 0x1000 + 1_200_000 - 1, 0xB2).Ranges[0];
+        var source = MemoryImage.FromRanges([first, second]);
+        var service = new MemoryImageFileService();
+
+        using var exported = new MemoryStream();
+        service.ExportSegments(source, [0], MemoryImageExportFormat.IntelHex, 16, exported);
+        exported.Position = 0;
+        var imported = service.PrepareImport(exported).Apply(OverlapDecision.OverwriteIncoming)!.Image;
+
+        Assert.AreEqual(1_200_000UL, imported.OccupiedByteCount);
+        Assert.IsTrue(imported.TryGetByte(0x1000, out var firstByte));
+        Assert.AreEqual((byte)0xA1, firstByte);
+        Assert.IsTrue(imported.TryGetByte(0x1000 + 600_000, out var secondByte));
+        Assert.AreEqual((byte)0xB2, secondByte);
+        Assert.IsTrue(imported.TryGetByte(0x1000 + 1_200_000 - 1, out var lastByte));
+        Assert.AreEqual((byte)0xB2, lastByte);
+    }
+
+    [TestMethod]
     public void ExportAddressRange_ClipsSegmentsAndPreservesHolesForBothFormats()
     {
         var source = MemoryImage.FromSegments(
