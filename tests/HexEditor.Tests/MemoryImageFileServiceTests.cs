@@ -614,6 +614,38 @@ public sealed class MemoryImageFileServiceTests
         }
     }
 
+    [TestMethod]
+    public void SaveAtomically_FullAddressSpaceCancellationPreservesExistingOutputForBothFormats()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), $"hex-editor-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        var image = MemoryImage.FromPatternRange(0, uint.MaxValue, [0x11, 0x22, 0x33]);
+        var service = new MemoryImageFileService();
+        try
+        {
+            foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+            {
+                var extension = format == MemoryImageExportFormat.IntelHex ? ".hex" : ".srec";
+                var path = Path.Combine(directory, $"firmware{extension}");
+                File.WriteAllText(path, "preserve this output");
+                using var cancellation = new CancellationTokenSource();
+                var progress = new CapturingCancellingProgress(cancellation);
+
+                Assert.Throws<OperationCanceledException>(() => service.SaveAtomically(image, path, format, 32,
+                    overwriteExisting: true, cancellationToken: cancellation.Token, progress: progress));
+
+                Assert.AreEqual("preserve this output", File.ReadAllText(path));
+                Assert.AreEqual(32L, progress.Last!.Completed);
+                Assert.AreEqual(4_294_967_296L, progress.Last.Total);
+                Assert.HasCount(1, Directory.GetFiles(directory).Where(file => Path.GetFileName(file) == Path.GetFileName(path)));
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private sealed class CapturingCancellingProgress(CancellationTokenSource cancellation) : IProgress<MemoryImageFileProgress>
     {
         public MemoryImageFileProgress? Last { get; private set; }

@@ -145,14 +145,40 @@ public sealed class ImageEditingSession
     public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
         FillPolicy policy = FillPolicy.KeepExisting)
     {
+        ValidateFill(startAddress, endAddress, pattern, policy);
+        Commit(_currentImage.WithPatternRange(startAddress, endAddress, pattern.ToArray(), policy == FillPolicy.OverwriteExisting));
+    }
+
+    /// <summary>Builds a logical repeated range off-thread, then commits it as one undoable edit.</summary>
+    public async Task FillRangeAsync(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
+        FillPolicy policy, CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
+    {
+        ValidateFill(startAddress, endAddress, pattern, policy);
+        var priorImage = _currentImage;
+        var fillPattern = pattern.ToArray();
+        var addressCount = (long)((ulong)endAddress - startAddress + 1);
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report(new MemoryImageFileProgress("Preparing fill", 0, addressCount));
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var nextImage = await Task.Run(() => priorImage.WithPatternRange(startAddress, endAddress,
+            fillPattern, policy == FillPolicy.OverwriteExisting), cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!ReferenceEquals(_currentImage, priorImage))
+            throw new InvalidOperationException("The image changed while Fill Range was being prepared. No fill was applied.");
+        progress?.Report(new MemoryImageFileProgress("Committing fill", addressCount, addressCount));
+        cancellationToken.ThrowIfCancellationRequested();
+        Commit(nextImage);
+    }
+
+    private static void ValidateFill(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern, FillPolicy policy)
+    {
         ValidateRange(startAddress, endAddress);
         ArgumentNullException.ThrowIfNull(pattern);
         if (pattern.Count == 0) throw new ArgumentException("The fill pattern must contain at least one byte.", nameof(pattern));
         if (policy is not FillPolicy.KeepExisting and not FillPolicy.OverwriteExisting)
             throw new ArgumentOutOfRangeException(nameof(policy));
-        var length = (ulong)endAddress - startAddress + 1;
-        if (length > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(endAddress), "The selected range is too large to represent as a memory segment.");
-        Commit(_currentImage.WithPatternRange(startAddress, endAddress, pattern.ToArray(), policy == FillPolicy.OverwriteExisting));
     }
 
     public MemoryRelocationPreview PrepareRelocation(int segmentIndex, uint destinationBaseAddress) =>

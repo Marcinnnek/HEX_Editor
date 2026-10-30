@@ -347,6 +347,66 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public async Task FillRangeAsync_FillsFull32BitSpaceAsOneUndoablePatternBackedChange()
+    {
+        var original = MemoryImage.FromSegments([
+            new MemorySegment(0, [0xE0]),
+            new MemorySegment(0x80000000, [0xE1]),
+            new MemorySegment(uint.MaxValue, [0xE2])]);
+        var model = new MainViewModel();
+        model.LoadImage(original, null, null);
+        var progress = new RecordingFillProgress();
+
+        await model.FillRangeAsync(0, uint.MaxValue, [0x11, 0x22, 0x33],
+            FillPolicy.OverwriteExisting, CancellationToken.None, progress);
+
+        Assert.AreEqual(4_294_967_296UL, model.CurrentImage.OccupiedByteCount);
+        AssertByte(model.CurrentImage, 0, 0x11);
+        AssertByte(model.CurrentImage, 0x80000000, 0x33);
+        AssertByte(model.CurrentImage, uint.MaxValue, 0x11);
+        Assert.IsTrue(model.CanUndo);
+        Assert.IsTrue(model.Undo());
+        Assert.AreSame(original, model.CurrentImage);
+        Assert.IsTrue(model.Redo());
+        AssertByte(model.CurrentImage, uint.MaxValue, 0x11);
+        Assert.IsGreaterThan(0, progress.Updates.Count);
+    }
+
+    [TestMethod]
+    public async Task FillRangeAsync_CancellationLeavesTheImageAndUndoHistoryUnchanged()
+    {
+        var original = MemoryImage.FromSegments([new MemorySegment(0x10, [0xA5])]);
+        var model = new MainViewModel();
+        model.LoadImage(original, null, null);
+        using var cancellation = new CancellationTokenSource();
+        var progress = new CancellingFillProgress(cancellation);
+
+        await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () =>
+            await model.FillRangeAsync(0, uint.MaxValue, [0x11], FillPolicy.OverwriteExisting,
+                cancellation.Token, progress));
+
+        Assert.AreSame(original, model.CurrentImage);
+        Assert.IsFalse(model.CanUndo);
+    }
+
+    private static void AssertByte(MemoryImage image, uint address, byte expected)
+    {
+        Assert.IsTrue(image.TryGetByte(address, out var actual), $"Address {address:X8} should be occupied.");
+        Assert.AreEqual(expected, actual, $"Unexpected value at address {address:X8}.");
+    }
+
+    private sealed class RecordingFillProgress : IProgress<MemoryImageFileProgress>
+    {
+        public List<MemoryImageFileProgress> Updates { get; } = [];
+        public void Report(MemoryImageFileProgress value) => Updates.Add(value);
+    }
+
+    private sealed class CancellingFillProgress(CancellationTokenSource cancellation) : IProgress<MemoryImageFileProgress>
+    {
+        public void Report(MemoryImageFileProgress value) => cancellation.Cancel();
+    }
+
+    [TestMethod]
     public void FillAllRegion_UsesLowestAndHighestOccupiedAddressesAndIsNullForEmptyImage()
     {
         var model = new MainViewModel();

@@ -235,6 +235,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
     public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
         FillPolicy policy = FillPolicy.KeepExisting) => Editing.FillRange(startAddress, endAddress, pattern, policy);
+    public Task FillRangeAsync(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern, FillPolicy policy,
+        CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress) =>
+        Editing.FillRangeAsync(startAddress, endAddress, pattern, policy, cancellationToken, progress);
 
     public ChecksumCalculationResult CalculateChecksum(ChecksumRequest request)
     {
