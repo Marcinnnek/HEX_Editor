@@ -1,5 +1,6 @@
 using System.IO;
 using HexEditor.Core;
+using HexEditor.Compare;
 using HexEditor.Formats;
 using HexEditor.Tools;
 

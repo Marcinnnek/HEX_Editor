@@ -90,7 +90,7 @@ public sealed class MemoryComparisonModelTests
         using var cancellation = new CancellationTokenSource();
         var progress = new CancellingComparisonProgress(cancellation);
 
-        Assert.ThrowsException<OperationCanceledException>(() =>
+        Assert.Throws<OperationCanceledException>(() =>
             new MemoryComparisonModel(image, image, cancellationToken: cancellation.Token, progress: progress));
         Assert.IsTrue(progress.Reports > 0);
     }

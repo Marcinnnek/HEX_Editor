@@ -1,4 +1,5 @@
 using HexEditor.Core;
+using HexEditor.Compare;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.ComponentModel;
