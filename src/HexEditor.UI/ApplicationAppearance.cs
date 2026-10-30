@@ -12,8 +12,7 @@ public static class ApplicationAppearance
 
     public static void Apply(AppearanceMode theme)
     {
-        if (theme is not (AppearanceMode.Light or AppearanceMode.Dark))
-            throw new ArgumentOutOfRangeException(nameof(theme), "An effective Light or Dark appearance is required.");
+        ValidateEffectiveTheme(theme);
 
         var application = Application.Current;
         if (application is null || !application.Dispatcher.CheckAccess()) return;
@@ -32,11 +31,16 @@ public static class ApplicationAppearance
     public static void ApplyToWindow(Window window, AppearanceMode theme)
     {
         ArgumentNullException.ThrowIfNull(window);
-        if (theme is not (AppearanceMode.Light or AppearanceMode.Dark))
-            throw new ArgumentOutOfRangeException(nameof(theme), "An effective Light or Dark appearance is required.");
+        ValidateEffectiveTheme(theme);
 
         AppearancePalette.Apply(window.Resources, theme == AppearanceMode.Dark);
         BindWindow(window);
+    }
+
+    private static void ValidateEffectiveTheme(AppearanceMode theme)
+    {
+        if (theme is not (AppearanceMode.Light or AppearanceMode.Dark))
+            throw new ArgumentOutOfRangeException(nameof(theme), "An effective Light or Dark appearance is required.");
     }
 
     private static void Window_Loaded(object sender, RoutedEventArgs e)

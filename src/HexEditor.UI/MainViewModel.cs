@@ -342,5 +342,5 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
 public sealed record MemorySegmentRow(string StartAddress, string EndAddress, int ByteCount)
 {
-    public string ByteCountText => $"0x{ByteCount:X} = {ByteCount}";
+    public string ByteCountText => SegmentByteCountFormatter.Format(ByteCount);
 }

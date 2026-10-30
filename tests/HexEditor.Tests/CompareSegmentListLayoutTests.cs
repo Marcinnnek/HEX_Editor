@@ -21,8 +21,8 @@ public sealed class CompareSegmentListLayoutTests
             try
             {
                 var workspace = new CompareWorkspaceTabViewModel(
-                    MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]),
-                    MemoryImage.FromSegments([new MemorySegment(0x2000, [0x20])]),
+                    MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10]), new MemorySegment(0x1010, [0x11])]),
+                    MemoryImage.FromSegments([new MemorySegment(0x2000, [0x20]), new MemorySegment(0x2010, [0x21])]),
                     "base.hex", "reference.hex");
                 var view = new CompareView(workspace);
                 view.Measure(new Size(width, 650));
@@ -38,8 +38,9 @@ public sealed class CompareSegmentListLayoutTests
                 Assert.HasCount(2, dataPanels);
 
                 Assert.IsTrue(segmentLists.All(grid => !grid.CanUserSortColumns));
-                Assert.IsTrue(segmentLists.All(grid => grid.RowHeight == 24));
+                Assert.IsTrue(segmentLists.All(grid => grid.RowHeight == 20));
                 Assert.IsTrue(segmentLists.All(grid => grid.HorizontalScrollBarVisibility == ScrollBarVisibility.Auto));
+                foreach (var grid in segmentLists) AssertRenderedRowGap(grid);
                 Assert.IsTrue(workspace.BlocksA.All(row => row.ByteCountText == $"0x{row.ByteCount:X} = {row.ByteCount}"));
 
                 AssertAligned(workspace.BlocksA, workspace.Comparison.FileARows);
@@ -90,6 +91,19 @@ public sealed class CompareSegmentListLayoutTests
         thread.Start();
         thread.Join();
         if (failure is not null) throw failure;
+    }
+
+    private static void AssertRenderedRowGap(DataGrid grid)
+    {
+        var firstRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(0);
+        var secondRow = (DataGridRow)grid.ItemContainerGenerator.ContainerFromIndex(1);
+        var firstText = Descendants<TextBlock>(firstRow).First();
+        var secondText = Descendants<TextBlock>(secondRow).First();
+        var firstBounds = firstText.TransformToAncestor(grid).TransformBounds(new Rect(firstText.RenderSize));
+        var secondBounds = secondText.TransformToAncestor(grid).TransformBounds(new Rect(secondText.RenderSize));
+        var gapInCharacterHeights = (secondBounds.Top - firstBounds.Bottom) / firstText.FontSize;
+        Assert.IsTrue(gapInCharacterHeights is >= 0.35 and <= 0.65,
+            $"Expected about half a character of visible text-to-text gap, got {gapInCharacterHeights:F2}.");
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject

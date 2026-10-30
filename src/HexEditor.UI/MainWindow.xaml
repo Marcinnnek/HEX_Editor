@@ -151,19 +151,19 @@
                     <ui:DataGrid Grid.Row="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                               HorizontalAlignment="Left"
                               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                              CanUserSortColumns="False" RowHeight="24"
+                              CanUserSortColumns="False" RowHeight="20" CellStyle="{StaticResource SegmentListCellStyle}"
                               HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
                               MouseDoubleClick="SegmentsGrid_MouseDoubleClick"
                               MaxHeight="150" MinHeight="72" VerticalScrollBarVisibility="Auto">
                         <ui:DataGrid.Columns>
                             <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="Auto">
-                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Left" /></Style></DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.ElementStyle><StaticResource ResourceKey="SegmentListTextBlockStyle" /></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                             <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="Auto">
-                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Left" /></Style></DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.ElementStyle><StaticResource ResourceKey="SegmentListTextBlockStyle" /></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                             <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCountText}" Width="Auto">
-                                <DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Left" /></Style></DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.ElementStyle><StaticResource ResourceKey="SegmentListTextBlockStyle" /></DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
                         </ui:DataGrid.Columns>
                     </ui:DataGrid>
