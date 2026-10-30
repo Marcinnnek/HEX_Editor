@@ -28,6 +28,9 @@ public partial class CompareView : UserControl
 
     public CompareWorkspaceTabViewModel Workspace { get; }
     public CompareViewModel ViewModel { get; }
+    public (ComparePanelSide Side, uint Address)? CurrentFindCursor => SelectedAddress() is uint address
+        ? (_lastSelectedSide, address)
+        : null;
     public IReadOnlyList<int> SelectedBaseSegmentIndexes => FileABlocks.SelectedItems
         .Cast<CompareMemoryBlockRow>().Select(row => Workspace.BlocksA.IndexOf(row)).Where(index => index >= 0).ToArray();
     public int[] RowWidths { get; }
@@ -75,6 +78,7 @@ public partial class CompareView : UserControl
 
     public void NavigateToFindMatch(ComparePanelSide side, uint start, uint end)
     {
+        _lastSelectedSide = side;
         ViewModel.ClearFindMatch();
         ViewModel.SetFindMatch(side == ComparePanelSide.Base, start, end);
         Navigate(start);
