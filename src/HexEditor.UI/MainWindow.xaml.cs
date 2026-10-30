@@ -337,6 +337,14 @@ public partial class MainWindow : FluentWindow
         }
     }
 
+    private void PrimaryToolBarTray_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var width = e.NewSize.Width;
+        ViewToolBar.Visibility = width < 900 ? Visibility.Collapsed : Visibility.Visible;
+        HistoryToolBar.Visibility = width < 760 ? Visibility.Collapsed : Visibility.Visible;
+        CompareToolBar.Visibility = width < 650 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;

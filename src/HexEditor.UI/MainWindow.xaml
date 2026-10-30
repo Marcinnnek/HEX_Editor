@@ -72,20 +72,20 @@
                     </StackPanel>
                 </DockPanel>
             </Border>
-            <ToolBarTray DockPanel.Dock="Top" IsLocked="True" ToolTip="Primary commands">
-                <ToolBar ToolTip="File">
+            <ToolBarTray DockPanel.Dock="Top" x:Name="PrimaryToolBarTray" SizeChanged="PrimaryToolBarTray_SizeChanged" IsLocked="True" ToolTip="Primary commands">
+                <ToolBar x:Name="FileToolBar" ToolTip="File">
                     <ui:Button Content="Open" Click="OpenImage_Click" ToolTip="Open HEX / S-Record (Ctrl+O)" />
                     <ui:Button Content="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" ToolTip="Save active base (Ctrl+S)" />
                 </ToolBar>
-                <ToolBar ToolTip="Compare / Merge">
+                <ToolBar x:Name="CompareToolBar" ToolTip="Compare / Merge">
                     <ui:Button Content="Compare" Click="CompareImages_Click" />
                     <ui:Button Content="Merge" Click="MergeImages_Click" />
                 </ToolBar>
-                <ToolBar ToolTip="History">
+                <ToolBar x:Name="HistoryToolBar" ToolTip="History">
                     <ui:Button Content="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
                     <ui:Button Content="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
                 </ToolBar>
-                <ToolBar ToolTip="View">
+                <ToolBar x:Name="ViewToolBar" ToolTip="View">
                     <ComboBox Width="64" ToolTip="Bytes per row" ItemsSource="{Binding ViewModel.RowWidths}"
                               SelectedItem="{Binding ViewModel.ActiveBytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
                     <CheckBox Content="ASCII" ToolTip="Show ASCII" IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
@@ -99,8 +99,21 @@
                     <ui:Button Content="More ▾" Click="MoreCommands_Click">
                         <ui:Button.ContextMenu>
                             <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <MenuItem Header="Open HEX / S-Record..." Click="OpenImage_Click" InputGestureText="Ctrl+O" />
+                                <MenuItem Header="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" InputGestureText="Ctrl+S" />
                                 <MenuItem Header="Save As..." Click="SaveAs_Click" IsEnabled="{Binding ViewModel.ActiveCanSaveAs}" />
                                 <MenuItem Header="Close Image" Click="CloseImage_Click" IsEnabled="{Binding ViewModel.ActiveCanCloseImage}" />
+                                <Separator />
+                                <MenuItem Header="Compare images..." Click="CompareImages_Click" />
+                                <MenuItem Header="Merge images..." Click="MergeImages_Click" />
+                                <Separator />
+                                <MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" InputGestureText="Ctrl+Z" />
+                                <MenuItem Header="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" InputGestureText="Ctrl+Y" />
+                                <Separator />
+                                <MenuItem Header="8 bytes per row" Click="RowWidth8_Click" />
+                                <MenuItem Header="16 bytes per row" Click="RowWidth16_Click" />
+                                <MenuItem Header="32 bytes per row" Click="RowWidth32_Click" />
+                                <MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ActiveShowAscii, Mode=TwoWay}" />
                                 <Separator />
                                 <MenuItem Header="Select Range..." Click="SelectRange_Click" />
                                 <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" />
