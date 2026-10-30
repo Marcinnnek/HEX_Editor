@@ -41,6 +41,10 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ViewModel = new MainViewModel();
+        ViewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.WindowTitle)) Title = ViewModel.WindowTitle;
+        };
         _imageEdits = new ImageEditWorkflow(ViewModel);
         _checksums = new ChecksumWorkflow(ViewModel);
         _comparisonImageLoader = new ComparisonImageLoader(ViewModel);
