@@ -15,7 +15,6 @@ using HexEditor.Core;
 using HexEditor.Formats;
 using HexEditor.Tools;
 using Wpf.Ui.Appearance;
-using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 using WindowBackdropType = Wpf.Ui.Controls.WindowBackdropType;
 using MessageBox = HexEditor.UI.ThemedMessageBox;
 
@@ -24,7 +23,7 @@ namespace HexEditor.UI;
 /// <summary>
 /// Interaction logic for MainWindow.xaml
 /// </summary>
-public partial class MainWindow : FluentWindow
+public partial class MainWindow : Window
 {
     private readonly AppearanceSettings _appearanceSettings = new();
     private readonly ExportSettings _exportSettings = new();
