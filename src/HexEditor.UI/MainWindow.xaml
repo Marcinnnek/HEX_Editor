@@ -165,21 +165,23 @@
         <TabControl x:Name="WorkspaceTabs">
             <TabItem Header="Editor">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="230" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <ui:DataGrid Grid.Column="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="6" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <ui:DataGrid Grid.Row="0" x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
-                              HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged">
+                              HeadersVisibility="Column" SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
+                              MaxHeight="150" MinHeight="72" VerticalScrollBarVisibility="Auto">
                         <ui:DataGrid.Columns>
                             <DataGridTextColumn Header="Start Address" Binding="{Binding StartAddress}" Width="*" />
                             <DataGridTextColumn Header="End Address" Binding="{Binding EndAddress}" Width="*" />
                             <DataGridTextColumn Header="Bytes" Binding="{Binding ByteCount}" Width="65" />
                         </ui:DataGrid.Columns>
                     </ui:DataGrid>
-                    <local:HexViewControl Grid.Column="2" x:Name="HexRowsView"
+                    <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                    <local:HexViewControl Grid.Row="2" x:Name="HexRowsView"
                                           ItemsSource="{Binding ViewModel.ImageView.Rows}"
                                           ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
                                           AddressRangeSelected="HexView_AddressRangeSelected" />
