@@ -253,10 +253,10 @@ public sealed class CompareViewModelTests
         Assert.AreEqual(0x1001u, fileA.Cells[1].Address);
         Assert.AreEqual(ByteHighlightState.Different, fileA.Cells[1].Highlight);
         Assert.AreEqual(ByteHighlightState.Different, fileB.Cells[1].Highlight);
-        Assert.AreEqual(ByteHighlightState.OnlyInPanel, fileA.Cells[3].Highlight);
-        Assert.AreEqual(ByteHighlightState.OnlyOther, fileB.Cells[3].Highlight);
-        Assert.AreEqual(ByteHighlightState.OnlyOther, fileA.Cells[4].Highlight);
-        Assert.AreEqual(ByteHighlightState.OnlyInPanel, fileB.Cells[4].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyInA, fileA.Cells[3].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyInA, fileB.Cells[3].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyInB, fileA.Cells[4].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyInB, fileB.Cells[4].Highlight);
         Assert.AreEqual(ByteHighlightState.None, fileA.Cells[5].Highlight);
         Assert.AreEqual(0x1007u, fileA.Cells[7].Address);
     }

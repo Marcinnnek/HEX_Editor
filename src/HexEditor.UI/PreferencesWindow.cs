@@ -6,10 +6,15 @@ namespace HexEditor.UI;
 
 public sealed class PreferencesWindow : Window
 {
+    private readonly PreferencesSession _choices;
+    private readonly Dictionary<ComparisonColorKind, Border> _swatches = [];
+    private AppearanceMode _palette = AppearanceMode.Light;
+
     public PreferencesWindow(PreferencesSession choices)
     {
+        _choices = choices;
         Title = "Preferences";
-        Width = 420;
+        Width = 470;
         SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize;
         WindowStyle = WindowStyle.SingleBorderWindow;
@@ -36,6 +41,26 @@ public sealed class PreferencesWindow : Window
         AddSetting(panel, "Horizontal space between bytes", horizontal);
         AddSetting(panel, "Vertical space between rows", vertical);
 
+        panel.Children.Add(new TextBlock { Text = "Comparison colors", FontSize = 18,
+            FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 8) });
+        var paletteSelector = new ComboBox { Name = "ComparisonPaletteSelector", Width = 150,
+            HorizontalAlignment = HorizontalAlignment.Left, SelectedIndex = 0, Margin = new Thickness(0, 0, 0, 8) };
+        paletteSelector.Items.Add("Light palette");
+        paletteSelector.Items.Add("Dark palette");
+        paletteSelector.SelectionChanged += (_, _) =>
+        {
+            _palette = paletteSelector.SelectedIndex == 1 ? AppearanceMode.Dark : AppearanceMode.Light;
+            RefreshSwatches();
+        };
+        panel.Children.Add(paletteSelector);
+        AddColorRow(panel, "Unequal bytes", ComparisonColorKind.Different);
+        AddColorRow(panel, "Bytes only in A", ComparisonColorKind.OnlyInA);
+        AddColorRow(panel, "Bytes only in B", ComparisonColorKind.OnlyInB);
+        var reset = new Wpf.Ui.Controls.Button { Content = "Reset palette", MinWidth = 100,
+            HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
+        reset.Click += (_, _) => { choices.ResetPalette(_palette); RefreshSwatches(); };
+        panel.Children.Add(reset);
+
         var actions = new StackPanel { Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true,
@@ -54,6 +79,38 @@ public sealed class PreferencesWindow : Window
         actions.Children.Add(save);
         panel.Children.Add(actions);
         Content = panel;
+        RefreshSwatches();
+    }
+
+    private void AddColorRow(Panel panel, string label, ComparisonColorKind kind)
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 3, 0, 3), LastChildFill = false };
+        var choose = new Wpf.Ui.Controls.Button { Content = "Choose…", MinWidth = 80, Tag = kind };
+        choose.Click += (_, _) => ChooseColor(kind);
+        DockPanel.SetDock(choose, Dock.Right);
+        row.Children.Add(choose);
+        var swatch = new Border { Width = 42, Height = 22, BorderThickness = new Thickness(1),
+            Margin = new Thickness(0, 0, 8, 0), Tag = kind };
+        swatch.SetResourceReference(Border.BorderBrushProperty, "HexBorderBrush");
+        DockPanel.SetDock(swatch, Dock.Right);
+        row.Children.Add(swatch);
+        _swatches.Add(kind, swatch);
+        row.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center });
+        panel.Children.Add(row);
+    }
+
+    private void ChooseColor(ComparisonColorKind kind)
+    {
+        var picker = new ComparisonColorPickerWindow(_choices.GetColor(_palette, kind)) { Owner = this };
+        if (picker.ShowDialog() != true) return;
+        _choices.SetColor(_palette, kind, picker.SelectedColor);
+        RefreshSwatches();
+    }
+
+    private void RefreshSwatches()
+    {
+        foreach (var (kind, swatch) in _swatches)
+            swatch.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(_choices.GetColor(_palette, kind)));
     }
 
     private static RadioButton AddMode(Panel panel, string label, bool selected)

@@ -150,6 +150,6 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
         $"Skipped 0x{startAddress:X8}...0x{endAddress:X8}");
 }
 
-public enum ByteHighlightState { None, Different, OnlyInPanel, OnlyOther }
+public enum ByteHighlightState { None, Different, OnlyInPanel, OnlyOther, OnlyInA, OnlyInB }
 
 public sealed record HexByteCell(string Hex, string Ascii, uint? Address, ByteHighlightState Highlight);
