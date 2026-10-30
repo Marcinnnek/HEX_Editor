@@ -26,7 +26,8 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
             BaseDocument.ImageChanged += OnBaseDocumentChanged;
             BaseDocument.PropertyChanged += OnBaseDocumentPropertyChanged;
         }
-        Comparison = new CompareViewModel(fileA, fileB, cancellationToken: cancellationToken, progress: progress);
+        Comparison = new CompareViewModel(fileA, fileB, cancellationToken: cancellationToken, progress: progress,
+            isBaseByteEdited: BaseDocument is { } document ? document.IsEditedByte : null);
         BlocksA = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileA));
         BlocksB = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileB));
     }
@@ -87,6 +88,7 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
 
     private void OnBaseDocumentPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(EditorDocument.IsModified)) Comparison.RefreshEditedBytes();
         if (e.PropertyName != nameof(EditorDocument.SourcePath) || BaseDocument?.SourcePath is not { } path) return;
         NameA = Path.GetFileName(path);
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(NameA)));

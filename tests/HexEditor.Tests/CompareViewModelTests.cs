@@ -76,6 +76,42 @@ public sealed class CompareViewModelTests
     }
 
     [TestMethod]
+    public async Task CompareBaseKeepsDifferenceBackgroundAndEditedOutlineUntilSavedOrUndone()
+    {
+        var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x11])]);
+        var reference = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20, 0x11])]);
+        var owner = new MainViewModel();
+        owner.LoadImage(baseImage, null, MemoryImageExportFormat.IntelHex);
+        var document = owner.Workspace.Document;
+        var compare = new CompareWorkspaceTabViewModel(baseImage, reference, "base.hex", "reference.hex",
+            baseDocument: document);
+
+        document.Editing.EditByte(0x1000, 0x12, OverlapDecision.OverwriteIncoming);
+        var editedBase = compare.Comparison.FileARows[0].Cells.Single(cell => cell.Address == 0x1000);
+        var unchangedReference = compare.Comparison.FileBRows[0].Cells.Single(cell => cell.Address == 0x1000);
+        Assert.AreEqual(ByteHighlightState.Different, editedBase.Highlight);
+        Assert.IsTrue(editedBase.IsEdited);
+        Assert.IsFalse(unchangedReference.IsEdited);
+
+        Assert.IsTrue(document.Editing.Undo());
+        var undoneBase = compare.Comparison.FileARows[0].Cells.Single(cell => cell.Address == 0x1000);
+        Assert.AreEqual(ByteHighlightState.Different, undoneBase.Highlight);
+        Assert.IsFalse(undoneBase.IsEdited);
+
+        document.Editing.EditByte(0x1000, 0x13, OverlapDecision.OverwriteIncoming);
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-compare-edited-{Guid.NewGuid():N}.hex");
+        try
+        {
+            await document.SaveAsAsync(path, MemoryImageExportFormat.IntelHex, false,
+                CancellationToken.None, null);
+            var savedBase = compare.Comparison.FileARows[0].Cells.Single(cell => cell.Address == 0x1000);
+            Assert.AreEqual(ByteHighlightState.Different, savedBase.Highlight);
+            Assert.IsFalse(savedBase.IsEdited);
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    [TestMethod]
     public void ActiveTabViewSettings_RestoreIndependentlyAndSynchronizePrimaryControls()
     {
         var viewModel = new MainViewModel();

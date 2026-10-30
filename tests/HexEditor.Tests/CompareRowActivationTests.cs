@@ -108,6 +108,27 @@ public sealed class CompareRowActivationTests
         Assert.AreEqual(1, first.Comparison.Rows[0].States.Count(state => state == HexEditor.Compare.CompareByteState.Different));
     }
 
+    [TestMethod]
+    public void RemovingComparedBaseByteLeavesOneSidedDifferenceWithoutEditableCell()
+    {
+        var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+        var reference = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x20])]);
+        var owner = new MainViewModel();
+        owner.LoadImage(baseImage, null, null);
+        var compare = new CompareWorkspaceTabViewModel(baseImage, reference, "base.hex", "reference.hex",
+            baseDocument: owner.Workspace.Document);
+
+        owner.Workspace.Document.Editing.DeleteSegment(0);
+
+        Assert.AreEqual(HexEditor.Compare.CompareByteState.OnlyB, compare.Comparison.Rows[0].States[0]);
+        Assert.AreEqual(ByteHighlightState.OnlyInB, compare.Comparison.FileARows[0].Cells[0].Highlight);
+        Assert.IsFalse(compare.Comparison.FileARows[0].Cells[0].IsEdited);
+        Assert.AreEqual(CompareRowActivationKind.Ignored,
+            compare.ActivateRow(ComparePanelSide.Base, 0, 0x1000).Kind);
+        Assert.AreEqual(CompareRowActivationKind.ReferenceReadOnly,
+            compare.ActivateRow(ComparePanelSide.Reference, 0, 0x1000).Kind);
+    }
+
     private static byte ReadByte(MemoryImage image, uint address)
     {
         Assert.IsTrue(image.TryGetByte(address, out var value));
