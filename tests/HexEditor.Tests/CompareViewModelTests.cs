@@ -234,13 +234,13 @@ public sealed class CompareViewModelTests
 
         Assert.HasCount(8, fileA.Cells);
         Assert.AreEqual(0x1001u, fileA.Cells[1].Address);
-        Assert.AreEqual("Different", fileA.Cells[1].Highlight);
-        Assert.AreEqual("Different", fileB.Cells[1].Highlight);
-        Assert.AreEqual("OnlyInPanel", fileA.Cells[3].Highlight);
-        Assert.AreEqual("OnlyOther", fileB.Cells[3].Highlight);
-        Assert.AreEqual("OnlyOther", fileA.Cells[4].Highlight);
-        Assert.AreEqual("OnlyInPanel", fileB.Cells[4].Highlight);
-        Assert.AreEqual(string.Empty, fileA.Cells[5].Highlight);
+        Assert.AreEqual(ByteHighlightState.Different, fileA.Cells[1].Highlight);
+        Assert.AreEqual(ByteHighlightState.Different, fileB.Cells[1].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyInPanel, fileA.Cells[3].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyOther, fileB.Cells[3].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyOther, fileA.Cells[4].Highlight);
+        Assert.AreEqual(ByteHighlightState.OnlyInPanel, fileB.Cells[4].Highlight);
+        Assert.AreEqual(ByteHighlightState.None, fileA.Cells[5].Highlight);
         Assert.AreEqual(0x1007u, fileA.Cells[7].Address);
     }
 
@@ -285,7 +285,7 @@ public sealed class CompareViewModelTests
             Assert.AreEqual(inRange ? (uint?)(0x1000 + offset) : null, row.FileA.Cells[offset].Address);
             Assert.AreEqual(inRange ? (0xB0 + offset).ToString("X2") : string.Empty, row.FileB.Cells[offset].Hex);
             Assert.AreEqual(inRange ? "." : " ", row.FileA.Cells[offset].Ascii);
-            Assert.AreEqual(inRange ? "Different" : string.Empty, comparison.FileARows[0].Cells[offset].Highlight);
+            Assert.AreEqual(inRange ? ByteHighlightState.Different : ByteHighlightState.None, comparison.FileARows[0].Cells[offset].Highlight);
         }
 
         Assert.IsNull(row.FileA.Cells[2].Address);

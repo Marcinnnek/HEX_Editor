@@ -22,18 +22,8 @@ public partial class CompareView : UserControl
         RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
-        FileAView.ItemsGrid.SelectionUnit = DataGridSelectionUnit.FullRow;
-        FileBView.ItemsGrid.SelectionUnit = DataGridSelectionUnit.FullRow;
-        FileAView.ItemsGrid.SelectionMode = DataGridSelectionMode.Single;
-        FileBView.ItemsGrid.SelectionMode = DataGridSelectionMode.Single;
-        FileAView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
-        FileBView.ItemsGrid.SelectionChanged += Panel_SelectionChanged;
-        FileAView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
-        FileBView.ItemsGrid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
-        FileAView.ItemsGrid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
-            new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
-        FileBView.ItemsGrid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
-            new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
+        ConfigurePanel(FileAView);
+        ConfigurePanel(FileBView);
     }
 
     public CompareWorkspaceTabViewModel Workspace { get; }
@@ -45,6 +35,31 @@ public partial class CompareView : UserControl
     public event Action<uint, uint>? BaseRowActivated;
     public event Action<string>? StatusRequested;
     public event Action<string, Exception, ComparePanelSide, int, uint?>? InteractionFailed;
+
+    private void ConfigurePanel(HexViewControl panel)
+    {
+        var grid = panel.ItemsGrid;
+        grid.SelectionUnit = DataGridSelectionUnit.FullRow;
+        grid.SelectionMode = DataGridSelectionMode.Single;
+        grid.SelectionChanged += Panel_SelectionChanged;
+        panel.ByteClickFailed += Panel_ByteClickFailed;
+        grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
+        grid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+            new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
+    }
+
+    private ComparePanelSide SideOf(object panel) => ReferenceEquals(panel, FileAView) ||
+        ReferenceEquals(panel, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+
+    private DataGrid OppositeGrid(ComparePanelSide side) => side == ComparePanelSide.Base
+        ? FileBView.ItemsGrid : FileAView.ItemsGrid;
+
+    private void Panel_ByteClickFailed(object? sender, ByteClickFailedEventArgs e)
+    {
+        if (sender is not HexViewControl panel) return;
+        ReportInteractionFailure("single-click", SideOf(panel), panel.ItemsGrid.SelectedIndex,
+            e.Address, e.Exception);
+    }
 
     public void RefreshImage(MemoryImage previousImage, MemoryImage updatedImage)
     {
@@ -62,7 +77,7 @@ public partial class CompareView : UserControl
     {
         if (sender is not DataGrid grid || e.ClickCount is not (1 or 2)) return;
 
-        var side = ReferenceEquals(grid, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        var side = SideOf(grid);
         var rowIndex = -1;
         uint? address = null;
         uint? rowStart = null;
@@ -224,12 +239,12 @@ public partial class CompareView : UserControl
     private void Panel_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_syncingScroll || sender is not DataGrid source || source.SelectedItem is not HexViewRow) return;
-        var side = ReferenceEquals(source, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        var side = SideOf(source);
         try
         {
             _lastSelectedSide = side;
             _syncingScroll = true;
-            var target = side == ComparePanelSide.Base ? FileBView.ItemsGrid : FileAView.ItemsGrid;
+            var target = OppositeGrid(side);
             if ((uint)source.SelectedIndex < (uint)target.Items.Count)
             {
                 var targetRow = target.Items[source.SelectedIndex];
@@ -250,7 +265,7 @@ public partial class CompareView : UserControl
 
     private void ByteAddressSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        var side = ReferenceEquals(sender, FileAView) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        var side = SideOf(sender!);
         _lastSelectedSide = side;
         try { Navigate(e.EndAddress); }
         catch (Exception exception) { ReportInteractionFailure("single-click", side, -1, e.EndAddress, exception); }
@@ -259,10 +274,10 @@ public partial class CompareView : UserControl
     private void Grid_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (_syncingScroll || sender is not DataGrid source || e.VerticalChange == 0) return;
-        var side = ReferenceEquals(source, FileAView.ItemsGrid) ? ComparePanelSide.Base : ComparePanelSide.Reference;
+        var side = SideOf(source);
         try
         {
-            var target = side == ComparePanelSide.Base ? FileBView.ItemsGrid : FileAView.ItemsGrid;
+            var target = OppositeGrid(side);
             var sourceScroll = FindScrollViewer(source);
             var targetScroll = FindScrollViewer(target);
             if (sourceScroll is null || targetScroll is null) return;

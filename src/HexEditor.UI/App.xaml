@@ -10,21 +10,6 @@
                 <ui:ThemesDictionary Theme="Light" />
                 <ui:ControlsDictionary />
             </ResourceDictionary.MergedDictionaries>
-            <SolidColorBrush x:Key="HexWindowBrush" Color="#F8F9FB" />
-            <SolidColorBrush x:Key="HexSurfaceBrush" Color="#FFFFFF" />
-            <SolidColorBrush x:Key="HexRaisedBrush" Color="#EDF0F4" />
-            <SolidColorBrush x:Key="HexTextBrush" Color="#1B1D21" />
-            <SolidColorBrush x:Key="HexMutedTextBrush" Color="#4C5561" />
-            <SolidColorBrush x:Key="HexDisabledTextBrush" Color="#68717D" />
-            <SolidColorBrush x:Key="HexBorderBrush" Color="#AAB3BE" />
-            <SolidColorBrush x:Key="HexSelectionBrush" Color="#C4DDF5" />
-            <SolidColorBrush x:Key="HexFocusBrush" Color="#246CA4" />
-            <SolidColorBrush x:Key="HexErrorBrush" Color="#A52828" />
-            <SolidColorBrush x:Key="HexAsciiBackgroundBrush" Color="#146B87A6" />
-            <SolidColorBrush x:Key="HexDifferentBrush" Color="#55D03838" />
-            <SolidColorBrush x:Key="HexOnlyInPanelBrush" Color="#55D08514" />
-            <SolidColorBrush x:Key="HexOnlyOtherBrush" Color="#55707070" />
-
             <Style TargetType="{x:Type Window}">
                 <Setter Property="Background" Value="{DynamicResource HexWindowBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />

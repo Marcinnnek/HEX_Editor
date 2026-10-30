@@ -92,7 +92,7 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
             var text = ByteText.FromByte(value);
             hex.Append(text.HexColumn);
             ascii?.Append(text.Ascii);
-            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), address <= uint.MaxValue ? (uint)address : null, string.Empty);
+            cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), address <= uint.MaxValue ? (uint)address : null, ByteHighlightState.None);
         }
         return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null) { Cells = cells };
     }
@@ -150,4 +150,6 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
         $"Skipped 0x{startAddress:X8}...0x{endAddress:X8}");
 }
 
-public sealed record HexByteCell(string Hex, string Ascii, uint? Address, string Highlight);
+public enum ByteHighlightState { None, Different, OnlyInPanel, OnlyOther }
+
+public sealed record HexByteCell(string Hex, string Ascii, uint? Address, ByteHighlightState Highlight);

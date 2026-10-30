@@ -43,13 +43,21 @@ public sealed class GridSpacingSettings
         var temp = FilePath + ".tmp";
         try
         {
-            File.WriteAllText(temp, JsonSerializer.Serialize(new StoredSettings(horizontalByteSpacing, verticalRowSpacing)));
+            File.WriteAllText(temp, Serialize(horizontalByteSpacing, verticalRowSpacing));
             File.Move(temp, FilePath, true);
-            _horizontalByteSpacing = horizontalByteSpacing;
-            _verticalRowSpacing = verticalRowSpacing;
-            SpacingChanged?.Invoke();
+            ApplySavedSpacing(horizontalByteSpacing, verticalRowSpacing);
         }
         finally { if (File.Exists(temp)) File.Delete(temp); }
+    }
+
+    internal static string Serialize(int horizontalByteSpacing, int verticalRowSpacing) =>
+        JsonSerializer.Serialize(new StoredSettings(horizontalByteSpacing, verticalRowSpacing));
+
+    internal void ApplySavedSpacing(int horizontalByteSpacing, int verticalRowSpacing)
+    {
+        _horizontalByteSpacing = horizontalByteSpacing;
+        _verticalRowSpacing = verticalRowSpacing;
+        SpacingChanged?.Invoke();
     }
 
     private sealed record StoredSettings(int HorizontalByteSpacing, int VerticalRowSpacing);

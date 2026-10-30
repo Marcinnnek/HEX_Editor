@@ -64,6 +64,43 @@ public sealed class PreferencesSessionTests
     }
 
     [TestMethod]
+    public void Failed_save_leaves_active_and_persisted_preferences_unchanged()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "hex-editor-preferences-" + Guid.NewGuid());
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var spacingPath = Path.Combine(folder, "grid-spacing.json");
+            var appearancePath = Path.Combine(folder, "appearance.json");
+            var spacing = new GridSpacingSettings(spacingPath);
+            spacing.SetSpacing(3, 2);
+            Directory.CreateDirectory(appearancePath); // A destination that rejects the second commit.
+            using var appearance = new AppearanceSession(new AppearanceSettings(appearancePath),
+                new FixedWindowsAppearance());
+            var choices = new PreferencesSession(appearance, spacing)
+            {
+                Appearance = AppearanceMode.Dark,
+                HorizontalByteSpacing = 6,
+                VerticalRowSpacing = 4
+            };
+
+            Assert.ThrowsExactly<UnauthorizedAccessException>(choices.Save);
+
+            Assert.AreEqual(AppearanceMode.Automatic, appearance.Mode);
+            Assert.AreEqual(AppearanceMode.Light, appearance.EffectiveTheme);
+            Assert.AreEqual(3, spacing.HorizontalByteSpacing);
+            Assert.AreEqual(2, spacing.VerticalRowSpacing);
+            Assert.AreEqual(3, new GridSpacingSettings(spacingPath).HorizontalByteSpacing);
+            Assert.AreEqual(2, new GridSpacingSettings(spacingPath).VerticalRowSpacing);
+            Assert.AreEqual(AppearanceMode.Automatic, new AppearanceSettings(appearancePath).Mode);
+        }
+        finally
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
+    }
+
+    [TestMethod]
     public void Preferences_window_shows_current_choices_and_native_close_control()
     {
         Exception? failure = null;

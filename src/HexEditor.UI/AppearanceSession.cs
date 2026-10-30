@@ -24,6 +24,7 @@ public sealed class AppearanceSession : IDisposable
     }
 
     public AppearanceMode Mode => _settings.Mode;
+    internal string SettingsPath => _settings.FilePath;
     public AppearanceMode EffectiveTheme { get; private set; }
     public event Action<AppearanceMode>? ThemeChanged;
 
@@ -31,6 +32,14 @@ public sealed class AppearanceSession : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (_settings.Mode != mode) _settings.SetMode(mode);
+        UpdateSubscription();
+        Refresh();
+    }
+
+    internal void ApplySavedMode(AppearanceMode mode)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        _settings.ApplySavedMode(mode);
         UpdateSubscription();
         Refresh();
     }

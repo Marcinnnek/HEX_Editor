@@ -119,7 +119,7 @@ public sealed class CompareRowActivationTests
     {
         var row = new HexViewRow("00001000", "10 20", "..", false, null)
         {
-            Cells = [new HexByteCell("10", ".", 0x1000, ""), new HexByteCell("20", ".", 0x1001, "")]
+            Cells = [new HexByteCell("10", ".", 0x1000, ByteHighlightState.None), new HexByteCell("20", ".", 0x1001, ByteHighlightState.None)]
         };
         var control = new HexByteRowControl { Row = row };
         control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));

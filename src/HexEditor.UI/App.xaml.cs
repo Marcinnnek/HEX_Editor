@@ -9,5 +9,10 @@ namespace HexEditor.UI;
 /// </summary>
 public partial class App : Application
 {
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        AppearancePalette.Apply(dark: false);
+        base.OnStartup(e);
+    }
 }
 

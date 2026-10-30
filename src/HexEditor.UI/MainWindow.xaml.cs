@@ -72,7 +72,7 @@ public partial class MainWindow : Window
             choices.Save();
             ApplyAppearance();
         }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or AggregateException)
         {
             RecordError("Save preferences", exception);
             MessageBox.Show(this, exception.Message, "Unable to save preferences", MessageBoxButton.OK, MessageBoxImage.Error);

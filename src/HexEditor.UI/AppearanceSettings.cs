@@ -36,15 +36,19 @@ public sealed class AppearanceSettings
         var temporaryPath = FilePath + ".tmp";
         try
         {
-            File.WriteAllText(temporaryPath, JsonSerializer.Serialize(new StoredSettings(mode)));
+            File.WriteAllText(temporaryPath, Serialize(mode));
             File.Move(temporaryPath, FilePath, true);
-            Mode = mode;
+            ApplySavedMode(mode);
         }
         finally
         {
             if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
         }
     }
+
+    internal static string Serialize(AppearanceMode mode) => JsonSerializer.Serialize(new StoredSettings(mode));
+
+    internal void ApplySavedMode(AppearanceMode mode) => Mode = mode;
 
     private static AppearanceMode ReadMode(string path)
     {

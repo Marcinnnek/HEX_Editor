@@ -15,9 +15,9 @@ public sealed class AsciiRenderingTests
         {
             Cells =
             [
-                new HexByteCell("20", " ", 0x1000, string.Empty),
-                new HexByteCell("20", " ", 0x1001, "Different"),
-                new HexByteCell("20", " ", 0x1002, string.Empty)
+                new HexByteCell("20", " ", 0x1000, ByteHighlightState.None),
+                new HexByteCell("20", " ", 0x1001, ByteHighlightState.Different),
+                new HexByteCell("20", " ", 0x1002, ByteHighlightState.None)
             ]
         };
         var ascii = new HexByteRowControl { IsAscii = true, Row = row, FontFamily = new FontFamily("Consolas"), FontSize = 16 };
