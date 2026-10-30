@@ -646,7 +646,10 @@ public partial class MainWindow : Window
     private bool ConfirmCloseImage(EditorDocument document)
     {
         if (!document.IsModified) return true;
-        var choice = MessageBox.Show(this, "Save changes to this memory image before closing?", "Unsaved changes", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        var imageName = string.IsNullOrWhiteSpace(document.SourcePath)
+            ? "Untitled image"
+            : System.IO.Path.GetFileName(document.SourcePath);
+        var choice = SaveChangesDialog.Show(this, imageName);
         if (choice == MessageBoxResult.Cancel) return false;
         if (choice == MessageBoxResult.No) return true;
         if (document.SourcePath is null || document.SourceFormat is null) return TrySaveAs(document);
