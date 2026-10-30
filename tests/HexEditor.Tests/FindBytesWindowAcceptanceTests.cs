@@ -151,6 +151,56 @@ public sealed class FindBytesWindowAcceptanceTests
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
+    [TestMethod]
+    public void Compare_find_navigates_full_range_final_match_and_orders_base_before_reference()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var main = new MainWindow();
+            FindBytesWindow? find = null;
+            try
+            {
+                main.Show();
+                main.UpdateLayout();
+                var tabs = Descendants<TabControl>(main).Single();
+                var imageA = MemoryImage.FromSegments([
+                    new MemorySegment(0, [0xAA, 0xAA]),
+                    new MemorySegment(uint.MaxValue - 1, [0xAA, 0xAA])]);
+                var imageB = MemoryImage.FromSegments([
+                    new MemorySegment(0, [0xAA, 0xAA]),
+                    new MemorySegment(uint.MaxValue - 1, [0xAA, 0xAA])]);
+                var compare = new CompareView(new CompareWorkspaceTabViewModel(imageA, imageB, "A", "B"));
+                tabs.Items.Add(new TabItem { Header = "Full range", Content = compare });
+                tabs.SelectedIndex = tabs.Items.Count - 1;
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.IsTrue(compare.NavigateToAddress(uint.MaxValue));
+
+                var findMenu = LogicalDescendants<MenuItem>(main).Single(item => item.Header?.ToString() == "Find bytes...");
+                findMenu.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                find = main.OwnedWindows.OfType<FindBytesWindow>().Single();
+                find.PatternInput.Text = "AAAA";
+                Descendants<Button>(find).Single(button => button.Content?.ToString() == "Find Previous")
+                    .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WaitForCompareMatch(compare, fileA: true, uint.MaxValue - 1);
+                WaitForCompareAddress(compare, uint.MaxValue - 1);
+
+                var previous = Descendants<Button>(find).Single(button => button.Content?.ToString() == "Find Previous");
+                previous.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WaitForCompareAddress(compare, 0);
+                previous.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                WaitForCompareAddress(compare, uint.MaxValue - 1);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { find?.Close(); main.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     private static void WaitForSelection(MainWindow window, uint address)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);
@@ -173,6 +223,17 @@ public sealed class FindBytesWindowAcceptanceTests
         }
         var rows = fileA ? view.ViewModel.FileARows : view.ViewModel.FileBRows;
         Assert.IsTrue(rows.Any(row => row.Cells.Any(cell => cell.Address == address && cell.IsFindMatch)));
+    }
+
+    private static void WaitForCompareAddress(CompareView view, uint address)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!Descendants<TextBox>(view).Any(box => box.Text == address.ToString("X8")) && DateTime.UtcNow < deadline)
+        {
+            view.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
+            Thread.Sleep(10);
+        }
+        Assert.IsTrue(Descendants<TextBox>(view).Any(box => box.Text == address.ToString("X8")));
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject

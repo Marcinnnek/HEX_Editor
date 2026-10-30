@@ -8,6 +8,12 @@ public sealed class MemoryImageRange
     private readonly bool _isRepeated;
     private readonly ulong _patternOffset;
 
+    /// <summary>Whether this range stores bytes as a repeating pattern instead of a materialized segment.</summary>
+    public bool IsRepeated => _isRepeated;
+
+    /// <summary>The number of bytes in the repeating backing pattern, or zero for a materialized range.</summary>
+    public int RepetitionLength => _isRepeated ? _pattern.Length : 0;
+
     private MemoryImageRange(uint startAddress, uint endAddress, ReadOnlyMemory<byte> data, ReadOnlyMemory<byte> pattern,
         bool isRepeated, ulong patternOffset = 0)
     {

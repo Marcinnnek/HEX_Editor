@@ -21,6 +21,55 @@ public sealed class EditorFindWorkflowTests
         Assert.AreEqual((uint)0x1001, previousInclusive.MatchAddress);
         Assert.AreEqual((uint)0x1000, previousExclusive.MatchAddress);
     }
+
+    [TestMethod]
+    public async Task Editor_find_searches_full_range_boundaries_without_materializing_bytes()
+    {
+        var image = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xAA);
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(image, null, null);
+
+        var first = await workspace.FindNextAsync("AA AA", FindPatternMode.Hex, null, null, CancellationToken.None, null);
+        var interior = await workspace.FindNextAsync("AA AA", FindPatternMode.Hex, 0x7FFFFFFF, 0x7FFFFFFF, CancellationToken.None, null);
+        var final = await workspace.FindPreviousAsync("AA AA", FindPatternMode.Hex, null, null, CancellationToken.None, null);
+        var wrappedAtZero = await workspace.FindPreviousAsync("AA AA", FindPatternMode.Hex, 0, 0, CancellationToken.None, null);
+        var wrappedAtEnd = await workspace.FindNextAsync("AA AA", FindPatternMode.Hex, uint.MaxValue, uint.MaxValue, CancellationToken.None, null);
+
+        Assert.AreEqual((uint)0, first.MatchAddress);
+        Assert.AreEqual((uint)0x80000000, interior.MatchAddress);
+        Assert.AreEqual(uint.MaxValue - 1, final.MatchAddress);
+        Assert.AreEqual(uint.MaxValue - 1, wrappedAtZero.MatchAddress);
+        Assert.AreEqual((uint)0, wrappedAtEnd.MatchAddress);
+    }
+
+    [TestMethod]
+    public void Compare_candidate_skips_entire_repeated_range_when_pattern_cannot_match()
+    {
+        var image = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xAA);
+        var progress = new RecordingProgress();
+
+        var result = EditorFindSearch.FindCandidate(image, "AA AB", FindPatternMode.Hex, null, forward: true,
+            inclusive: true, progress: progress);
+
+        Assert.IsNull(result.MatchAddress);
+        Assert.IsLessThan((ulong)16, progress.LastCompleted,
+            $"Expected a periodicity-bounded search, got {progress.LastCompleted} candidate addresses.");
+    }
+
+    [TestMethod]
+    public void Compare_find_candidates_cover_both_panels_at_the_full_range_end()
+    {
+        var baseImage = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xAA);
+        var referenceImage = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xAA);
+
+        var baseMatch = EditorFindSearch.FindCandidate(baseImage, "AA AA", FindPatternMode.Hex,
+            uint.MaxValue, forward: false, inclusive: true);
+        var referenceMatch = EditorFindSearch.FindCandidate(referenceImage, "AA AA", FindPatternMode.Hex,
+            uint.MaxValue, forward: false, inclusive: true);
+
+        Assert.AreEqual(uint.MaxValue - 1, baseMatch.MatchAddress);
+        Assert.AreEqual(uint.MaxValue - 1, referenceMatch.MatchAddress);
+    }
     [TestMethod]
     public async Task Editor_find_matches_across_adjacent_ranges_but_stops_at_address_gaps()
     {
@@ -152,5 +201,11 @@ public sealed class EditorFindWorkflowTests
         {
             if (value.Completed > 0) cancellation.Cancel();
         }
+    }
+
+    private sealed class RecordingProgress : IProgress<(ulong Completed, ulong Total)>
+    {
+        public ulong LastCompleted { get; private set; }
+        public void Report((ulong Completed, ulong Total) value) => LastCompleted = value.Completed;
     }
 }

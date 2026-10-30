@@ -15,35 +15,20 @@ public static class EditorFindSearch
     {
         ArgumentNullException.ThrowIfNull(image);
         if (!TryParse(draft, mode, out var pattern, out var error)) return new FindSearchResult(false, null, null, error);
-        ulong total = 0;
-        foreach (var range in image.Ranges)
-            if ((ulong)range.EndAddress - range.StartAddress + 1 >= (uint)pattern.Length)
-                total += (ulong)range.EndAddress - range.StartAddress + 1 - (uint)pattern.Length + 1;
-
+        if (!forward && !inclusive && cursorAddress == 0)
+            return new FindSearchResult(true, null, null, "No match.");
+        var start = cursorAddress is uint cursor
+            ? forward ? (ulong)cursor + (inclusive ? 0UL : 1UL) : (ulong)cursor - (!inclusive && cursor > 0 ? 1UL : 0UL)
+            : forward ? 0UL : uint.MaxValue;
+        const ulong through = 0;
+        var total = CandidateCount(image.Ranges, pattern.Length, forward ? start : 0, forward ? uint.MaxValue : start);
         ulong completed = 0;
-        ulong? best = null;
-        foreach (var range in image.Ranges)
-        {
-            if ((ulong)range.EndAddress - range.StartAddress + 1 < (uint)pattern.Length) continue;
-            var last = (ulong)range.EndAddress + 1 - (uint)pattern.Length;
-            for (var address = (ulong)range.StartAddress; address <= last; address++)
-            {
-                if ((completed & 0xFFF) == 0)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    progress?.Report((completed, total));
-                }
-                var meetsCursor = cursorAddress is null || (forward
-                    ? (inclusive ? address >= cursorAddress.Value : address > cursorAddress.Value)
-                    : (inclusive ? address <= cursorAddress.Value : address < cursorAddress.Value));
-                if (meetsCursor && Matches(range, address, pattern) &&
-                    (best is null || (forward ? address < best.Value : address > best.Value))) best = address;
-                completed++;
-            }
-        }
+        var foundAddress = forward
+            ? SearchForward(image.Ranges, pattern, start, uint.MaxValue, cancellationToken, progress, ref completed, total)
+            : SearchBackward(image.Ranges, pattern, start, through, cancellationToken, progress, ref completed, total);
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report((completed, total));
-        return best is ulong found
+        return foundAddress is ulong found
             ? new FindSearchResult(true, (uint)found, (uint)(found + (uint)pattern.Length - 1))
             : new FindSearchResult(true, null, null, "No match.");
     }
@@ -70,7 +55,7 @@ public static class EditorFindSearch
             return new FindSearchResult(true, null, null, "No match.");
 
         var ranges = image.Ranges;
-        var total = image.OccupiedByteCount * 2;
+        var total = CandidateCount(ranges, pattern.Length, 0, uint.MaxValue);
         ulong completed = 0;
         ulong? match = null;
         if (forward)
@@ -113,6 +98,7 @@ public static class EditorFindSearch
             if (lastByte + 1 < (uint)pattern.Length) continue;
             var last = Math.Min(lastByte + 1 - (uint)pattern.Length, (ulong)range.EndAddress + 1 - (uint)pattern.Length);
             if (first > last) continue;
+            if (range.IsRepeated) return SearchRepeated(range, pattern, first, last, forward: true, token, progress, ref completed, total);
             for (var candidate = first; candidate <= last; candidate++)
             {
                 if ((completed & 0xFFF) == 0) { token.ThrowIfCancellationRequested(); progress?.Report((completed, total)); }
@@ -134,6 +120,7 @@ public static class EditorFindSearch
             var first = Math.Max((ulong)range.StartAddress, through);
             var last = Math.Min(from, (ulong)range.EndAddress + 1 - (uint)pattern.Length);
             if (first > last) continue;
+            if (range.IsRepeated) return SearchRepeated(range, pattern, first, last, forward: false, token, progress, ref completed, total);
             for (var candidate = last; ; candidate--)
             {
                 if ((completed & 0xFFF) == 0) { token.ThrowIfCancellationRequested(); progress?.Report((completed, total)); }
@@ -141,6 +128,44 @@ public static class EditorFindSearch
                 completed++;
                 if (candidate == first) break;
             }
+        }
+        return null;
+    }
+
+    private static ulong CandidateCount(IReadOnlyList<MemoryImageRange> ranges, int patternLength, ulong from, ulong through)
+    {
+        ulong total = 0;
+        foreach (var range in ranges)
+        {
+            if (range.ByteCount < (uint)patternLength) continue;
+            var first = Math.Max(from, range.StartAddress);
+            var last = Math.Min(through, (ulong)range.EndAddress + 1 - (uint)patternLength);
+            if (first <= last)
+            {
+                var candidates = last - first + 1;
+                total += range.IsRepeated ? Math.Min(candidates, (ulong)range.RepetitionLength) : candidates;
+            }
+        }
+        return total;
+    }
+
+    private static ulong? SearchRepeated(MemoryImageRange range, byte[] pattern, ulong first, ulong last, bool forward,
+        CancellationToken token, IProgress<(ulong Completed, ulong Total)>? progress, ref ulong completed, ulong total)
+    {
+        var cycle = (ulong)range.RepetitionLength;
+        var attempts = Math.Min(last - first + 1, cycle);
+        var candidate = forward ? first : last;
+        for (ulong attempt = 0; attempt < attempts; attempt++)
+        {
+            if ((completed & 0xFFF) == 0)
+            {
+                token.ThrowIfCancellationRequested();
+                progress?.Report((completed, total));
+            }
+            if (Matches(range, candidate, pattern)) return candidate;
+            completed++;
+            if (forward) candidate++;
+            else if (attempt + 1 < attempts) candidate--;
         }
         return null;
     }

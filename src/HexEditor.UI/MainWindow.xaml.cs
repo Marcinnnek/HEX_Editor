@@ -834,7 +834,7 @@ public partial class MainWindow : Window
                     }
                     var selected = e.Forward
                         ? eligible.OrderBy(match => match.Start).ThenBy(match => match.Side).Select(match => ((ComparePanelSide Side, uint Start, uint End)?)match).FirstOrDefault()
-                        : eligible.OrderByDescending(match => match.Start).ThenByDescending(match => match.Side).Select(match => ((ComparePanelSide Side, uint Start, uint End)?)match).FirstOrDefault();
+                        : eligible.OrderByDescending(match => match.Start).ThenBy(match => match.Side).Select(match => ((ComparePanelSide Side, uint Start, uint End)?)match).FirstOrDefault();
                     return (A: a, B: b, Match: selected);
                 }, cancellation.Token);
                 await RunOnUiAsync(() => ApplyCompareFindResult(window, e, scan.A, scan.B, scan.Match, searchedCompare, generation));
