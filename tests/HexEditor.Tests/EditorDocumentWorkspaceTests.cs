@@ -14,7 +14,7 @@ public sealed class EditorDocumentWorkspaceTests
         var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20])]);
         var viewModel = new MainViewModel();
         viewModel.LoadImage(image, path, MemoryImageExportFormat.IntelHex);
-        viewModel.EditByte(0x1000, 0x11);
+        viewModel.EditByte(0x1000, 0x11, OverlapDecision.OverwriteIncoming);
 
         using var output = new MemoryStream();
         viewModel.ExportImage(MemoryImageExportFormat.SRecord, 8, output);
