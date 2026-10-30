@@ -26,6 +26,54 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void Import_LimitsUniqueOccupiedBytesAndCountsRepeatedRecordsOnce()
+    {
+        using var atLimit = new MemoryStream(Encoding.ASCII.GetBytes(
+            ":020001000102FA\n:020001000102FA\n:00000001FF\n"));
+        var service = new MemoryImageFileService(maximumOccupiedByteCount: 2);
+
+        var imported = service.PrepareImport(atLimit).Apply(OverlapDecision.OverwriteIncoming)!;
+        Assert.AreEqual(2UL, imported.Image.OccupiedByteCount);
+
+        using var overLimit = new MemoryStream(Encoding.ASCII.GetBytes(
+            ":020001000102FA\n:0100030004F8\n:00000001FF\n"));
+        var error = Assert.Throws<MemoryImageImportException>(() => service.PrepareImport(overLimit));
+        StringAssert.Contains(error.Message, "maximum of 2 occupied bytes");
+
+        using var sRecordAtLimit = new MemoryStream(Encoding.ASCII.GetBytes(
+            "S1051234AABB4F\nS1051234AABB4F\nS9030000FC\n"));
+        Assert.AreEqual(2UL, service.PrepareImport(sRecordAtLimit).Apply(OverlapDecision.OverwriteIncoming)!.Image.OccupiedByteCount);
+
+        using var sRecordOverLimit = new MemoryStream(Encoding.ASCII.GetBytes(
+            "S1051234AABB4F\nS104123604AF\nS9030000FC\n"));
+        var sRecordError = Assert.Throws<MemoryImageImportException>(() => service.PrepareImport(sRecordOverLimit));
+        StringAssert.Contains(sRecordError.Message, "maximum of 2 occupied bytes");
+    }
+
+    [TestMethod]
+    public void Import_AllowsSparseAddressesAcrossFullDomainWithinOccupiedByteLimit()
+    {
+        var expected = MemoryImage.FromSegments([
+            new MemorySegment(0, [0x11]),
+            new MemorySegment(uint.MaxValue, [0x22])]);
+        var service = new MemoryImageFileService(maximumOccupiedByteCount: 2);
+
+        foreach (var format in new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord })
+        {
+            using var source = new MemoryStream();
+            service.Export(expected, format, 8, source);
+            source.Position = 0;
+
+            var imported = service.PrepareImport(source).Apply(OverlapDecision.OverwriteIncoming)!;
+            Assert.AreEqual(2UL, imported.Image.OccupiedByteCount);
+            Assert.IsTrue(imported.Image.TryGetByte(0, out var first));
+            Assert.AreEqual((byte)0x11, first);
+            Assert.IsTrue(imported.Image.TryGetByte(uint.MaxValue, out var last));
+            Assert.AreEqual((byte)0x22, last);
+        }
+    }
+
+    [TestMethod]
     public void Import_ReportsProgressAndCanBeCancelledWithoutProducingAPreview()
     {
         using var source = new MemoryStream();
