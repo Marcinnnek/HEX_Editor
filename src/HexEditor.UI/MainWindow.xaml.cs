@@ -701,24 +701,22 @@ public partial class MainWindow : FluentWindow
 
     private void RelocateSegment_Click(object sender, RoutedEventArgs e)
     {
-        if (SegmentsGrid.SelectedIndex < 0)
+        var segmentIndex = SegmentsGrid.SelectedIndex;
+        if ((uint)segmentIndex >= (uint)ViewModel.CurrentImage.Segments.Count)
         {
             MessageBox.Show(this, "Select an occupied segment to relocate.", "No segment selected",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
-        if (!HexAddressParser.TryParse(AddressInput.Text, out var destination))
-        {
-            MessageBox.Show(this, "Enter the destination base as an absolute 32-bit hexadecimal address in the Address field.",
-                "Invalid destination", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
+        var segment = ViewModel.CurrentImage.Segments[segmentIndex];
+        var dialog = new RelocateSegmentDialog(segment.StartAddress, segment.EndAddress, segment.ByteCount) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
 
         try
         {
-            if (_imageEdits.Relocate(SegmentsGrid.SelectedIndex, destination, AskRelocationOverlap) &&
-                ViewModel.TryNavigateToAddress(destination, out var rowIndex))
+            if (_imageEdits.Relocate(segmentIndex, dialog.DestinationAddress, AskRelocationOverlap) &&
+                ViewModel.TryNavigateToAddress(dialog.DestinationAddress, out var rowIndex))
             {
                 SelectRow(rowIndex);
             }
@@ -738,14 +736,11 @@ public partial class MainWindow : FluentWindow
         var message = $"The destination overlaps {preview.Overlaps.Count:N0} occupied byte(s) " +
                       $"({identicalCount:N0} identical, {differentCount:N0} different).\n\n" +
                       $"Affected addresses: {addresses}\n\n" +
-                      "Yes: overwrite destination bytes with the relocated segment\n" +
-                      "No: keep existing destination bytes\n" +
-                      "Cancel: cancel relocation";
+                      "Overwrite these occupied destination bytes? Declining cancels the relocation.";
         var choice = ShowYesNoCancelWarning(message, "Overlapping destination data");
         return choice switch
         {
             YesNoCancelChoice.Yes => RelocationOverlapDecision.Overwrite,
-            YesNoCancelChoice.No => RelocationOverlapDecision.KeepExisting,
             _ => RelocationOverlapDecision.Cancel
         };
     }

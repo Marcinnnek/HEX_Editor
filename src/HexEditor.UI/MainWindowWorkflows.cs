@@ -23,8 +23,8 @@ internal sealed class ImageEditWorkflow(MainViewModel viewModel)
 
     public bool Relocate(int segmentIndex, uint destination, Func<MemoryRelocationPreview, RelocationOverlapDecision> chooseOverlap)
     {
-        var preview = viewModel.Editing.PrepareRelocation(segmentIndex, destination);
-        return viewModel.Editing.ApplyRelocation(preview, preview.Overlaps.Count == 0
+        var preview = viewModel.Workspace.PrepareRelocation(segmentIndex, destination);
+        return viewModel.Workspace.ApplyRelocation(preview, preview.Overlaps.Count == 0
             ? RelocationOverlapDecision.Overwrite
             : chooseOverlap(preview));
     }
