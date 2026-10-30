@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Media.Imaging;
 using Wpf.Ui.Appearance;
 using WindowBackdropType = Wpf.Ui.Controls.WindowBackdropType;
 
@@ -7,6 +8,8 @@ namespace HexEditor.UI;
 /// <summary>Applies the effective application appearance to WPF and Wpf.Ui windows.</summary>
 public static class ApplicationAppearance
 {
+    private static readonly Uri IconUri = new("pack://application:,,,/HexEditor.UI;component/HexEditor.ico", UriKind.Absolute);
+
     static ApplicationAppearance() => EventManager.RegisterClassHandler(
         typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler(Window_Loaded), handledEventsToo: true);
 
@@ -52,5 +55,6 @@ public static class ApplicationAppearance
     {
         window.SetResourceReference(Window.BackgroundProperty, "HexWindowBrush");
         window.SetResourceReference(Window.ForegroundProperty, "HexTextBrush");
+        window.Icon = new BitmapImage(IconUri);
     }
 }

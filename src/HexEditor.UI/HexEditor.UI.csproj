@@ -8,12 +8,17 @@
     <ProjectReference Include="..\HexEditor.Tools\HexEditor.Tools.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="..\..\HexEditor.ico" Link="HexEditor.ico" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>..\..\HexEditor.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
