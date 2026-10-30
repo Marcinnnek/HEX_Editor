@@ -4,7 +4,7 @@
 
 **Blocked by:** 15: Edited-byte colors in Editor.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A base byte that differs from the reference keeps its difference background and gains the edited-byte outline when it is also edited.
 - [ ] Unequal, A-only, and B-only states continue to use their distinct configured colors in both themes.

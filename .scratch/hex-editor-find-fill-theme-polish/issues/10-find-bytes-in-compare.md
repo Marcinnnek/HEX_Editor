@@ -4,7 +4,7 @@
 
 **Blocked by:** 09: Find bytes in Editor.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Find searches both the editable base image and the read-only reference image of the active comparison.
 - [ ] Results are ordered by address, then panel A before B; a match at the same address in both panels is two results.

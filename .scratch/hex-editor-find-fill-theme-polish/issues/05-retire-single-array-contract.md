@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: Migrate Editor range operations; 03: Migrate Compare range operations; 04: Migrate streamed file workflows.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Editor, Compare, import, save, export, and editing paths use the range-aware contract after the migration batches are complete.
 - [ ] Legacy single-array assumptions that would reject or overflow a fully occupied 32-bit range are removed from the active contract.

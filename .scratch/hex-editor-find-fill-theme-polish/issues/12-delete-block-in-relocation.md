@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Delete is available only for one selected editable Block in the relocation dialog, whether opened from the menu or by double-click; it is unavailable for multiple selections.
 - [ ] Delete targets the original selected Block even if the destination address field contains an uncommitted value.

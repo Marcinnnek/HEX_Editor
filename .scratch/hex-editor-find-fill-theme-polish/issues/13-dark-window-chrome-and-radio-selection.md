@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Every existing and newly opened application window uses a dark native title bar in Dark and a light title bar in Light.
 - [ ] Follow Windows updates title bars when the system theme changes without restarting or reopening dialogs.

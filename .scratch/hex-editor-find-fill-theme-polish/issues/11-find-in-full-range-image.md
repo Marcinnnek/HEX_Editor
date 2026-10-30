@@ -4,7 +4,7 @@
 
 **Blocked by:** 07: Fill the full 32-bit address space; 09: Find bytes in Editor; 10: Find bytes in Compare.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Editor Find can locate a pattern near the first, interior, and final address of a fully occupied image without materializing a second 4 GiB copy.
 - [ ] Compare Find can search a fully occupied base or reference image while preserving address-then-panel ordering.

@@ -4,7 +4,7 @@
 
 **Blocked by:** 01: Expand memory image ranges.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Editor rows and the Block list can display occupied ranges and address gaps through the expanded image representation, including bytes near both ends of the 32-bit space.
 - [ ] Existing byte edits, Edit Row, insertion, deletion, relocation, Merge, Undo, and Redo still produce the same observable results for small images.

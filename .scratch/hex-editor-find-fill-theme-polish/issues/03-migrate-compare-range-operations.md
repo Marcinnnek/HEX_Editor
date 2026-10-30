@@ -4,7 +4,7 @@
 
 **Blocked by:** 01: Expand memory image ranges.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The base and reference panels can read and display bytes from range-aware images without materializing the whole image.
 - [ ] Unequal bytes, one-sided occupied bytes, address gaps, and difference counts remain correct near `0x00000000` and `0xFFFFFFFF`.

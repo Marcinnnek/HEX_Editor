@@ -4,7 +4,7 @@
 
 **Blocked by:** 09: Find bytes in Editor; 10: Find bytes in Compare; 16: Layer edits and differences in Compare.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The complete current match has a separate visible indicator in HEX and visible ASCII, including across displayed rows.
 - [ ] In Compare, a byte can simultaneously show its difference background, edited outline, and Find indicator without losing any state.

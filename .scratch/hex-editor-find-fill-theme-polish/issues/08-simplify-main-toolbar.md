@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] The toolbar no longer contains the address field, Go button, or More button.
 - [ ] View > Go to address and Ctrl+G open the existing address dialog.

@@ -4,7 +4,7 @@
 
 **Blocked by:** 05: Retire the single-array segment contract; 06: Fill policy and whole-image range.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A Fill from zero through `0xFFFFFFFF` produces exactly 4,294,967,296 occupied bytes, with correct pattern values at the beginning, interior, and final address.
 - [ ] Keep and Overwrite follow the chosen policy throughout that range, including existing occupied bytes and gaps.

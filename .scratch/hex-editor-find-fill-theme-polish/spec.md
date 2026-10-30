@@ -1,6 +1,6 @@
 # Find, Fill, Block Deletion, and Appearance Polish
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 

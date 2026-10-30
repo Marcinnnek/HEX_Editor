@@ -4,7 +4,7 @@
 
 **Blocked by:** 14: Configurable comparison colors.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] An occupied byte is marked edited when its current value differs from the last saved image; newly added occupied bytes are marked too.
 - [ ] Save or Undo that restores the saved value removes the marker; a removed address has no green Editor cell.

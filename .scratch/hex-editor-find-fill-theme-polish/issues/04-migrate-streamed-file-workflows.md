@@ -4,7 +4,7 @@
 
 **Blocked by:** 01: Expand memory image ranges.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Import and export preserve absolute addresses, occupied bytes, and gaps when using the expanded image representation.
 - [ ] A logical occupied range may span the full 32-bit address space without requiring a single giant array or a 32-bit byte count.

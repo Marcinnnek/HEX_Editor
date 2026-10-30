@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Preferences offers separate swatches and a picker for unequal bytes, bytes only in A, and bytes only in B in each appearance mode.
 - [ ] Selecting a palette to edit does not switch the application's active theme before Save.

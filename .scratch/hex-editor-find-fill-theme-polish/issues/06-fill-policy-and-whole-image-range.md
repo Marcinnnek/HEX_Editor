@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Fill Range offers Keep existing data and Overwrite existing data, with Keep selected by default.
 - [ ] Keep writes only to address gaps; Overwrite writes to every address in the selected interval.

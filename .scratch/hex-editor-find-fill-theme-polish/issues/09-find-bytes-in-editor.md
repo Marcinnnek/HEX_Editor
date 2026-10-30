@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] View > Find bytes and Ctrl+F open or focus a single Find window with HEX/ASCII choice, separate drafts, Find Next, Find Previous, and Close.
 - [ ] HEX accepts complete byte pairs with or without spaces and ignores letter case; ASCII accepts case-sensitive 7-bit characters and rejects non-ASCII input.

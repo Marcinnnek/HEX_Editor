@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A public memory-image operation can represent and read a logical occupied range from `0x00000000` through `0xFFFFFFFF` without allocating one 4 GiB byte array.
 - [ ] Occupancy and byte counts use values wide enough for `2^32` bytes, including inclusive end-address arithmetic.
