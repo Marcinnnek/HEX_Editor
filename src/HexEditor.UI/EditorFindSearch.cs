@@ -9,26 +9,45 @@ public sealed record FindSearchResult(bool IsValidPattern, uint? MatchAddress, u
 /// <summary>Parses and searches byte sequences in an Editor memory image.</summary>
 public static class EditorFindSearch
 {
-    public static IReadOnlyList<(uint Start, uint End)> FindAll(MemoryImage image, string draft, FindPatternMode mode,
-        CancellationToken cancellationToken = default)
+    public static FindSearchResult FindCandidate(MemoryImage image, string draft, FindPatternMode mode,
+        uint? cursorAddress, bool forward, bool inclusive, CancellationToken cancellationToken = default,
+        IProgress<(ulong Completed, ulong Total)>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(image);
-        if (!TryParse(draft, mode, out var pattern, out _)) return [];
-        var matches = new List<(uint Start, uint End)>();
-        ulong visited = 0;
+        if (!TryParse(draft, mode, out var pattern, out var error)) return new FindSearchResult(false, null, null, error);
+        ulong total = 0;
+        foreach (var range in image.Ranges)
+            if ((ulong)range.EndAddress - range.StartAddress + 1 >= (uint)pattern.Length)
+                total += (ulong)range.EndAddress - range.StartAddress + 1 - (uint)pattern.Length + 1;
+
+        ulong completed = 0;
+        ulong? best = null;
         foreach (var range in image.Ranges)
         {
             if ((ulong)range.EndAddress - range.StartAddress + 1 < (uint)pattern.Length) continue;
             var last = (ulong)range.EndAddress + 1 - (uint)pattern.Length;
-            if ((ulong)range.StartAddress > last) continue;
             for (var address = (ulong)range.StartAddress; address <= last; address++)
             {
-                if ((visited++ & 0xFFF) == 0) cancellationToken.ThrowIfCancellationRequested();
-                if (Matches(range, address, pattern)) matches.Add(((uint)address, (uint)(address + (uint)pattern.Length - 1)));
+                if ((completed & 0xFFF) == 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    progress?.Report((completed, total));
+                }
+                var meetsCursor = cursorAddress is null || (forward
+                    ? (inclusive ? address >= cursorAddress.Value : address > cursorAddress.Value)
+                    : (inclusive ? address <= cursorAddress.Value : address < cursorAddress.Value));
+                if (meetsCursor && Matches(range, address, pattern) &&
+                    (best is null || (forward ? address < best.Value : address > best.Value))) best = address;
+                completed++;
             }
         }
-        return matches;
+        cancellationToken.ThrowIfCancellationRequested();
+        progress?.Report((completed, total));
+        return best is ulong found
+            ? new FindSearchResult(true, (uint)found, (uint)(found + (uint)pattern.Length - 1))
+            : new FindSearchResult(true, null, null, "No match.");
     }
+
     public static FindSearchResult FindNext(MemoryImage image, string draft, FindPatternMode mode,
         uint? selectionStart, uint? selectionEnd, CancellationToken cancellationToken = default,
         IProgress<(ulong Completed, ulong Total)>? progress = null) =>
