@@ -47,7 +47,7 @@
                 <Separator />
                 <ui:MenuItem Header="Show ASCII" IsCheckable="True" IsChecked="{Binding ViewModel.ActiveShowAscii, Mode=TwoWay}" />
                 <ui:MenuItem Header="Go to address" Click="GoToAddressDialog_Click" InputGestureText="Ctrl+G" />
-                <ui:MenuItem Header="Find bytes..." Click="FindBytes_Click" InputGestureText="Ctrl+F" IsEnabled="{Binding ViewModel.ActiveIsEditor}" />
+                <ui:MenuItem Header="Find bytes..." Click="FindBytes_Click" InputGestureText="Ctrl+F" />
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Compare">

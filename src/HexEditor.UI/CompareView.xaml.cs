@@ -73,6 +73,13 @@ public partial class CompareView : UserControl
         return rowIndex >= 0;
     }
 
+    public void NavigateToFindMatch(ComparePanelSide side, uint start, uint end)
+    {
+        ViewModel.ClearFindMatch();
+        ViewModel.SetFindMatch(side == ComparePanelSide.Base, start, end);
+        Navigate(start);
+    }
+
     private void Panel_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (sender is not DataGrid grid || e.ClickCount is not (1 or 2)) return;

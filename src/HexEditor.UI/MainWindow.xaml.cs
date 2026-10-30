@@ -39,6 +39,7 @@ public partial class MainWindow : Window
     private FindPatternMode? _lastFindMode;
     private string? _lastFindDraft;
     private int _findGeneration;
+    private (ComparePanelSide Side, uint Start, uint End)? _compareFindMatch;
     private uint? _selectionStart;
     private uint? _selectionEnd;
     private bool _suppressSegmentNavigation;
@@ -726,7 +727,6 @@ public partial class MainWindow : Window
 
     private void FindBytes_Click(object sender, RoutedEventArgs e)
     {
-        if (!ViewModel.ActiveIsEditor) return;
         if (_findWindow is { IsVisible: true } existing)
         {
             existing.Activate();
@@ -744,6 +744,9 @@ public partial class MainWindow : Window
             CancelFind();
             _findWindow = null;
             ViewModel.ImageView.ClearFindMatch();
+            foreach (var compare in WorkspaceTabs.Items.OfType<TabItem>().Select(item => item.Content).OfType<CompareView>())
+                compare.ViewModel.ClearFindMatch();
+            _compareFindMatch = null;
         };
         _findWindow = window;
         window.Show();
@@ -755,7 +758,8 @@ public partial class MainWindow : Window
     private async void FindWindow_FindRequested(object? sender, FindRequestedEventArgs e)
     {
         var window = _findWindow;
-        if (!ViewModel.ActiveIsEditor) return;
+        var compareView = WorkspaceTabs.SelectedContent as CompareView;
+        if (!ViewModel.ActiveIsEditor && compareView is null) return;
         if (_findCancellation is not null)
         {
             CancelFind();
@@ -773,6 +777,7 @@ public partial class MainWindow : Window
         var generation = ++_findGeneration;
         var searchedDocument = ViewModel.Workspace.Document;
         var searchedImage = searchedDocument.CurrentImage;
+        var searchedCompare = compareView?.Workspace;
         window?.SetSearching(true);
         var progress = new InlineProgress<(ulong Completed, ulong Total)>(update =>
         {
@@ -785,12 +790,26 @@ public partial class MainWindow : Window
         });
         try
         {
-            var result = e.Forward
-                ? await ViewModel.Workspace.FindNextAsync(e.Draft, e.Mode, selectionStart, selectionEnd,
-                    cancellation.Token, progress)
-                : await ViewModel.Workspace.FindPreviousAsync(e.Draft, e.Mode, selectionStart, selectionEnd,
-                    cancellation.Token, progress);
-            await RunOnUiAsync(() => ApplyFindResult(window, e, result, searchedDocument, searchedImage, generation));
+            if (searchedCompare is not null)
+            {
+                var matches = await Task.Run(() =>
+                {
+                    var all = EditorFindSearch.FindAll(searchedCompare.Comparison.FileA, e.Draft, e.Mode, cancellation.Token)
+                        .Select(m => (Side: ComparePanelSide.Base, m.Start, m.End))
+                        .Concat(EditorFindSearch.FindAll(searchedCompare.Comparison.FileB, e.Draft, e.Mode, cancellation.Token)
+                            .Select(m => (Side: ComparePanelSide.Reference, m.Start, m.End)))
+                        .OrderBy(m => m.Start).ThenBy(m => m.Side).ToArray();
+                    return all;
+                }, cancellation.Token);
+                await RunOnUiAsync(() => ApplyCompareFindResult(window, e, matches, searchedCompare, generation));
+            }
+            else
+            {
+                var result = e.Forward
+                    ? await ViewModel.Workspace.FindNextAsync(e.Draft, e.Mode, selectionStart, selectionEnd, cancellation.Token, progress)
+                    : await ViewModel.Workspace.FindPreviousAsync(e.Draft, e.Mode, selectionStart, selectionEnd, cancellation.Token, progress);
+                await RunOnUiAsync(() => ApplyFindResult(window, e, result, searchedDocument, searchedImage, generation));
+            }
         }
         catch (OperationCanceledException)
         {
@@ -808,7 +827,7 @@ public partial class MainWindow : Window
 
     private void RepeatLastFind(bool previous)
     {
-        if (!ViewModel.ActiveIsEditor) return;
+        if (!ViewModel.ActiveIsEditor && WorkspaceTabs.SelectedContent is not CompareView) return;
         if (_findWindow is { IsVisible: true } window)
         {
             FindWindow_FindRequested(window, new FindRequestedEventArgs(window.Mode, window.CurrentDraft, !previous));
@@ -822,7 +841,30 @@ public partial class MainWindow : Window
     {
         CancelFind();
         ViewModel.ImageView.ClearFindMatch();
+        foreach (var compare in WorkspaceTabs.Items.OfType<TabItem>().Select(item => item.Content).OfType<CompareView>())
+            compare.ViewModel.ClearFindMatch();
+        _compareFindMatch = null;
         _findWindow?.SetStatus(status);
+    }
+
+    private void ApplyCompareFindResult(FindBytesWindow? window, FindRequestedEventArgs request,
+        (ComparePanelSide Side, uint Start, uint End)[] matches, CompareWorkspaceTabViewModel comparison, int generation)
+    {
+        if (generation != _findGeneration || !ReferenceEquals((WorkspaceTabs.SelectedContent as CompareView)?.Workspace, comparison)) return;
+        var validation = EditorFindSearch.FindNext(comparison.Comparison.FileA, request.Draft, request.Mode, null, null);
+        if (!validation.IsValidPattern) { SetFindStatus(window, validation.Message ?? "Invalid pattern."); return; }
+        _lastFindMode = request.Mode;
+        _lastFindDraft = request.Draft;
+        if (matches.Length == 0) { SetFindStatus(window, "No match."); return; }
+        var current = _compareFindMatch;
+        var result = current is null
+            ? (request.Forward ? matches[0] : matches[^1])
+            : request.Forward
+                ? matches.FirstOrDefault(m => m.Start > current.Value.Start || m.Start == current.Value.Start && m.Side > current.Value.Side, matches[0])
+                : matches.LastOrDefault(m => m.Start < current.Value.Start || m.Start == current.Value.Start && m.Side < current.Value.Side, matches[^1]);
+        _compareFindMatch = result;
+        (WorkspaceTabs.SelectedContent as CompareView)?.NavigateToFindMatch(result.Side, result.Start, result.End);
+        SetFindStatus(window, $"Found in {(result.Side == ComparePanelSide.Base ? "A" : "B")} at 0x{result.Start:X8}–0x{result.End:X8}.");
     }
 
     private void CancelFind()

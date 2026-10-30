@@ -12,13 +12,14 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     private readonly MemoryComparisonModel _comparison;
     private readonly ComparePanelRows _fileARows;
     private readonly ComparePanelRows _fileBRows;
+    private uint? _findStartA, _findEndA, _findStartB, _findEndB;
 
     public CompareViewModel(MemoryImage fileA, MemoryImage fileB, int bytesPerRow = 16, bool showAscii = true,
         CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null)
     {
         _comparison = new MemoryComparisonModel(fileA, fileB, bytesPerRow, showAscii, cancellationToken, progress);
-        _fileARows = new ComparePanelRows(_comparison, fileA: true);
-        _fileBRows = new ComparePanelRows(_comparison, fileA: false);
+        _fileARows = new ComparePanelRows(_comparison, this, fileA: true);
+        _fileBRows = new ComparePanelRows(_comparison, this, fileA: false);
         _comparison.RowsChanged += OnRowsChanged;
     }
 
@@ -32,6 +33,22 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     public bool ShowAscii { get => _comparison.ShowAscii; set => SetComparisonProperty(() => _comparison.ShowAscii = value, nameof(ShowAscii)); }
     public CompareViewMode ViewMode { get => _comparison.ViewMode; set => SetComparisonProperty(() => _comparison.ViewMode = value, nameof(ViewMode)); }
     public string ComparisonStatus => _comparison.ComparisonStatus;
+    internal uint? FindStartA => _findStartA;
+    internal uint? FindEndA => _findEndA;
+    internal uint? FindStartB => _findStartB;
+    internal uint? FindEndB => _findEndB;
+
+    public void SetFindMatch(bool fileA, uint start, uint end)
+    {
+        if (fileA) { _findStartA = start; _findEndA = end; }
+        else { _findStartB = start; _findEndB = end; }
+        _fileARows.RefreshFind(); _fileBRows.RefreshFind();
+    }
+    public void ClearFindMatch()
+    {
+        _findStartA = _findEndA = _findStartB = _findEndB = null;
+        _fileARows.RefreshFind(); _fileBRows.RefreshFind();
+    }
 
     public void SetAddressRange(uint start, uint end) => _comparison.SetAddressRange(start, end);
     public void Refresh(MemoryImage fileA, MemoryImage fileB)
@@ -68,11 +85,13 @@ public sealed class CompareViewModel : INotifyPropertyChanged
 internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotifyCollectionChanged
 {
     private readonly MemoryComparisonModel _comparison;
+    private readonly CompareViewModel _owner;
     private readonly bool _fileA;
 
-    public ComparePanelRows(MemoryComparisonModel comparison, bool fileA)
+    public ComparePanelRows(MemoryComparisonModel comparison, CompareViewModel owner, bool fileA)
     {
         _comparison = comparison;
+        _owner = owner;
         _fileA = fileA;
         _comparison.RowsChanged += (_, _) =>
         {
@@ -82,6 +101,11 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotif
     }
 
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
+    public void RefreshFind()
+    {
+        ClearCachedRows();
+        CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+    }
     public override int Count => _comparison.Rows.Count;
 
     protected override HexViewRow GetAt(int index)
@@ -90,6 +114,8 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotif
         if (row.IsGapMarker) return new HexViewRow(row.Address, string.Empty, null, true, row.GapDescription);
 
         var panel = _fileA ? row.FileA : row.FileB;
+        var findStart = _fileA ? _owner.FindStartA : _owner.FindStartB;
+        var findEnd = _fileA ? _owner.FindEndA : _owner.FindEndB;
         var cells = panel.Cells.Select(cell => new HexByteCell(
             cell.Hex,
             cell.Ascii,
@@ -100,7 +126,7 @@ internal sealed class ComparePanelRows : ReadOnlyListAdapter<HexViewRow>, INotif
                 CompareByteState.OnlyA => ByteHighlightState.OnlyInA,
                 CompareByteState.OnlyB => ByteHighlightState.OnlyInB,
                 _ => ByteHighlightState.None
-            })).ToArray();
+            }, cell.Address is uint address && findStart is uint start && findEnd is uint end && address >= start && address <= end)).ToArray();
         return new HexViewRow(row.Address, panel.HexData, panel.Ascii, false, null) { Cells = cells };
     }
 }
