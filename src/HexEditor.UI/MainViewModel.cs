@@ -185,7 +185,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshImage();
         RefreshEditorStatus();
         RefreshTitle();
-        StatusMessage = DescribeImage(preview.InputFormat) + (IsModified ? " | merged changes not saved" : string.Empty);
+        StatusMessage = DescribeImage(preview.InputFormat);
         Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata),
             nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
         if (!ReferenceEquals(previousImage, CurrentImage)) NotifyImageChanged(previousImage, CurrentImage);

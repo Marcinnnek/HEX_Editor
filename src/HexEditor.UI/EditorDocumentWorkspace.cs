@@ -133,14 +133,14 @@ public sealed class EditorDocumentWorkspace
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         using var stream = File.OpenRead(path);
-        return _files.PrepareImport(stream, Document.CurrentImage, path);
+        return _files.PrepareImport(stream, MemoryImage.Empty, path);
     }
 
     public Task<MemoryImageImportPreview> PrepareOpenAsync(string path, CancellationToken cancellationToken,
         IProgress<MemoryImageFileProgress>? progress)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        var currentImage = Document.CurrentImage;
+        var currentImage = MemoryImage.Empty;
         return Task.Run(() =>
         {
             using var stream = File.OpenRead(path);
@@ -164,8 +164,7 @@ public sealed class EditorDocumentWorkspace
         ArgumentNullException.ThrowIfNull(preview);
         var imported = preview.Apply(decision);
         if (imported is null) return false;
-        OpenImage(imported.Image, imported.SourcePath, imported.DetectedFormat, imported.FormatMetadata,
-            isModified: Document.CurrentImage.OccupiedByteCount > 0);
+        OpenImage(imported.Image, imported.SourcePath, imported.DetectedFormat, imported.FormatMetadata);
         return true;
     }
 
