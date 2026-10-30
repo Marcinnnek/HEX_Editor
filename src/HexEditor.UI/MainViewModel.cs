@@ -51,7 +51,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// <summary>The editable base image for the selected workspace tab.</summary>
     public EditorDocument ActiveDocument => _activeComparisonDocument ?? Workspace.Document;
     public MemoryImage ActiveImage => ActiveDocument.CurrentImage;
-    public bool ActiveHasImage => ActiveImage.Segments.Count > 0;
+    public bool ActiveHasImage => ActiveImage.OccupiedByteCount > 0;
     public bool ActiveIsEditor => _activeComparison is null;
     public bool ActiveCanSave => !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath) && ActiveDocument.SourceFormat is not null;
     public bool ActiveCanSaveAs => ActiveHasImage || !string.IsNullOrWhiteSpace(ActiveDocument.SourcePath);
@@ -59,7 +59,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ActiveHasSelection => _activeComparison is null && EditorStatus.SelectionLength > 0;
     public bool ActiveCanPaste => _activeComparison is null && ActiveHasSelection && Editing.HasClipboard;
     public bool ActiveCanRelocate => _activeComparison is null &&
-        (uint)_selectedSegmentIndex < (uint)ActiveImage.Segments.Count;
+        (uint)_selectedSegmentIndex < (uint)ActiveImage.Ranges.Count;
     public int SelectedSegmentIndex
     {
         get => _selectedSegmentIndex;
@@ -230,8 +230,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void DeleteRange(uint startAddress, uint endAddress) => Editing.DeleteRange(startAddress, endAddress);
     public (uint Start, uint End)? GetFillAllRegion()
     {
-        if (ActiveImage.Segments.Count == 0) return null;
-        return (ActiveImage.Segments.Min(segment => segment.StartAddress), ActiveImage.Segments.Max(segment => segment.EndAddress));
+        if (ActiveImage.Ranges.Count == 0) return null;
+        return (ActiveImage.Ranges[0].StartAddress, ActiveImage.Ranges[^1].EndAddress);
     }
     public void FillRange(uint startAddress, uint endAddress, IReadOnlyList<byte> pattern,
         FillPolicy policy = FillPolicy.KeepExisting) => Editing.FillRange(startAddress, endAddress, pattern, policy);
@@ -289,7 +289,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void CompleteSave(EditorDocument document)
     {
         if (ReferenceEquals(document, Workspace.Document)) RefreshTitle();
-        StatusMessage = $"Saved {document.CurrentImage.Segments.Sum(segment => (long)segment.ByteCount):N0} bytes as {document.SourceFormat}.";
+        StatusMessage = $"Saved {document.CurrentImage.OccupiedByteCount:N0} bytes as {document.SourceFormat}.";
         if (ReferenceEquals(document, Workspace.Document)) RefreshEditorStatus();
         Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified),
             nameof(ActiveCanSave), nameof(ActiveHasImage), nameof(ActiveCanCloseImage));
@@ -343,8 +343,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         EditorStatus.ClearSelection();
         ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii);
         Segments.Clear();
-        foreach (var (segment, index) in CurrentImage.Segments.OrderBy(segment => segment.StartAddress).Select((segment, index) => (segment, index)))
-            Segments.Add(new MemorySegmentRow(segment.StartAddress.ToString("X8"), segment.EndAddress.ToString("X8"), segment.ByteCount, index + 1));
+        foreach (var (range, index) in CurrentImage.Ranges.Select((range, index) => (range, index)))
+            Segments.Add(new MemorySegmentRow(range.StartAddress.ToString("X8"), range.EndAddress.ToString("X8"), checked((long)range.ByteCount), index + 1));
     }
 
     private void RefreshEditorStatus() => EditorStatus.UpdateImageState(SourceFormat, IsModified);
@@ -364,8 +364,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string DescribeImage(string? format)
     {
-        var totalBytes = CurrentImage.Segments.Sum(segment => (long)segment.ByteCount);
-        return $"{CurrentImage.Segments.Count:N0} segments, {totalBytes:N0} bytes" + (format is null ? string.Empty : $" | {format}");
+        return $"{CurrentImage.Ranges.Count:N0} segments, {CurrentImage.OccupiedByteCount:N0} bytes" + (format is null ? string.Empty : $" | {format}");
     }
 
     private void Raise(params string[] names)
@@ -382,7 +381,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
 }
 
-public sealed record MemorySegmentRow(string StartAddress, string EndAddress, int ByteCount, int Number = 0)
+public sealed record MemorySegmentRow(string StartAddress, string EndAddress, long ByteCount, int Number = 0)
 {
     public string ByteCountText => SegmentByteCountFormatter.Format(ByteCount);
     public string Description => SegmentBlockFormatter.Format(Number, StartAddress, EndAddress, ByteCount);

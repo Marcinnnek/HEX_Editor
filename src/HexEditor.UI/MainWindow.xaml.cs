@@ -242,7 +242,7 @@ public partial class MainWindow : Window
         try
         {
             var editorDocument = ViewModel.Workspace.Document;
-            var editorHasImage = editorDocument.CurrentImage.Segments.Count > 0;
+            var editorHasImage = editorDocument.CurrentImage.OccupiedByteCount > 0;
             string? destinationPath = null;
             string sourcePath;
             if (editorHasImage)
@@ -956,7 +956,7 @@ public partial class MainWindow : Window
     private void RelocateSegment_Click(object sender, RoutedEventArgs e)
     {
         var segmentIndex = SegmentsGrid.SelectedIndex;
-        if ((uint)segmentIndex >= (uint)ViewModel.CurrentImage.Segments.Count)
+        if ((uint)segmentIndex >= (uint)ViewModel.CurrentImage.Ranges.Count)
         {
             MessageBox.Show(this, "Select an occupied segment to relocate.", "No segment selected",
                 MessageBoxButton.OK, MessageBoxImage.Information);

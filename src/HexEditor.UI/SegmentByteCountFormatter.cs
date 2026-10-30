@@ -2,5 +2,5 @@ namespace HexEditor.UI;
 
 internal static class SegmentByteCountFormatter
 {
-    public static string Format(int byteCount) => $"0x{byteCount:X} = {byteCount}";
+    public static string Format(long byteCount) => $"0x{byteCount:X} = {byteCount}";
 }
