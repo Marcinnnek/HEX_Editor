@@ -68,7 +68,7 @@ public readonly record struct ByteGridLayout(double CharacterWidth, double LineH
 {
     public Size GetRowSize(int count, bool isAscii)
     {
-        var height = LineHeight * 1.2 + VerticalSpacing;
+        var height = LineHeight + VerticalSpacing;
         if (count <= 0) return new Size(0, height);
         var byteWidth = CharacterWidth * (isAscii ? 1 : 2);
         var spacing = isAscii ? 0 : HorizontalSpacing;
