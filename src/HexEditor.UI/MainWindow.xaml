@@ -92,14 +92,6 @@
                 <ui:Button Content="Relocate selected segment" Padding="8,4" Margin="8,0,0,0" Click="RelocateSegment_Click" />
             </WrapPanel>
             <WrapPanel VerticalAlignment="Center">
-                <TextBlock Text="Start" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <ui:TextBox x:Name="RangeStartInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,6,0" />
-                <TextBlock Text="End" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <ui:TextBox x:Name="RangeEndInput" Width="85" Text="00000000" VerticalContentAlignment="Center" Margin="0,0,8,0" />
-                <ui:Button Content="Select range" Click="SelectRange_Click" Padding="8,4" Margin="0,0,6,0" ToolTip="Select the inclusive address range above" />
-                <ui:TextBox x:Name="PatternInput" Width="130" ToolTip="Byte or repeating hexadecimal pattern, for example 00 FF" VerticalContentAlignment="Center" Margin="0,0,6,0" />
-                <ui:Button Content="Edit / Insert" Click="EditInsert_Click" Padding="8,4" Margin="0,0,4,0" />
-                <ui:Button Content="Fill" Click="Fill_Click" Padding="8,4" Margin="0,0,4,0" />
                 <ui:Button Content="Copy" Click="Copy_Click" Padding="8,4" Margin="0,0,4,0" />
                 <ui:Button Content="Cut" Click="Cut_Click" Padding="8,4" Margin="0,0,4,0" />
                 <ui:Button Content="Paste at Start" Click="Paste_Click" Padding="8,4" Margin="0,0,4,0" />
@@ -174,7 +166,16 @@
                     <local:HexViewControl Grid.Row="2" x:Name="HexRowsView"
                                           ItemsSource="{Binding ViewModel.ImageView.Rows}"
                                           ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
-                                          AddressRangeSelected="HexView_AddressRangeSelected" />
+                                          AddressRangeSelected="HexView_AddressRangeSelected">
+                        <local:HexViewControl.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Select Range..." Click="SelectRange_Click" />
+                                <Separator />
+                                <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" />
+                                <MenuItem Header="Fill Range..." Click="Fill_Click" />
+                            </ContextMenu>
+                        </local:HexViewControl.ContextMenu>
+                    </local:HexViewControl>
                 </Grid>
             </TabItem>
         </TabControl>
