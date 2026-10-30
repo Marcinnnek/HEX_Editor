@@ -26,9 +26,10 @@ namespace HexEditor.UI;
 public partial class MainWindow : Window
 {
     private readonly AppearanceSettings _appearanceSettings = new();
+    private readonly WindowsAppearanceSource _windowsAppearance;
+    private readonly AppearanceSession _appearanceSession;
     private readonly ExportSettings _exportSettings = new();
     private readonly UserDataDiagnostics _diagnostics = new();
-    private bool _watchingSystemTheme;
     private readonly ImageEditWorkflow _imageEdits;
     private readonly ChecksumWorkflow _checksums;
     private readonly ComparisonImageLoader _comparisonImageLoader;
@@ -50,8 +51,15 @@ public partial class MainWindow : Window
         HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         DataContext = this;
         Closing += MainWindow_Closing;
-        ApplicationThemeManager.Changed += (theme, _) => AppearancePalette.Apply(theme == ApplicationTheme.Dark);
-        Loaded += (_, _) => ApplyAppearance();
+        _windowsAppearance = new WindowsAppearanceSource(this);
+        _appearanceSession = new AppearanceSession(_appearanceSettings, _windowsAppearance);
+        _appearanceSession.ThemeChanged += _ => ApplyAppearance();
+        Loaded += (_, _) => _appearanceSession.Refresh();
+        Closed += (_, _) =>
+        {
+            _appearanceSession.Dispose();
+            _windowsAppearance.Dispose();
+        };
         ApplyAppearance();
     }
 
@@ -73,7 +81,7 @@ public partial class MainWindow : Window
     {
         try
         {
-            _appearanceSettings.SetMode(mode);
+            _appearanceSession.SetMode(mode);
             ApplyAppearance();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
@@ -86,32 +94,14 @@ public partial class MainWindow : Window
 
     private void ApplyAppearance()
     {
-        var mode = _appearanceSettings.Mode;
+        var mode = _appearanceSession.Mode;
         AutomaticAppearanceItem.IsChecked = mode == AppearanceMode.Automatic;
         LightAppearanceItem.IsChecked = mode == AppearanceMode.Light;
         DarkAppearanceItem.IsChecked = mode == AppearanceMode.Dark;
 
-        if (mode == AppearanceMode.Automatic)
-        {
-            ApplicationThemeManager.ApplySystemTheme();
-            if (IsLoaded && !_watchingSystemTheme)
-            {
-                SystemThemeWatcher.Watch(this, WindowBackdropType.None);
-                _watchingSystemTheme = true;
-            }
-        }
-        else
-        {
-            if (_watchingSystemTheme)
-            {
-                SystemThemeWatcher.UnWatch(this);
-                _watchingSystemTheme = false;
-            }
-            ApplicationThemeManager.Apply(mode == AppearanceMode.Light ? ApplicationTheme.Light : ApplicationTheme.Dark,
-                WindowBackdropType.None);
-        }
-        AppearancePalette.Apply(_appearanceSettings.GetEffectiveTheme(
-            ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark) == AppearanceMode.Dark);
+        var dark = _appearanceSession.EffectiveTheme == AppearanceMode.Dark;
+        ApplicationThemeManager.Apply(dark ? ApplicationTheme.Dark : ApplicationTheme.Light, WindowBackdropType.None);
+        AppearancePalette.Apply(dark);
     }
 
     public MainViewModel ViewModel { get; }
