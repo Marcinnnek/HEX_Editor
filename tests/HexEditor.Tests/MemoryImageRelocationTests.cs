@@ -26,6 +26,32 @@ public sealed class MemoryImageRelocationTests
     }
 
     [TestMethod]
+    public void MemoryImage_CanRepresentFullyOccupied32BitRangeWithoutMaterializingIt()
+    {
+        var image = MemoryImage.FromRepeatedRange(0x00000000, 0xFFFFFFFF, 0xA5);
+
+        Assert.AreEqual(4_294_967_296UL, image.OccupiedByteCount);
+        Assert.IsTrue(image.TryGetByte(0x00000000, out var first));
+        Assert.AreEqual((byte)0xA5, first);
+        Assert.IsTrue(image.TryGetByte(0x7FFFFFFF, out var middle));
+        Assert.AreEqual((byte)0xA5, middle);
+        Assert.IsTrue(image.TryGetByte(0xFFFFFFFF, out var last));
+        Assert.AreEqual((byte)0xA5, last);
+    }
+
+    [TestMethod]
+    public void MemoryImage_RepeatsRangePatternFromItsFirstAddress()
+    {
+        var image = MemoryImage.FromPatternRange(0xFFFFFFFE, 0xFFFFFFFF, [0x10, 0x20, 0x30]);
+
+        Assert.AreEqual(2UL, image.OccupiedByteCount);
+        Assert.IsTrue(image.TryGetByte(0xFFFFFFFE, out var first));
+        Assert.AreEqual((byte)0x10, first);
+        Assert.IsTrue(image.TryGetByte(0xFFFFFFFF, out var last));
+        Assert.AreEqual((byte)0x20, last);
+    }
+
+    [TestMethod]
     public void Relocation_ReportsOverlapsEvenWhenValuesAreIdenticalAndCanBeCancelled()
     {
         var image = MemoryImage.FromSegments(
