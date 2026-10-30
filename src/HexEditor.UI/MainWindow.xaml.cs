@@ -137,8 +137,9 @@ public partial class MainWindow : Window
         FileOperationText.Text = "Working...";
         var progress = new Progress<MemoryImageFileProgress>(update =>
         {
+            var unit = update.Stage.Contains("fill", StringComparison.OrdinalIgnoreCase) ? "addresses" : "bytes";
             FileOperationText.Text = update.Total is { } total
-                ? $"{update.Stage}: {update.Completed:N0} / {total:N0} bytes"
+                ? $"{update.Stage}: {update.Completed:N0} / {total:N0} {unit}"
                 : $"{update.Stage}: {update.Completed:N0}";
             FileOperationProgress.IsIndeterminate = update.Total is null or 0;
             if (update.Total is > 0)
@@ -573,16 +574,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Fill_Click(object sender, RoutedEventArgs e)
+    private async void Fill_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             var (start, end) = GetSelectionDefaults();
             var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end, ViewModel.GetFillAllRegion()) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
-            ViewModel.FillRange(input.Start, input.End, input.Pattern!, input.FillPolicy);
+            await RunFileOperationAsync((token, progress) => ViewModel.FillRangeAsync(
+                input.Start, input.End, input.Pattern!, input.FillPolicy, token, progress));
             Title = ViewModel.WindowTitle;
         }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Fill"); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
             RecordError("Fill", exception);
