@@ -9,6 +9,26 @@ public sealed record FindSearchResult(bool IsValidPattern, uint? MatchAddress, u
 /// <summary>Parses and searches byte sequences in an Editor memory image.</summary>
 public static class EditorFindSearch
 {
+    public static IReadOnlyList<(uint Start, uint End)> FindAll(MemoryImage image, string draft, FindPatternMode mode,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        if (!TryParse(draft, mode, out var pattern, out _)) return [];
+        var matches = new List<(uint Start, uint End)>();
+        ulong visited = 0;
+        foreach (var range in image.Ranges)
+        {
+            if ((ulong)range.EndAddress - range.StartAddress + 1 < (uint)pattern.Length) continue;
+            var last = (ulong)range.EndAddress + 1 - (uint)pattern.Length;
+            if ((ulong)range.StartAddress > last) continue;
+            for (var address = (ulong)range.StartAddress; address <= last; address++)
+            {
+                if ((visited++ & 0xFFF) == 0) cancellationToken.ThrowIfCancellationRequested();
+                if (Matches(range, address, pattern)) matches.Add(((uint)address, (uint)(address + (uint)pattern.Length - 1)));
+            }
+        }
+        return matches;
+    }
     public static FindSearchResult FindNext(MemoryImage image, string draft, FindPatternMode mode,
         uint? selectionStart, uint? selectionEnd, CancellationToken cancellationToken = default,
         IProgress<(ulong Completed, ulong Total)>? progress = null) =>

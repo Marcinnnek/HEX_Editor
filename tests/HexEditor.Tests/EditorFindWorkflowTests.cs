@@ -7,6 +7,15 @@ namespace HexEditor.Tests;
 public sealed class EditorFindWorkflowTests
 {
     [TestMethod]
+    public void Find_all_returns_overlapping_matches_in_address_order()
+    {
+        var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0xAA, 0xAA, 0xAA])]);
+
+        var matches = EditorFindSearch.FindAll(image, "AA AA", FindPatternMode.Hex);
+
+        CollectionAssert.AreEqual(new[] { (0x1000u, 0x1001u), (0x1001u, 0x1002u) }, matches.ToArray());
+    }
+    [TestMethod]
     public async Task Editor_find_matches_across_adjacent_ranges_but_stops_at_address_gaps()
     {
         var workspace = new EditorDocumentWorkspace();
