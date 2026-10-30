@@ -96,4 +96,33 @@ public sealed class MemoryImageRelocationTests
         Assert.IsTrue(viewModel.Redo());
         Assert.AreEqual("A0000000", viewModel.Segments[0].StartAddress);
     }
+
+    [TestMethod]
+    public void WorkspaceRelocation_IsAtomicReversibleAndCancellationKeepsDocumentState()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x10, 0x20]),
+            new MemorySegment(0x2001, [0x20])]);
+        var workspace = new EditorDocumentWorkspace();
+        workspace.OpenImage(image, null, null);
+
+        var preview = workspace.PrepareRelocation(0, 0x2000);
+        Assert.HasCount(1, preview.Overlaps, "Identical occupied bytes still require explicit approval.");
+        Assert.IsTrue(preview.Overlaps[0].ValuesAreIdentical);
+        Assert.IsFalse(workspace.ApplyRelocation(preview, RelocationOverlapDecision.Cancel));
+        Assert.AreSame(image, workspace.Document.CurrentImage);
+        Assert.IsFalse(workspace.Document.IsModified);
+
+        preview = workspace.PrepareRelocation(0, 0x3000);
+        Assert.IsTrue(workspace.ApplyRelocation(preview, RelocationOverlapDecision.Overwrite));
+        Assert.IsTrue(workspace.Document.IsModified);
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x3001, out var moved));
+        Assert.AreEqual((byte)0x20, moved);
+        Assert.IsTrue(workspace.Undo());
+        Assert.AreSame(image, workspace.Document.CurrentImage);
+        Assert.IsFalse(workspace.Document.IsModified);
+        Assert.IsTrue(workspace.Redo());
+        Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x3000, out var first));
+        Assert.AreEqual((byte)0x10, first);
+    }
 }
