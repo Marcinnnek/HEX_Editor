@@ -249,8 +249,7 @@ public partial class HexViewControl : UserControl
             FlowDirection.LeftToRight, new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, HexGrid.FontWeight, HexGrid.FontStretch), HexGrid.FontSize, Foreground,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
         var width = BytesPerRow * sample.WidthIncludingTrailingWhitespace + 12;
-        // The DataGrid reserves a three-DIP sorting glyph slot even without a sort indicator.
-        AsciiColumn.Width = new DataGridLength(Math.Max(0, width - 3));
+        AsciiColumn.Width = new DataGridLength(width);
         WindowedHeaderAsciiColumn.Width = new GridLength(width);
         foreach (var item in WindowRows)
         {

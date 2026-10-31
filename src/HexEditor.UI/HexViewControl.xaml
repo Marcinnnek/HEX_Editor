@@ -176,7 +176,7 @@
                     <DataTemplate>
                         <Grid>
                             <TextBlock Text="{Binding Address}" TextAlignment="Center" HorizontalAlignment="Stretch" />
-                            <TextBlock Text="{Binding GapDescription}" ToolTip="{Binding GapDescription}" FontStyle="Italic" TextAlignment="Left" TextTrimming="CharacterEllipsis" HorizontalAlignment="Stretch">
+                            <TextBlock Text="{Binding GapDescription}" ToolTip="{Binding GapDescription}" FontStyle="Italic" TextAlignment="Left" TextTrimming="CharacterEllipsis" HorizontalAlignment="Stretch" Margin="6,0,0,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed" />

@@ -11,6 +11,57 @@ namespace HexEditor.Tests;
 public sealed class OuterInsetRowSelectionAcceptanceTests
 {
     [TestMethod]
+    public void SelectingGapRowClearsByteRangeAndPreservesCurrentAddressInBothLayouts()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            MainWindow? main = null;
+            try
+            {
+                foreach (var windowed in new[] { false, true })
+                {
+                    main = new MainWindow();
+                    main.ViewModel.LoadImage(MemoryImage.FromSegments([
+                        new MemorySegment(0x1000, Enumerable.Range(0, 32).Select(value => (byte)value).ToArray()),
+                        new MemorySegment(0x1100, [0xA5])]), null, null);
+                    main.Show();
+                    main.UpdateLayout();
+                    var view = (HexViewControl)main.FindName("HexRowsView");
+                    view.UseWindowedScrolling = windowed;
+                    main.UpdateLayout();
+                    var firstRow = Descendants<HexByteRowControl>(view).First(control =>
+                        control.IsVisible && !control.IsAscii && control.Row?.Address == "00001000");
+                    Assert.IsTrue(view.SelectByteAt(firstRow, new Point(2, 4), extendSelection: false));
+                    Assert.IsTrue(view.SelectByteAt(firstRow, new Point(35, 4), extendSelection: true));
+                    Assert.AreEqual(4L, main.ViewModel.EditorStatus.SelectionLength);
+
+                    var gapIndex = Enumerable.Range(0, main.ViewModel.ImageView.Rows.Count)
+                        .First(index => main.ViewModel.ImageView.Rows[index].IsGapMarker);
+                    var gapRow = main.ViewModel.ImageView.Rows[gapIndex];
+                    view.ScrollToRow(gapIndex);
+                    main.UpdateLayout();
+                    RaiseAddressRowClick(view, gapRow, gapIndex);
+
+                    Assert.AreEqual(0x1000u, main.ViewModel.EditorStatus.CurrentAddress,
+                        "Selecting a gap must preserve the current occupied address.");
+                    Assert.AreEqual(1L, main.ViewModel.EditorStatus.SelectionLength,
+                        "Selecting a gap must collapse the previous multi-byte selection.");
+                    Assert.AreEqual(gapIndex, view.SelectedRowIndex);
+                    main.Close();
+                    main = null;
+                }
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { main?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void AsciiOuterInsetsSelectTheRowInBothLayoutsAndKeepByteCellsClickable()
     {
         Exception? failure = null;
@@ -194,6 +245,34 @@ public sealed class OuterInsetRowSelectionAcceptanceTests
         grid.ScrollIntoView(row);
         grid.UpdateLayout();
         var content = grid.Columns[columnIndex].GetCellContent(row);
+        Assert.IsNotNull(content);
+        var cell = Ancestor<DataGridCell>(content);
+        Assert.IsNotNull(cell);
+        grid.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            Source = cell
+        });
+    }
+
+    private static void RaiseAddressRowClick(HexViewControl view, HexViewRow row, int rowIndex)
+    {
+        if (view.UseWindowedScrolling)
+        {
+            var address = Descendants<HexRowAddressControl>(view).Single(control => control.IsVisible &&
+                control.Row?.IsGapMarker == row.IsGapMarker && control.Row?.GapDescription == row.GapDescription);
+            address.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+                System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+            {
+                RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+                Source = address
+            });
+            return;
+        }
+
+        var grid = view.ItemsGrid;
+        var content = grid.Columns[0].GetCellContent(grid.Items[rowIndex]);
         Assert.IsNotNull(content);
         var cell = Ancestor<DataGridCell>(content);
         Assert.IsNotNull(cell);

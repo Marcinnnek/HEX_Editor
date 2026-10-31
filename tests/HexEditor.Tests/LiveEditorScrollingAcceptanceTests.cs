@@ -95,8 +95,13 @@ public sealed class LiveEditorScrollingAcceptanceTests
                 Assert.IsGreaterThanOrEqualTo(2, asciiRows.Length);
                 Assert.AreEqual(asciiRows[0].DesiredSize.Width, asciiRows[1].DesiredSize.Width, 0.1,
                     "A short final row must retain the active row capacity width.");
-                Assert.AreEqual(asciiRows[0].DesiredSize.Width + 3, view.ItemsGrid.Columns[2].ActualWidth, 1,
-                    "The DataGrid ASCII column must match its capacity-sized row content.");
+                var sample = new FormattedText("0", System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight, new Typeface(view.ItemsGrid.FontFamily, view.ItemsGrid.FontStyle,
+                        view.ItemsGrid.FontWeight, view.ItemsGrid.FontStretch), view.ItemsGrid.FontSize,
+                    view.Foreground, VisualTreeHelper.GetDpi(view).PixelsPerDip);
+                var targetAsciiWidth = view.BytesPerRow * sample.WidthIncludingTrailingWhitespace + 12;
+                Assert.AreEqual(targetAsciiWidth, view.ItemsGrid.Columns[2].ActualWidth, 1,
+                    "The DataGrid ASCII column must use the calculated width, matching windowed layout.");
 
                 view.ShowAscii = false;
                 window.UpdateLayout();
@@ -109,6 +114,8 @@ public sealed class LiveEditorScrollingAcceptanceTests
                 Assert.IsTrue(asciiRows.Length > 0);
                 Assert.IsTrue(asciiRows.All(control => Math.Abs(control.DesiredSize.Width - asciiRows[0].DesiredSize.Width) < 0.1),
                     "Windowed rows, including a short final row, must use one ASCII width.");
+                Assert.AreEqual(targetAsciiWidth, asciiRows[0].DesiredSize.Width, 1,
+                    "The windowed ASCII column must use the same calculated width.");
                 view.ShowAscii = false;
                 window.UpdateLayout();
                 Assert.IsFalse(Descendants<HexByteRowControl>(view).Any(control => control.IsAscii && control.IsVisible));
