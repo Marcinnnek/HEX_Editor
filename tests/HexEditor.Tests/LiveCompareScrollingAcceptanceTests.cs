@@ -102,6 +102,62 @@ public sealed class LiveCompareScrollingAcceptanceTests
         Assert.IsLessThan(TimeSpan.FromMilliseconds(100), elapsed);
     }
 
+    [TestMethod]
+    public void ClickingVisibleCompareBytesKeepsBothViewportsAndTheSelectedAddress()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var baseImage = MemoryImage.FromPatternRange(0, 999_999, [0x12]);
+                var referenceImage = MemoryImage.FromPatternRange(0, 999_999, [0x34]);
+                var compare = new CompareView(new CompareWorkspaceTabViewModel(
+                    baseImage, referenceImage, "base.hex", "reference.hex"));
+                window = new Window { Content = compare, Width = 1280, Height = 800, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var left = (HexViewControl)compare.FindName("FileAView");
+                var right = (HexViewControl)compare.FindName("FileBView");
+                Assert.IsTrue(left.UseWindowedScrolling);
+                left.ScrollToRow(50);
+                Pump(window.Dispatcher);
+                Assert.AreEqual(50, right.FirstVisibleRowIndex);
+
+                var address = 54u * (uint)compare.ViewModel.BytesPerRow;
+                foreach (var (panel, side) in new[]
+                {
+                    (left, ComparePanelSide.Base),
+                    (right, ComparePanelSide.Reference)
+                })
+                {
+                    var row = Descendants<HexByteRowControl>(panel)
+                        .Single(item => !item.IsAscii && item.Row?.Address == address.ToString("X8"));
+                    Assert.IsTrue(panel.SelectByteAt(row, new Point(3, 3), extendSelection: false));
+                    Assert.AreEqual(50, left.FirstVisibleRowIndex);
+                    Assert.AreEqual(50, right.FirstVisibleRowIndex);
+                    Assert.AreEqual(side, compare.CurrentFindCursor?.Side);
+                    Assert.AreEqual(address, compare.CurrentFindCursor?.Address);
+                }
+
+                var next = Descendants<Wpf.Ui.Controls.Button>(compare)
+                    .Single(button => Equals(button.Content, "Next difference"));
+                next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                var addressBox = (Wpf.Ui.Controls.TextBox)compare.FindName("AddressBox");
+                Assert.AreEqual((address + 1).ToString("X8"), addressBox.Text);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     private static void RaiseWheel(HexViewControl panel)
     {
         var scroll = Descendants<ScrollViewer>(panel).Single(item => ScrollViewer.GetVerticalScrollBarVisibility(item) == ScrollBarVisibility.Disabled);

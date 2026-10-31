@@ -13,6 +13,7 @@ public partial class CompareView : UserControl
 {
     private bool _syncingScroll;
     private ComparePanelSide _lastSelectedSide = ComparePanelSide.Base;
+    private uint? _selectedByteAddress;
 
     public CompareView(CompareWorkspaceTabViewModel workspace)
     {
@@ -83,6 +84,7 @@ public partial class CompareView : UserControl
     public void NavigateToFindMatch(ComparePanelSide side, uint start, uint end)
     {
         _lastSelectedSide = side;
+        _selectedByteAddress = start;
         ViewModel.ClearFindMatch();
         ViewModel.SetFindMatch(side == ComparePanelSide.Base, start, end);
         AddressBox.Text = start.ToString("X8");
@@ -168,6 +170,7 @@ public partial class CompareView : UserControl
             MessageBox.Show(Window.GetWindow(this), "Enter an address in the displayed comparison range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+        _selectedByteAddress = address;
         SelectRow(rowIndex);
     }
 
@@ -223,6 +226,8 @@ public partial class CompareView : UserControl
 
     private uint? SelectedAddress()
     {
+        if (FileAView.UseWindowedScrolling && _selectedByteAddress is uint selectedByte)
+            return selectedByte;
         var selected = FileAView.UseWindowedScrolling && FileAView.WindowRows.Count > 0
             ? FileAView.WindowRows[0].Row : FileAView.ItemsGrid.SelectedItem as HexViewRow;
         if (selected is { } row && HexAddressParser.TryParse(row.Address, out var rowAddress))
@@ -237,6 +242,7 @@ public partial class CompareView : UserControl
 
     private void Navigate(uint address)
     {
+        _selectedByteAddress = address;
         AddressBox.Text = address.ToString("X8");
         if (ViewModel.TryNavigateToAddress(address, out var rowIndex)) SelectRow(rowIndex);
     }
@@ -314,7 +320,11 @@ public partial class CompareView : UserControl
     {
         var side = SideOf(sender!);
         _lastSelectedSide = side;
-        try { Navigate(e.EndAddress); }
+        try
+        {
+            _selectedByteAddress = e.EndAddress;
+            AddressBox.Text = e.EndAddress.ToString("X8");
+        }
         catch (Exception exception) { ReportInteractionFailure("single-click", side, -1, e.EndAddress, exception); }
     }
 
@@ -344,6 +354,7 @@ public partial class CompareView : UserControl
         if (_syncingScroll || sender is not HexViewControl source) return;
         try
         {
+            _selectedByteAddress = null;
             var target = ReferenceEquals(source, FileAView) ? FileBView : FileAView;
             _syncingScroll = true;
             target.ScrollToRow(source.FirstVisibleRowIndex);
