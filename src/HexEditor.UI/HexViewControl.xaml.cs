@@ -37,6 +37,9 @@ public partial class HexViewControl : UserControl
     public static readonly DependencyProperty ShowAsciiProperty = DependencyProperty.Register(
         nameof(ShowAscii), typeof(bool), typeof(HexViewControl), new PropertyMetadata(true, OnShowAsciiChanged));
 
+    public static readonly DependencyProperty BytesPerRowProperty = DependencyProperty.Register(
+        nameof(BytesPerRow), typeof(int), typeof(HexViewControl), new PropertyMetadata(16, OnBytesPerRowChanged));
+
     public static readonly DependencyProperty RowGapProperty = DependencyProperty.Register(
         nameof(RowGap), typeof(Thickness), typeof(HexViewControl), new PropertyMetadata(default(Thickness)));
 
@@ -50,6 +53,12 @@ public partial class HexViewControl : UserControl
     {
         get => (bool)GetValue(ShowAsciiProperty);
         set => SetValue(ShowAsciiProperty, value);
+    }
+
+    public int BytesPerRow
+    {
+        get => (int)GetValue(BytesPerRowProperty);
+        set => SetValue(BytesPerRowProperty, value);
     }
 
     public bool UseWindowedScrolling
@@ -123,6 +132,30 @@ public partial class HexViewControl : UserControl
             control.AsciiColumn.Visibility = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
             control.WindowedAsciiHeader.Visibility = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
             control.RefreshWindow();
+            control.UpdateAsciiColumnWidth();
+        }
+    }
+
+    private static void OnBytesPerRowChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
+    {
+        if (owner is HexViewControl control) control.UpdateAsciiColumnWidth();
+    }
+
+    private void UpdateAsciiColumnWidth()
+    {
+        if (!IsLoaded) return;
+        var sample = new FormattedText("0", System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight, new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, HexGrid.FontWeight, HexGrid.FontStretch), HexGrid.FontSize, Foreground,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var width = BytesPerRow * sample.WidthIncludingTrailingWhitespace + 12;
+        // The DataGrid reserves a three-DIP sorting glyph slot even without a sort indicator.
+        AsciiColumn.Width = new DataGridLength(Math.Max(0, width - 3));
+        WindowedHeaderAsciiColumn.Width = new GridLength(width);
+        foreach (var item in WindowRows)
+        {
+            var container = WindowedRows.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+            if (container?.FindName("WindowedRowAsciiColumn") is ColumnDefinition column)
+                column.Width = new GridLength(width);
         }
     }
 
@@ -219,6 +252,7 @@ public partial class HexViewControl : UserControl
     {
         UpdateAddressColumnWidth();
         RefreshWindow();
+        UpdateAsciiColumnWidth();
     }
 
     private void UpdateAddressColumnWidth()

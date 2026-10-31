@@ -11,6 +11,19 @@ namespace HexEditor.Tests;
 public sealed class GridSpacingSettingsTests
 {
     [TestMethod]
+    public void AsciiGeometryIncludesSixUnitInsetsAndStartsCharactersAfterTheLeftInset()
+    {
+        var layout = new ByteGridLayout(8, 16, 3, 0);
+
+        Assert.AreEqual(76d, layout.GetRowSize(8, isAscii: true).Width);
+        Assert.AreEqual(6d, layout.GetByteBounds(0, isAscii: true).Left);
+        Assert.AreEqual(70d, layout.GetByteBounds(7, isAscii: true).Right);
+        Assert.IsFalse(layout.TryGetByteIndexAt(new Point(5.9, 1), 8, isAscii: true, out _));
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(6, 1), 8, isAscii: true, out var index));
+        Assert.AreEqual(0, index);
+    }
+
+    [TestMethod]
     public void NewProfileUsesTighterGridDefaults()
     {
         var settings = new GridSpacingSettings(Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json"));

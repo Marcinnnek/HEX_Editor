@@ -131,6 +131,7 @@
                                           ItemsSource="{Binding ViewModel.ImageView.Rows}"
                                           UseWindowedScrolling="True"
                                           ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
+                                          BytesPerRow="{Binding ViewModel.ActiveBytesPerRow}"
                                           AddressRangeSelected="HexView_AddressRangeSelected">
                         <local:HexViewControl.ContextMenu>
                             <ContextMenu>

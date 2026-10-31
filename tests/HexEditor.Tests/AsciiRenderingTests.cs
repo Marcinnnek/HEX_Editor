@@ -29,9 +29,9 @@ public sealed class AsciiRenderingTests
         ascii.InvalidateVisual();
         var dark = Render(ascii);
 
-        var byteWidth = (int)(ascii.DesiredSize.Width / row.Cells.Count);
-        var unchangedX = 1;
-        var changedX = byteWidth + 1;
+        var byteWidth = (int)((ascii.DesiredSize.Width - 12) / row.Cells.Count);
+        var unchangedX = 7;
+        var changedX = byteWidth + 7;
         Assert.IsGreaterThan((byte)0, light.AlphaAt(unchangedX, 1));
         Assert.IsGreaterThan(light.AlphaAt(unchangedX, 1), light.AlphaAt(changedX, 1));
         Assert.IsGreaterThan(dark.AlphaAt(unchangedX, 1), dark.AlphaAt(changedX, 1));
