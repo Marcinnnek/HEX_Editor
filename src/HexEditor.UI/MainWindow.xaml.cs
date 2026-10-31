@@ -400,6 +400,8 @@ public partial class MainWindow : Window
         try
         {
             if (document.SourcePath is null || document.SourceFormat is null) { await TrySaveAsAsync(document); return; }
+            if (!_files.ConfirmSaveFormat(document, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
+                    mismatch.Message, "Filename format mismatch"))) return;
             await RunFileOperationAsync((token, progress) => document.SaveAsync(token, progress));
             RefreshSavedDocumentTabs(document);
             InvalidateFind("Image saved. Search again.");
@@ -777,6 +779,8 @@ public partial class MainWindow : Window
         if (document.SourcePath is null || document.SourceFormat is null) return TrySaveAs(document);
         try
         {
+            if (!_files.ConfirmSaveFormat(document, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
+                    mismatch.Message, "Filename format mismatch"))) return false;
             document.Save();
             RefreshSavedDocumentTabs(document);
             return true;

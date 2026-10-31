@@ -241,6 +241,70 @@ public sealed class CompareCurrentImageWorkflowTests
     }
 
     [TestMethod]
+    public void SaveFormatMismatchRequiresConfirmationWithoutSavingOnCancel()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"save-mismatch-{Guid.NewGuid():N}.hex");
+        File.WriteAllText(path, "S1051234AABB4F\nS9030000FC\n");
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.Workspace.Open(path, OverlapDecision.OverwriteIncoming);
+            viewModel.EditByte(0x1234, 0xCC, OverlapDecision.OverwriteIncoming);
+            var document = viewModel.Workspace.Document;
+            var originalContents = File.ReadAllText(path);
+            MemoryImageFormatMismatch? shown = null;
+
+            var accepted = new MemoryImageFileWorkflow(viewModel).ConfirmSaveFormat(document, mismatch =>
+            {
+                shown = mismatch;
+                return false;
+            });
+
+            Assert.IsFalse(accepted);
+            Assert.IsNotNull(shown);
+            Assert.AreEqual(Path.GetFileName(path), shown.FileName);
+            Assert.AreEqual(MemoryImageExportFormat.IntelHex, shown.ExpectedFormat);
+            Assert.AreEqual(MemoryImageExportFormat.SRecord, shown.DetectedFormat);
+            Assert.IsTrue(document.IsModified);
+            Assert.AreEqual(originalContents, File.ReadAllText(path));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [TestMethod]
+    public void SaveFormatMismatchCanBeAcceptedAndMatchingExtensionDoesNotPrompt()
+    {
+        var mismatchPath = Path.Combine(Path.GetTempPath(), $"save-mismatch-{Guid.NewGuid():N}.hex");
+        var matchingPath = CreateImageFile(0x22);
+        File.WriteAllText(mismatchPath, "S1051234AABB4F\nS9030000FC\n");
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.Workspace.Open(mismatchPath, OverlapDecision.OverwriteIncoming);
+            var document = viewModel.Workspace.Document;
+            var workflow = new MemoryImageFileWorkflow(viewModel);
+            var promptCount = 0;
+
+            Assert.IsTrue(workflow.ConfirmSaveFormat(document, _ => { promptCount++; return true; }));
+            Assert.AreEqual(1, promptCount);
+            Assert.IsTrue(workflow.ConfirmSaveFormat(document, _ => { promptCount++; return true; }));
+            Assert.AreEqual(2, promptCount, "Every Save attempt must ask again after Save anyway was chosen before.");
+            document.Save();
+            Assert.IsFalse(document.IsModified);
+            Assert.IsTrue(File.ReadAllText(mismatchPath).StartsWith("S1", StringComparison.Ordinal));
+
+            viewModel.Workspace.Open(matchingPath, OverlapDecision.OverwriteIncoming);
+            Assert.IsTrue(workflow.ConfirmSaveFormat(viewModel.Workspace.Document, _ =>
+            {
+                promptCount++;
+                return false;
+            }));
+            Assert.AreEqual(2, promptCount);
+        }
+        finally { File.Delete(mismatchPath); File.Delete(matchingPath); }
+    }
+
+    [TestMethod]
     public void MergeFormatMismatchAllowsContinuingWhenUserAcceptsDetectedFormat()
     {
         var viewModel = new MainViewModel();
