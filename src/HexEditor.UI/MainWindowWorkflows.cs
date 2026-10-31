@@ -150,6 +150,15 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
         return mismatch is null || confirmMismatch(mismatch);
     }
 
+    public bool ConfirmSaveAsFormat(string path, MemoryImageExportFormat format,
+        Func<MemoryImageFormatMismatch, bool> confirmMismatch)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(confirmMismatch);
+        var mismatch = MemoryImageFormatClassifier.GetExtensionMismatch(path, format);
+        return mismatch is null || confirmMismatch(mismatch);
+    }
+
     public bool ConfirmMergeFormats(LoadedMemoryImage destination, LoadedMemoryImage source,
         Func<MemoryImageFormatMismatch, bool> confirmMismatch)
     {

@@ -529,6 +529,9 @@ public partial class MainWindow : Window
     private async Task<bool> TrySaveAsAsync(EditorDocument document)
     {
         if (!TryGetSaveAsSelection(document, out var selection)) return false;
+        if (!_files.ConfirmSaveAsFormat(selection.Path, selection.Format, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
+                $"The destination '{mismatch.FileName}' has an extension associated with {mismatch.ExpectedFormat.GetDisplayName()}, " +
+                $"but the selected output format is {mismatch.DetectedFormat.GetDisplayName()}.", "Save As format mismatch"))) return false;
         try
         {
             await RunFileOperationAsync((token, progress) => document.SaveAsAsync(selection.Path, selection.Format, selection.Overwrite,
@@ -550,6 +553,9 @@ public partial class MainWindow : Window
     private bool TrySaveAs(EditorDocument document)
     {
         if (!TryGetSaveAsSelection(document, out var selection)) return false;
+        if (!_files.ConfirmSaveAsFormat(selection.Path, selection.Format, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
+                $"The destination '{mismatch.FileName}' has an extension associated with {mismatch.ExpectedFormat.GetDisplayName()}, " +
+                $"but the selected output format is {mismatch.DetectedFormat.GetDisplayName()}.", "Save As format mismatch"))) return false;
         try
         {
             document.SaveAs(selection.Path, selection.Format, selection.Overwrite);
