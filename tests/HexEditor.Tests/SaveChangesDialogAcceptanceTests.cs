@@ -82,6 +82,55 @@ public sealed class SaveChangesDialogAcceptanceTests
         Assert.AreEqual(typeof(Window), messageBoxType.BaseType);
     }
 
+    [TestMethod]
+    public void Export_format_warning_names_the_output_and_cancel_is_available()
+    {
+        Exception? failure = null;
+        var canceled = true;
+        var thread = new Thread(() =>
+        {
+            Application? application = null;
+            Window? owner = null;
+            DispatcherTimer? timer = null;
+            try
+            {
+                application = new Application();
+                owner = new Window { Width = 500, Height = 300, ShowInTaskbar = false };
+                owner.Show();
+                timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+                timer.Tick += (_, _) =>
+                {
+                    var dialog = application.Windows.OfType<Window>().FirstOrDefault(window =>
+                        !ReferenceEquals(window, owner) && window.Title == "Export format mismatch");
+                    if (dialog is null) return;
+                    timer.Stop();
+                    dialog.UpdateLayout();
+                    var content = (DependencyObject)dialog.Content;
+                    Assert.IsTrue(FindChildren<TextBlock>(content).Any(text => text.Text.Contains("firmware.srec") &&
+                        text.Text.Contains("Intel HEX") && text.Text.Contains("Motorola S-Record")));
+                    var buttons = FindChildren<Button>(content).ToArray();
+                    CollectionAssert.AreEqual(new[] { "Save anyway", "Cancel" },
+                        buttons.Select(button => button.Content?.ToString()).ToArray());
+                    Assert.IsTrue(buttons[1].IsCancel);
+                    buttons[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                };
+                timer.Start();
+                var messageBoxType = typeof(SaveChangesDialog).Assembly.GetType("HexEditor.UI.ThemedMessageBox", throwOnError: true)!;
+                var show = messageBoxType.GetMethod("ShowSaveAnyway", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)!;
+                canceled = !(bool)show.Invoke(null, [owner,
+                    "The file 'firmware.srec' has an extension associated with Motorola S-Record, but its content is Intel HEX.",
+                    "Export format mismatch"])!;
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { timer?.Stop(); owner?.Close(); application?.Shutdown(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        Assert.IsTrue(canceled);
+    }
+
     private static MessageBoxResult ShowAndDismiss(bool escape)
     {
         MessageBoxResult result = MessageBoxResult.None;
