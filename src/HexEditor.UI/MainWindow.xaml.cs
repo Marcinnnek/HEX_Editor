@@ -226,7 +226,8 @@ public partial class MainWindow : Window
                 {
                     WorkspaceTabs.SelectedIndex = 0;
                     Title = ViewModel.WindowTitle;
-                }, token, progress, baseDocument));
+                }, token, progress, baseDocument,
+                mismatch => ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch")));
             if (comparison is null) return;
 
             var view = new CompareView(comparison);

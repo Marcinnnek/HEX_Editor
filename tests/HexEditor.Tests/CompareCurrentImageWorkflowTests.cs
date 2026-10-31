@@ -137,6 +137,87 @@ public sealed class CompareCurrentImageWorkflowTests
     }
 
     [TestMethod]
+    public async Task MismatchedReferenceCanBeCancelledWithoutChangingTheCurrentDocument()
+    {
+        var basePath = CreateImageFile(0x10);
+        var referencePath = CreateImageFile(0x20);
+        var mismatchPath = Path.ChangeExtension(referencePath, ".srec");
+        File.Move(referencePath, mismatchPath);
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.Workspace.Open(basePath, OverlapDecision.OverwriteIncoming);
+            viewModel.EditByte(0x1000, 0x30, OverlapDecision.OverwriteIncoming);
+            var document = viewModel.Workspace.Document;
+            MemoryImageFormatMismatch? prompted = null;
+
+            var comparison = await new CompareCurrentImageWorkflow(viewModel).StartAsync(
+                (_, _) => mismatchPath, () => Assert.Fail(), CancellationToken.None, null,
+                confirmMismatch: mismatch => { prompted = mismatch; return false; });
+
+            Assert.IsNull(comparison);
+            Assert.IsNotNull(prompted);
+            Assert.AreEqual(Path.GetFileName(mismatchPath), prompted!.FileName);
+            Assert.AreSame(document, viewModel.Workspace.Document);
+            Assert.IsTrue(document.IsModified);
+            Assert.AreEqual(0, viewModel.Workspace.ComparisonViews.Count);
+        }
+        finally { File.Delete(basePath); File.Delete(mismatchPath); }
+    }
+
+    [TestMethod]
+    public async Task MismatchedNewBaseCanBeCancelledBeforeOpeningIt()
+    {
+        var sourcePath = CreateImageFile(0x10);
+        var mismatchPath = Path.ChangeExtension(sourcePath, ".s19");
+        File.Move(sourcePath, mismatchPath);
+        try
+        {
+            var viewModel = new MainViewModel();
+            var originalDocument = viewModel.Workspace.Document;
+            MemoryImageFormatMismatch? prompted = null;
+
+            var comparison = await new CompareCurrentImageWorkflow(viewModel).StartAsync(
+                (_, _) => mismatchPath, () => Assert.Fail(), CancellationToken.None, null,
+                confirmMismatch: mismatch => { prompted = mismatch; return false; });
+
+            Assert.IsNull(comparison);
+            Assert.IsNotNull(prompted);
+            Assert.AreSame(originalDocument, viewModel.Workspace.Document);
+            Assert.IsNull(viewModel.SourcePath);
+        }
+        finally { File.Delete(mismatchPath); }
+    }
+
+    [TestMethod]
+    public async Task OpenAnywayUsesDetectedFormatForMismatchedReference()
+    {
+        var basePath = CreateImageFile(0x10);
+        var referencePath = CreateImageFile(0x20);
+        var mismatchPath = Path.ChangeExtension(referencePath, ".s28");
+        File.Move(referencePath, mismatchPath);
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.Workspace.Open(basePath, OverlapDecision.OverwriteIncoming);
+
+            var comparison = await new CompareCurrentImageWorkflow(viewModel).StartAsync(
+                (_, _) => mismatchPath, () => Assert.Fail(), CancellationToken.None, null,
+                confirmMismatch: mismatch =>
+                {
+                    Assert.AreEqual(MemoryImageExportFormat.SRecord, mismatch.ExpectedFormat);
+                    Assert.AreEqual(MemoryImageExportFormat.IntelHex, mismatch.DetectedFormat);
+                    return true;
+                });
+
+            Assert.IsNotNull(comparison);
+            Assert.AreEqual(Path.GetFileName(mismatchPath), comparison!.NameB);
+            Assert.AreEqual((byte)0x20, ReadByte(comparison.Comparison.FileB, 0x1000));
+        }
+        finally { File.Delete(basePath); File.Delete(mismatchPath); }
+    }
+
+    [TestMethod]
     public async Task CompareFromCompareUsesSameBaseDocumentAndEachReferenceKeepsLiveSharedEdits()
     {
         var basePath = CreateImageFile(0x10);
