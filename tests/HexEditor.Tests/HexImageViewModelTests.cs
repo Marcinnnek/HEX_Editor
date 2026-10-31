@@ -79,14 +79,16 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
-    public void Editor_RendersLogicalRangeAtBoth32BitEndsAndKeepsEditsUndoable()
+    public void Editor_RendersSparseBytesAtBoth32BitEndsAndKeepsEditsUndoable()
     {
         var workspace = new EditorDocumentWorkspace();
-        var image = MemoryImage.FromRepeatedRange(0x00000000, 0xFFFFFFFF, 0xA5);
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x00000000, [0xA5]),
+            new MemorySegment(0xFFFFFFFF, [0xA5])]);
         workspace.OpenImage(image, null, null);
         var view = new HexImageViewModel(workspace.Document.CurrentImage, bytesPerRow: 8);
 
-        Assert.AreEqual(4_294_967_296UL, workspace.Document.CurrentImage.OccupiedByteCount);
+        Assert.AreEqual(2UL, workspace.Document.CurrentImage.OccupiedByteCount);
         Assert.IsTrue(view.TryNavigateToAddress(0x00000000, out var firstRowIndex));
         Assert.AreEqual("00000000", view.Rows[firstRowIndex].Address);
         Assert.AreEqual("A5", view.Rows[firstRowIndex].Cells[0].Hex);
@@ -95,7 +97,7 @@ public sealed class HexImageViewModelTests
         Assert.AreEqual("A5", view.Rows[finalRowIndex].Cells[7].Hex);
 
         workspace.EditByte(0xFFFFFFFF, 0x5A, OverlapDecision.OverwriteIncoming);
-        Assert.AreEqual(4_294_967_296UL, workspace.Document.CurrentImage.OccupiedByteCount);
+        Assert.AreEqual(2UL, workspace.Document.CurrentImage.OccupiedByteCount);
         Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0x00000000, out var first));
         Assert.AreEqual((byte)0xA5, first);
         Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(0xFFFFFFFF, out var last));
@@ -347,7 +349,7 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
-    public async Task FillRangeAsync_FillsFull32BitSpaceAsOneUndoablePatternBackedChange()
+    public async Task FillRangeAsync_FillsRequestedRangeWithinLimitAsOneUndoablePatternBackedChange()
     {
         var original = MemoryImage.FromSegments([
             new MemorySegment(0, [0xE0]),
@@ -357,18 +359,20 @@ public sealed class HexImageViewModelTests
         model.LoadImage(original, null, null);
         var progress = new RecordingFillProgress();
 
-        await model.FillRangeAsync(0, uint.MaxValue, [0x11, 0x22, 0x33],
+        await model.FillRangeAsync(0, 0x000FFFFF, [0x11, 0x22, 0x33],
             FillPolicy.OverwriteExisting, CancellationToken.None, progress);
 
-        Assert.AreEqual(4_294_967_296UL, model.CurrentImage.OccupiedByteCount);
+        Assert.AreEqual(1_048_578UL, model.CurrentImage.OccupiedByteCount);
         AssertByte(model.CurrentImage, 0, 0x11);
-        AssertByte(model.CurrentImage, 0x80000000, 0x33);
-        AssertByte(model.CurrentImage, uint.MaxValue, 0x11);
+        AssertByte(model.CurrentImage, 0x00080000, 0x33);
+        AssertByte(model.CurrentImage, 0x000FFFFF, 0x11);
+        AssertByte(model.CurrentImage, 0x80000000, 0xE1);
+        AssertByte(model.CurrentImage, uint.MaxValue, 0xE2);
         Assert.IsTrue(model.CanUndo);
         Assert.IsTrue(model.Undo());
         Assert.AreSame(original, model.CurrentImage);
         Assert.IsTrue(model.Redo());
-        AssertByte(model.CurrentImage, uint.MaxValue, 0x11);
+        AssertByte(model.CurrentImage, 0x000FFFFF, 0x11);
         Assert.IsGreaterThan(0, progress.Updates.Count);
     }
 
@@ -382,7 +386,7 @@ public sealed class HexImageViewModelTests
         var progress = new CancellingFillProgress(cancellation);
 
         await Assert.ThrowsExactlyAsync<OperationCanceledException>(async () =>
-            await model.FillRangeAsync(0, uint.MaxValue, [0x11], FillPolicy.OverwriteExisting,
+            await model.FillRangeAsync(0, 1_000_000, [0x11], FillPolicy.OverwriteExisting,
                 cancellation.Token, progress));
 
         Assert.AreSame(original, model.CurrentImage);

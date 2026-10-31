@@ -269,10 +269,18 @@ public partial class CompareView : UserControl
                 FileAView.ItemsGrid.SelectedIndex = index;
                 FileBView.ItemsGrid.SelectedIndex = index;
             }
-            FileAView.ScrollToMatch(index);
-            FileBView.ScrollToMatch(index);
+            FileAView.ScrollToMatch(CompareFindScrollIndex(FileAView, index));
+            FileBView.ScrollToMatch(CompareFindScrollIndex(FileBView, index));
         }
         finally { _syncingScroll = false; }
+    }
+
+    private int CompareFindScrollIndex(HexViewControl view, int matchIndex)
+    {
+        if (view.UseWindowedScrolling) return matchIndex;
+        // The stock DataGrid exposes a one-row sliver before an exact logical item offset.
+        // Offset the requested item so the match itself is the first rendered row.
+        return Math.Min(matchIndex + 1, ViewModel.FileARows.Count - 1);
     }
 
     private void Panel_SelectionChanged(object sender, SelectionChangedEventArgs e)
