@@ -30,6 +30,10 @@ public sealed class EditorSegmentListLayoutTests
                 var blocks = (ListBox)window.FindName("SegmentsGrid");
                 var group = (GroupBox)LogicalTreeHelper.GetParent(blocks);
                 Assert.AreEqual("editor.hex", group.Header);
+                var editorLayout = (Grid)group.Parent;
+                Assert.AreEqual(2, editorLayout.RowDefinitions.Count);
+                Assert.IsFalse(editorLayout.Children.OfType<GridSplitter>().Any(),
+                    "The block list must not leave a resizable empty row above the editor.");
                 Assert.AreEqual(SelectionMode.Extended, blocks.SelectionMode);
                 Assert.AreEqual(ScrollBarVisibility.Auto, ScrollViewer.GetVerticalScrollBarVisibility(blocks));
                 var horizontalScroll = Descendants<ScrollViewer>(blocks).Single();
