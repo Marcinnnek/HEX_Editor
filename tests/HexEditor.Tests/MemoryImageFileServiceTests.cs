@@ -16,6 +16,9 @@ public sealed class MemoryImageFileServiceTests
         var preview = new MemoryImageFileService().PrepareImport(stream, sourcePath: "misleading.hex");
         var result = preview.Apply(OverlapDecision.OverwriteIncoming)!;
 
+        Assert.IsNotNull(preview.FormatMismatch);
+        Assert.AreEqual(MemoryImageExportFormat.IntelHex, preview.FormatMismatch!.ExpectedFormat);
+        Assert.AreEqual(MemoryImageExportFormat.SRecord, preview.FormatMismatch.DetectedFormat);
         Assert.AreEqual("Motorola S-Record", result.InputFormat);
         Assert.AreEqual(MemoryImageExportFormat.SRecord, result.DetectedFormat);
         Assert.AreEqual("misleading.hex", result.SourcePath);
@@ -23,6 +26,55 @@ public sealed class MemoryImageFileServiceTests
         Assert.AreEqual((byte)0xAA, first);
         Assert.IsTrue(result.Image.TryGetByte(0x1235, out var second));
         Assert.AreEqual((byte)0xBB, second);
+    }
+
+    [TestMethod]
+    public void Import_DetectsIntelHexContentAndDoesNotWarnForMatchingOrUnknownExtensions()
+    {
+        const string intelHex = ":0100100010DF\n:00000001FF\n";
+        foreach (var (path, expectedMismatch) in new[]
+                 {
+                     ("firmware.srec", true),
+                     ("firmware.HEX", false),
+                     ("firmware.custom", false)
+                 })
+        {
+            using var stream = new MemoryStream(Encoding.ASCII.GetBytes(intelHex));
+            var preview = new MemoryImageFileService().PrepareImport(stream, sourcePath: path);
+            Assert.AreEqual(MemoryImageExportFormat.IntelHex, preview.DetectedFormat);
+            Assert.AreEqual(expectedMismatch, preview.FormatMismatch is not null, path);
+        }
+    }
+
+    [TestMethod]
+    [DataRow("firmware.HEX", MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord)]
+    [DataRow("firmware.ihx", MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord)]
+    [DataRow("firmware.S19", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.s28", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.s37", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.srec", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.mot", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    public void Import_ReportsKnownExtensionMismatchAfterParsing(string path,
+        MemoryImageExportFormat expected, MemoryImageExportFormat detected)
+    {
+        var mismatch = MemoryImageFormatClassifier.GetExtensionMismatch(path, detected);
+
+        Assert.IsNotNull(mismatch);
+        Assert.AreEqual(Path.GetFileName(path), mismatch!.FileName);
+        Assert.AreEqual(expected, mismatch.ExpectedFormat);
+        Assert.AreEqual(detected, mismatch.DetectedFormat);
+        StringAssert.Contains(mismatch.Message, expected.GetDisplayName());
+        StringAssert.Contains(mismatch.Message, detected.GetDisplayName());
+    }
+
+    [TestMethod]
+    [DataRow("firmware.hex", MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.srec", MemoryImageExportFormat.SRecord)]
+    [DataRow("firmware.custom", MemoryImageExportFormat.IntelHex)]
+    [DataRow(null, MemoryImageExportFormat.SRecord)]
+    public void Import_DoesNotReportMatchingOrUnknownExtension(string? path, MemoryImageExportFormat detected)
+    {
+        Assert.IsNull(MemoryImageFormatClassifier.GetExtensionMismatch(path, detected));
     }
 
     [TestMethod]

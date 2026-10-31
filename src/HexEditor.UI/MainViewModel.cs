@@ -211,6 +211,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!ReferenceEquals(previousImage, CurrentImage)) NotifyImageChanged(previousImage, CurrentImage);
     }
 
+    public bool ApplyOpenImport(MemoryImageImportPreview preview, Func<MemoryImageFormatMismatch, bool> confirmMismatch)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        ArgumentNullException.ThrowIfNull(confirmMismatch);
+        if (preview.FormatMismatch is { } mismatch && !confirmMismatch(mismatch)) return false;
+        ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+        return true;
+    }
+
     public void LoadImage(MemoryImage image, string? sourcePath, MemoryImageExportFormat? format)
     {
         ArgumentNullException.ThrowIfNull(image);

@@ -375,7 +375,9 @@ public partial class MainWindow : Window
         try
         {
             var preview = await LoadOpenReplacementAsync(dialog.FileName);
-            ViewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+            if (!ViewModel.ApplyOpenImport(preview, mismatch =>
+                    ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch")))
+                return;
             CloseDocumentViews(replacedDocument);
             ViewModel.ActivateEditor();
             Title = ViewModel.WindowTitle;

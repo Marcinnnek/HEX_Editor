@@ -9,7 +9,8 @@ internal sealed class ThemedMessageBox : Window
 {
     private MessageBoxResult _result = MessageBoxResult.Cancel;
 
-    private ThemedMessageBox(Window? owner, string message, string title, MessageBoxButton buttons)
+    private ThemedMessageBox(Window? owner, string message, string title, MessageBoxButton buttons,
+        string? yesLabel = null, string? noLabel = null)
     {
         Title = title;
         Owner = owner;
@@ -36,8 +37,8 @@ internal sealed class ThemedMessageBox : Window
                 AddButton(actions, "Cancel", MessageBoxResult.Cancel, isCancel: true);
                 break;
             case MessageBoxButton.YesNo:
-                AddButton(actions, "Yes", MessageBoxResult.Yes, isDefault: true);
-                AddButton(actions, "No", MessageBoxResult.No, isCancel: true);
+                AddButton(actions, yesLabel ?? "Yes", MessageBoxResult.Yes, isDefault: true);
+                AddButton(actions, noLabel ?? "No", MessageBoxResult.No, isCancel: true);
                 _result = MessageBoxResult.No;
                 break;
             default:
@@ -63,6 +64,14 @@ internal sealed class ThemedMessageBox : Window
         var dialog = new ThemedMessageBox(owner, message, title, buttons);
         dialog.ShowDialog();
         return dialog._result;
+    }
+
+    public static bool ShowOpenAnyway(Window? owner, string message, string title)
+    {
+        var dialog = new ThemedMessageBox(owner, message, title, MessageBoxButton.YesNo,
+            yesLabel: "Open anyway", noLabel: "Cancel");
+        dialog.ShowDialog();
+        return dialog._result == MessageBoxResult.Yes;
     }
 
     private void AddButton(StackPanel actions, string label, MessageBoxResult result,
