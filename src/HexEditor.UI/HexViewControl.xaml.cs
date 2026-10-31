@@ -115,6 +115,12 @@ public partial class HexViewControl : UserControl
     private void AddressRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.OriginalSource is not DependencyObject source) return;
+        if (FindAncestor<HexByteRowControl>(source) is { } byteControl &&
+            SelectRowFromOuterInset(byteControl, e.GetPosition(byteControl)))
+        {
+            e.Handled = true;
+            return;
+        }
         HexViewRow? row = null;
         var index = -1;
         if (FindAncestor<DataGridRow>(source) is { Item: HexViewRow dataGridRow } dataRow &&
@@ -134,6 +140,29 @@ public partial class HexViewControl : UserControl
         SetSelectedRow(index);
         AddressRowSelected?.Invoke(this, new AddressRowSelectedEventArgs(index, row));
         e.Handled = true;
+    }
+
+    internal bool SelectRowFromOuterInset(HexByteRowControl byteControl, Point position)
+    {
+        if (!byteControl.IsOuterInsetAt(position)) return false;
+
+        HexViewRow? row;
+        int index;
+        if (FindAncestor<DataGridRow>(byteControl) is { Item: HexViewRow dataGridRow } dataGridRowContainer)
+        {
+            row = dataGridRow;
+            index = dataGridRowContainer.GetIndex();
+        }
+        else if (FindAncestor<ContentPresenter>(byteControl)?.DataContext is WindowedRowItem item)
+        {
+            row = item.Row;
+            index = item.RowIndex;
+        }
+        else return false;
+
+        SetSelectedRow(index);
+        AddressRowSelected?.Invoke(this, new AddressRowSelectedEventArgs(index, row));
+        return true;
     }
 
     private void AddressCell_Click(object sender, MouseButtonEventArgs e)

@@ -194,12 +194,13 @@ public sealed class LiveCompareScrollingAcceptanceTests
                 {
                     var row = Descendants<HexByteRowControl>(left)
                         .Single(item => item.IsAscii == ascii && item.Row?.Address == rowAddress.ToString("X8"));
-                    Assert.IsTrue(row.TryGetAddressAt(new Point(3, 3), out var hitAddress));
+                    var bytePoint = ascii ? new Point(9, 3) : new Point(3, 3);
+                    Assert.IsTrue(row.TryGetAddressAt(bytePoint, out var hitAddress));
                     Assert.AreEqual(rowAddress, hitAddress);
                     Assert.AreEqual(CompareRowActivationKind.EditableRow,
                         workspace.ActivateRow(ComparePanelSide.Base, 54, hitAddress).Kind);
                     var click = DoubleClick(row);
-                    left.RaiseWindowedByteDoubleClick(row, click, new Point(3, 3));
+                    left.RaiseWindowedByteDoubleClick(row, click, bytePoint);
                     Assert.AreEqual(ascii ? 2 : 1, raisedDoubleClicks);
                     Assert.HasCount(ascii ? 2 : 1, activated,
                         "A double-click in the windowed base panel must activate Edit Row.");
