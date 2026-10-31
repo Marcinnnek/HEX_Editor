@@ -272,6 +272,109 @@ public sealed class LiveEditorScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void EditorAddressClickSelectsOccupiedRowAndGapWithoutMovingTheWindow()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            MainWindow? main = null;
+            try
+            {
+                main = new MainWindow();
+                main.ViewModel.LoadImage(MemoryImage.FromSegments([
+                    new MemorySegment(0x1000, Enumerable.Range(0, 64).Select(value => (byte)value).ToArray()),
+                    new MemorySegment(0x1100, [0xA5])]), null, null);
+                main.Show();
+                main.UpdateLayout();
+                var view = (HexViewControl)main.FindName("HexRowsView");
+                var rowIndex = Enumerable.Range(0, main.ViewModel.ImageView.Rows.Count)
+                    .First(index => main.ViewModel.ImageView.Rows[index].Address == "00001020");
+                view.ScrollToRow(rowIndex);
+                Pump(main.Dispatcher);
+                var occupiedViewport = view.FirstVisibleRowIndex;
+                var byteRow = Descendants<HexByteRowControl>(view).First(row => !row.IsAscii && row.Row?.Address == "00001020");
+                Assert.IsTrue(view.SelectByteAt(byteRow, new Point(3, 3), extendSelection: false));
+                var firstAddress = Descendants<HexRowAddressControl>(view).Single(address => address.IsVisible && address.Row?.Address == "00001020");
+                firstAddress.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+                    Source = firstAddress
+                });
+                Assert.AreEqual(rowIndex, view.SelectedRowIndex);
+                Assert.AreEqual(0x1020u, main.ViewModel.EditorStatus.CurrentAddress);
+                Assert.AreEqual(1u, main.ViewModel.EditorStatus.SelectionLength);
+                Assert.AreEqual(occupiedViewport, view.FirstVisibleRowIndex);
+
+                var gapIndex = Enumerable.Range(0, main.ViewModel.ImageView.Rows.Count)
+                    .First(index => main.ViewModel.ImageView.Rows[index].IsGapMarker);
+                view.ScrollToRow(gapIndex);
+                Pump(main.Dispatcher);
+                var gapViewport = view.FirstVisibleRowIndex;
+                var gapAddress = Descendants<HexRowAddressControl>(view).Single(address => address.IsVisible && address.Row?.IsGapMarker == true);
+                gapAddress.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+                    Source = gapAddress
+                });
+                Assert.AreEqual(gapIndex, view.SelectedRowIndex);
+                Assert.AreEqual(0x1020u, main.ViewModel.EditorStatus.CurrentAddress,
+                    "Selecting an address-gap row leaves the current address unchanged.");
+                Assert.AreEqual(gapViewport, view.FirstVisibleRowIndex);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { main?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
+    public void DataGridAddressClickRaisesRowSelectionWithoutChangingItsViewport()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var image = MemoryImage.FromPatternRange(0x1000, 0x2FFF, [0x2A]);
+                var viewModel = new HexImageViewModel(image, 16, showAscii: true);
+                var view = new HexViewControl { ItemsSource = viewModel.Rows, Width = 900, Height = 340 };
+                AddressRowSelectedEventArgs? selected = null;
+                view.AddressRowSelected += (_, args) => selected = args;
+                window = new Window { Content = view, Width = 920, Height = 360, Left = -3000, Top = -3000, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                var grid = view.ItemsGrid;
+                grid.ScrollIntoView(grid.Items[80]);
+                grid.UpdateLayout();
+                var scroll = Descendants<ScrollViewer>(grid).First();
+                var offset = scroll.VerticalOffset;
+                var address = grid.Columns[0].GetCellContent(grid.Items[80]);
+                Assert.IsNotNull(address);
+                var click = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+                    Source = address
+                };
+                grid.RaiseEvent(click);
+                Assert.AreEqual(80, view.SelectedRowIndex);
+                Assert.AreEqual("00001500", selected?.Row.Address);
+                Assert.AreEqual(offset, scroll.VerticalOffset, 0.1,
+                    "Selecting an already visible address row does not scroll the DataGrid.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void EditorWindowMapsWheelAndThumbToGlobalRowsAndRendersWithinOneHundredMilliseconds()
     {
         Exception? failure = null;

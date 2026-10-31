@@ -4,6 +4,13 @@
              xmlns:local="clr-namespace:HexEditor.UI"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <UserControl.Resources>
+      <Style x:Key="WindowedRowSelectionStyle" TargetType="Grid">
+        <Style.Triggers>
+          <DataTrigger Binding="{Binding IsSelected}" Value="True">
+            <Setter Property="Background" Value="{DynamicResource HexSelectionBrush}"/>
+          </DataTrigger>
+        </Style.Triggers>
+      </Style>
       <Style x:Key="ScrollBarLineButtonStyle" TargetType="RepeatButton">
         <Setter Property="Background" Value="{DynamicResource HexRaisedBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}"/>
@@ -36,7 +43,7 @@
       </Style>
     </UserControl.Resources>
     <Grid x:Name="Root" Loaded="Control_Loaded" Unloaded="Control_Unloaded">
-      <Grid x:Name="WindowedView" Visibility="Collapsed" SizeChanged="WindowedView_SizeChanged">
+      <Grid x:Name="WindowedView" Visibility="Collapsed" SizeChanged="WindowedView_SizeChanged" PreviewMouseLeftButtonDown="AddressRow_PreviewMouseLeftButtonDown">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition Height="*"/></Grid.RowDefinitions>
         <ScrollViewer x:Name="WindowedScroll" Grid.RowSpan="2" Grid.Column="0"
@@ -70,7 +77,7 @@
               </ItemsControl.ItemContainerStyle>
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Grid>
+                  <Grid Style="{StaticResource WindowedRowSelectionStyle}">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
                       <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto">
@@ -83,7 +90,7 @@
                         </ColumnDefinition.Style>
                       </ColumnDefinition>
                     </Grid.ColumnDefinitions>
-                    <local:HexRowAddressControl Grid.Column="0" Row="{Binding Row}"/>
+                    <local:HexRowAddressControl Grid.Column="0" Row="{Binding Row}" MouseLeftButtonDown="AddressCell_Click"/>
                     <local:HexByteRowControl Grid.Column="1" Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding Row}" MouseLeftButtonDown="ByteCell_Click"/>
                     <local:HexByteRowControl x:Name="WindowedAscii" Grid.Column="2" Row="{Binding Row}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click">
                       <local:HexByteRowControl.Style>
@@ -145,7 +152,7 @@
           </ScrollBar.Template>
         </ScrollBar>
       </Grid>
-      <ui:DataGrid x:Name="HexGrid"
+      <ui:DataGrid x:Name="HexGrid" PreviewMouseLeftButtonDown="AddressRow_PreviewMouseLeftButtonDown"
               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
               CanUserResizeColumns="False"
               SelectionUnit="Cell" SelectionMode="Extended"

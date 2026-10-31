@@ -60,6 +60,7 @@ public partial class MainWindow : Window
         _files = new MemoryImageFileWorkflow(ViewModel);
         HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         HexRowsView.WindowedByteDoubleClicked += EditorWindowedByte_DoubleClick;
+        HexRowsView.AddressRowSelected += Editor_AddressRowSelected;
         DataContext = this;
         Closing += MainWindow_Closing;
         _windowsAppearance = new WindowsAppearanceSource(this);
@@ -1165,7 +1166,15 @@ public partial class MainWindow : Window
 
     private void HexView_AddressRangeSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
+        HexRowsView.SetSelectedRow(-1);
         SetSelection(e.StartAddress, e.EndAddress);
+    }
+
+    private void Editor_AddressRowSelected(object? sender, AddressRowSelectedEventArgs e)
+    {
+        if (e.Row.IsGapMarker || !HexAddressParser.TryParse(e.Row.Address, out var address)) return;
+        _selectionStart = _selectionEnd = address;
+        ViewModel.EditorStatus.SetSelection(address, address);
     }
 
     private (uint Start, uint End) GetSelectionDefaults()
@@ -1184,6 +1193,7 @@ public partial class MainWindow : Window
 
     private void SetSelection(uint start, uint end)
     {
+        HexRowsView.SetSelectedRow(-1);
         _selectionStart = start;
         _selectionEnd = end;
         ViewModel.EditorStatus.SetSelection(start, end);

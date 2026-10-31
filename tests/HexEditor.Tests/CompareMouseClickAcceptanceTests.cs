@@ -1,4 +1,5 @@
 using HexEditor.Core;
+using HexEditor.Compare;
 using HexEditor.UI;
 using System.Windows;
 using System.Windows.Controls;
@@ -58,8 +59,8 @@ public sealed class CompareMouseClickAcceptanceTests
                     var click = RaiseClick(grid, addressCell, 1);
                     Assert.IsTrue(click.Handled, "Compare should handle an occupied address-row click.");
 
-                    Assert.AreEqual("00001000", ((HexViewRow)panels[0].ItemsGrid.SelectedItem).Address);
-                    Assert.AreEqual("00001000", ((HexViewRow)panels[1].ItemsGrid.SelectedItem).Address);
+                    Assert.AreEqual(0, panels[0].SelectedRowIndex);
+                    Assert.AreEqual(0, panels[1].SelectedRowIndex);
                     Assert.IsTrue(view.NavigateToAddress(0x1010));
                     Assert.AreEqual("00001010", ((HexViewRow)panels[0].ItemsGrid.SelectedItem).Address);
                     Assert.AreEqual("00001010", ((HexViewRow)panels[1].ItemsGrid.SelectedItem).Address);
@@ -88,6 +89,53 @@ public sealed class CompareMouseClickAcceptanceTests
                 Assert.IsTrue(reported.Any(message => message.Contains("Base double-click failed at 0x00001000")));
                 Assert.AreSame(baseImage, workspace.Comparison.FileA);
                 Assert.AreSame(referenceImage, workspace.Comparison.FileB);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
+    public void Address_click_selects_gap_row_without_changing_address_or_scrolling_in_windowed_compare()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var a = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11]), new MemorySegment(0x1100, [0x22])]);
+                var b = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x11]), new MemorySegment(0x1100, [0x22])]);
+                var view = new CompareView(new CompareWorkspaceTabViewModel(a, b, "a.hex", "b.hex"));
+                view.ViewModel.SetAddressRange(0x1000, 0x1100);
+                view.ViewModel.ViewMode = CompareViewMode.AddressRange;
+                window = new Window { Content = view, Width = 1100, Height = 700, Left = -3000, Top = -3000, ShowInTaskbar = false };
+                window.Show();
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                var panels = FindChildren<HexViewControl>(view).ToArray();
+                foreach (var panel in panels) panel.UseWindowedScrolling = true;
+                view.NavigateToAddress(0x1000);
+                var gapIndex = Enumerable.Range(0, view.ViewModel.FileARows.Count)
+                    .First(index => view.ViewModel.FileARows[index].IsGapMarker);
+                var beforeA = panels[0].FirstVisibleRowIndex;
+                var beforeB = panels[1].FirstVisibleRowIndex;
+                panels[0].ScrollToRow(gapIndex);
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                var addressControl = FindChildren<HexRowAddressControl>(panels[0]).Single(control => control.IsVisible && control.Row?.IsGapMarker == true);
+                addressControl.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+                    Source = addressControl
+                });
+                Assert.AreEqual(gapIndex, panels[0].SelectedRowIndex);
+                Assert.AreEqual(gapIndex, panels[1].SelectedRowIndex);
+                Assert.AreEqual(beforeA, panels[0].FirstVisibleRowIndex);
+                Assert.AreEqual(beforeB, panels[1].FirstVisibleRowIndex);
+                Assert.IsTrue(FindChildren<Wpf.Ui.Controls.TextBox>(view).Any(box => box.Text == "00001000"));
             }
             catch (Exception exception) { failure = exception; }
             finally { window?.Close(); }
