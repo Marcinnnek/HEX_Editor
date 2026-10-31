@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Ctrl+C on one selected byte places exactly its two uppercase hex digits on the system clipboard, with no extra spaces.
 - [ ] Ctrl+C on a Shift+click range copies occupied byte values in ascending address order, with exactly one ASCII space between values.
