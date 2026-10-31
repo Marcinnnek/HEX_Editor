@@ -258,7 +258,9 @@ public partial class HexViewControl : UserControl
         var sample = new FormattedText("0", System.Globalization.CultureInfo.InvariantCulture,
             FlowDirection.LeftToRight, new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, HexGrid.FontWeight, HexGrid.FontStretch), HexGrid.FontSize, Foreground,
             VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        var width = BytesPerRow * sample.WidthIncludingTrailingWhitespace + 12;
+        var minimumWidth = MeasureColumnTextWidth("ASCII");
+        var width = Math.Max(BytesPerRow * sample.WidthIncludingTrailingWhitespace + 12, minimumWidth);
+        AsciiColumn.MinWidth = minimumWidth;
         AsciiColumn.Width = new DataGridLength(width);
         WindowedHeaderAsciiColumn.Width = new GridLength(width);
         foreach (var item in WindowRows)
@@ -453,13 +455,14 @@ public partial class HexViewControl : UserControl
 
         const double leftMargin = 6;
         const double rightMargin = 6;
+        var minimumWidth = MeasureColumnTextWidth("HEX Data");
+        var columnWidth = Math.Max(contentWidth + leftMargin + rightMargin, minimumWidth);
 
         SetValue(HexDataContentWidthPropertyKey, contentWidth);
-        SetValue(HexDataColumnWidthPropertyKey,
-            contentWidth + leftMargin + rightMargin);
+        SetValue(HexDataColumnWidthPropertyKey, columnWidth);
 
-        HexDataColumn.Width = new DataGridLength(
-            contentWidth + leftMargin + rightMargin);
+        HexDataColumn.MinWidth = minimumWidth;
+        HexDataColumn.Width = new DataGridLength(columnWidth);
 
         WindowedView.InvalidateMeasure();
 
@@ -486,6 +489,14 @@ public partial class HexViewControl : UserControl
         SetValue(AddressColumnWidthProperty, text.Width + 12);
         if (HexGrid.Columns.Count > 0) HexGrid.Columns[0].Width = new DataGridLength(AddressColumnWidth);
         InvalidateMeasure();
+    }
+
+    private double MeasureColumnTextWidth(string text)
+    {
+        var formatted = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, FontWeights.Bold, HexGrid.FontStretch),
+            HexGrid.FontSize, Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        return formatted.WidthIncludingTrailingWhitespace + 12;
     }
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)

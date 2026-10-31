@@ -57,7 +57,7 @@
           <StackPanel>
             <Grid Margin="0,4,0,4" TextElement.FontWeight="Bold">
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="{Binding HexDataColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/>
                 <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto">
                   <ColumnDefinition.Style>
                     <Style TargetType="ColumnDefinition">
@@ -69,7 +69,7 @@
                 </ColumnDefinition>
               </Grid.ColumnDefinitions>
               <TextBlock Grid.Column="0" Text="Address" TextAlignment="Center" HorizontalAlignment="Stretch"/>
-              <TextBlock Grid.Column="1" Text="HEX Data" Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0"/>
+              <TextBlock Grid.Column="1" Text="HEX Data" Margin="6,0"/>
               <TextBlock x:Name="WindowedAsciiHeader" Grid.Column="2" Text="ASCII" Margin="6,0,0,0"/>
             </Grid>
             <ItemsControl x:Name="WindowedRows" ItemsSource="{Binding WindowRows, RelativeSource={RelativeSource AncestorType=UserControl}}">
@@ -91,7 +91,7 @@
                         </Style>
                     </Grid.Resources>
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="{Binding HexDataColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/>
                       <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto">
                         <ColumnDefinition.Style>
                           <Style TargetType="ColumnDefinition">
