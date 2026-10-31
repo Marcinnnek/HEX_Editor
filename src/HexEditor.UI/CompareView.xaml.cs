@@ -23,6 +23,7 @@ public partial class CompareView : UserControl
     public CompareView(CompareWorkspaceTabViewModel workspace)
     {
         InitializeComponent();
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopySelection_Executed, CopySelection_CanExecute));
         Workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         ViewModel = workspace.Comparison;
         RowWidths = [8, 16, 32];
@@ -50,6 +51,23 @@ public partial class CompareView : UserControl
     public event Action<uint, uint>? BaseRowActivated;
     public event Action<string>? StatusRequested;
     public event Action<string, Exception, ComparePanelSide, int, uint?>? InteractionFailed;
+
+    private HexViewControl SelectedPanel => _lastSelectedSide == ComparePanelSide.Base ? FileAView : FileBView;
+
+    private void CopySelection_CanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        var panel = SelectedPanel;
+        e.CanExecute = panel.SelectionStart is not null && panel.SelectionEnd is not null;
+        e.Handled = true;
+    }
+
+    private void CopySelection_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        var panel = SelectedPanel;
+        var image = _lastSelectedSide == ComparePanelSide.Base ? ViewModel.FileA : ViewModel.FileB;
+        SelectionClipboardText.TryCopy(image, panel.SelectionStart, panel.SelectionEnd);
+        e.Handled = true;
+    }
 
     private void ConfigurePanel(HexViewControl panel)
     {

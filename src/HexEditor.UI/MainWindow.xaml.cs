@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopySelection_Executed, CopySelection_CanExecute));
         ViewModel = new MainViewModel { DefaultBytesPerRow = RowWidthSettings.Current.DefaultBytesPerRow };
         ViewModel.ImageChanged += (_, _) => InvalidateFind("Image changed. Search again.");
         ViewModel.PropertyChanged += (_, e) =>
@@ -546,6 +547,21 @@ public partial class MainWindow : Window
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
             return false;
         }
+    }
+
+    private void CopySelection_CanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = ViewModel.ActiveIsEditor &&
+            Keyboard.FocusedElement is not System.Windows.Controls.Primitives.TextBoxBase &&
+            HexRowsView.SelectionStart is not null && HexRowsView.SelectionEnd is not null;
+        e.Handled = true;
+    }
+
+    private void CopySelection_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        if (!ViewModel.ActiveIsEditor) return;
+        SelectionClipboardText.TryCopy(ViewModel.ActiveImage, HexRowsView.SelectionStart, HexRowsView.SelectionEnd);
+        e.Handled = true;
     }
 
     private bool TrySaveAs(EditorDocument document)
