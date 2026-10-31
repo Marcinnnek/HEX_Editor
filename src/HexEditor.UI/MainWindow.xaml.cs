@@ -1165,7 +1165,7 @@ public partial class MainWindow : Window
 
     private void HexView_AddressRangeSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
-        ApplySelection(e.StartAddress, e.EndAddress);
+        SetSelection(e.StartAddress, e.EndAddress);
     }
 
     private (uint Start, uint End) GetSelectionDefaults()
@@ -1176,12 +1176,17 @@ public partial class MainWindow : Window
 
     private void ApplySelection(uint start, uint end, bool scrollToMatch = false)
     {
-        _selectionStart = start;
-        _selectionEnd = end;
-        ViewModel.EditorStatus.SetSelection(start, end);
+        SetSelection(start, end);
         if (!ViewModel.ImageView.TryNavigateToAddress(start, out var rowIndex)) return;
         if (scrollToMatch) HexRowsView.ScrollToMatch(rowIndex);
         else SelectRow(rowIndex);
+    }
+
+    private void SetSelection(uint start, uint end)
+    {
+        _selectionStart = start;
+        _selectionEnd = end;
+        ViewModel.EditorStatus.SetSelection(start, end);
     }
 
     private void RunSelectedRangeEdit(Action<uint, uint> action)

@@ -75,6 +75,42 @@ public sealed class LiveEditorScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void ClickingVisibleEditorByteDoesNotMoveTheViewport()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            MainWindow? main = null;
+            try
+            {
+                main = new MainWindow();
+                main.ViewModel.LoadImage(MemoryImage.FromPatternRange(0x1000, 0x10FFF, [0xAB]), null, null);
+                main.Show();
+                main.UpdateLayout();
+                var view = (HexViewControl)main.FindName("HexRowsView");
+                view.ScrollToRow(50);
+                main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                Assert.AreEqual(50, view.FirstVisibleRowIndex);
+
+                var address = 0x1000u + (54u * (uint)main.ViewModel.ImageView.BytesPerRow);
+                var row = Descendants<HexByteRowControl>(view)
+                    .Single(item => !item.IsAscii && item.Row?.Address == address.ToString("X8"));
+                Assert.IsTrue(view.SelectByteAt(row, new Point(3, 3), extendSelection: false));
+
+                Assert.AreEqual(address, main.ViewModel.EditorStatus.CurrentAddress);
+                Assert.AreEqual(50, view.FirstVisibleRowIndex,
+                    "Selecting an already visible byte must not move that row to the top.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { main?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void EditorWindowMapsWheelAndThumbToGlobalRowsAndRendersWithinOneHundredMilliseconds()
     {
         Exception? failure = null;
