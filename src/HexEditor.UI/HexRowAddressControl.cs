@@ -20,7 +20,7 @@ public sealed class HexRowAddressControl : Control
         set => SetValue(RowProperty, value);
     }
 
-    protected override Size MeasureOverride(Size constraint) => new(100, 18);
+    protected override Size MeasureOverride(Size constraint) => new(double.IsInfinity(constraint.Width) ? 100 : constraint.Width, 18);
 
     protected override void OnRender(DrawingContext drawingContext)
     {
@@ -28,13 +28,17 @@ public sealed class HexRowAddressControl : Control
         var row = Row;
         if (row is null) return;
         var text = row.IsGapMarker ? row.GapDescription ?? string.Empty : row.Address;
+        var isGap = row.IsGapMarker;
+        ToolTip = isGap ? text : null;
+        var width = Math.Max(0, ActualWidth - 12);
         var formatted = new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             new Typeface(FontFamily, row.IsGapMarker ? FontStyles.Italic : FontStyles.Normal, FontWeight, FontStretch),
             FontSize, Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip)
         {
-            MaxTextWidth = 100,
+            MaxTextWidth = width,
+            TextAlignment = isGap ? TextAlignment.Left : TextAlignment.Center,
             Trimming = TextTrimming.CharacterEllipsis
         };
-        drawingContext.DrawText(formatted, new Point(0, 0));
+        drawingContext.DrawText(formatted, new Point(6, 0));
     }
 }

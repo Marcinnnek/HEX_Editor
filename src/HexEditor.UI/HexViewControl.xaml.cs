@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.ComponentModel;
 
 namespace HexEditor.UI;
 
@@ -20,6 +22,10 @@ public partial class HexViewControl : UserControl
     public HexViewControl()
     {
         InitializeComponent();
+        DependencyPropertyDescriptor.FromProperty(Control.FontFamilyProperty, typeof(DataGrid))!
+            .AddValueChanged(HexGrid, (_, _) => UpdateAddressColumnWidth());
+        DependencyPropertyDescriptor.FromProperty(Control.FontSizeProperty, typeof(DataGrid))!
+            .AddValueChanged(HexGrid, (_, _) => UpdateAddressColumnWidth());
     }
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
@@ -61,6 +67,10 @@ public partial class HexViewControl : UserControl
         get => (Thickness)GetValue(RowGapProperty);
         private set => SetValue(RowGapProperty, value);
     }
+
+    public static readonly DependencyProperty AddressColumnWidthProperty = DependencyProperty.Register(
+        nameof(AddressColumnWidth), typeof(double), typeof(HexViewControl), new PropertyMetadata(100d));
+    public double AddressColumnWidth => (double)GetValue(AddressColumnWidthProperty);
 
     public event EventHandler<AddressRangeSelectedEventArgs>? AddressRangeSelected;
     public event EventHandler<ByteClickFailedEventArgs>? ByteClickFailed;
@@ -205,7 +215,22 @@ public partial class HexViewControl : UserControl
     }
 
     private void WindowedView_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshWindow();
-    private void Control_Loaded(object sender, RoutedEventArgs e) => RefreshWindow();
+    private void Control_Loaded(object sender, RoutedEventArgs e)
+    {
+        UpdateAddressColumnWidth();
+        RefreshWindow();
+    }
+
+    private void UpdateAddressColumnWidth()
+    {
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var text = new FormattedText("FFFFFFFF", System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight, new Typeface(HexGrid.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+            HexGrid.FontSize, Foreground, dpi);
+        SetValue(AddressColumnWidthProperty, text.Width + 12);
+        if (HexGrid.Columns.Count > 0) HexGrid.Columns[0].Width = new DataGridLength(AddressColumnWidth);
+        InvalidateMeasure();
+    }
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)
     {
