@@ -76,11 +76,12 @@ public sealed class GridSpacingSettingsTests
     {
         var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 3);
 
-        Assert.AreEqual(new Rect(10, 0, 10, 20), layout.GetHighlightBounds(1, isAscii: true));
-        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(15, 10), 3, isAscii: true, out var byteIndex));
+        Assert.AreEqual(new Rect(16, 0, 10, 20), layout.GetHighlightBounds(1, isAscii: true));
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(21, 10), 3, isAscii: true, out var byteIndex));
         Assert.AreEqual(1, byteIndex);
         Assert.AreEqual(new Rect(25, 0, 20, 20), layout.GetHighlightBounds(1, isAscii: false));
-        Assert.IsFalse(layout.TryGetByteIndexAt(new Point(22, 10), 3, isAscii: false, out _));
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(22, 10), 3, isAscii: false, out var leftSeparatorByte));
+        Assert.AreEqual(0, leftSeparatorByte);
     }
 
     [TestMethod]
@@ -89,13 +90,49 @@ public sealed class GridSpacingSettingsTests
         var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 5, VerticalSpacing: 3);
 
         Assert.AreEqual(new System.Windows.Size(45, 23), layout.GetRowSize(2, isAscii: false));
-        Assert.AreEqual(new System.Windows.Size(20, 23), layout.GetRowSize(2, isAscii: true));
+        Assert.AreEqual(new System.Windows.Size(32, 23), layout.GetRowSize(2, isAscii: true));
         Assert.IsTrue(layout.TryGetByteIndexAt(new System.Windows.Point(44.9, 19.9), 2, isAscii: false, out var second));
         Assert.AreEqual(1, second);
-        Assert.IsFalse(layout.TryGetByteIndexAt(new System.Windows.Point(21, 10), 2, isAscii: false, out _));
+        Assert.IsTrue(layout.TryGetByteIndexAt(new System.Windows.Point(21, 10), 2, isAscii: false, out var leftSeparatorByte));
+        Assert.AreEqual(0, leftSeparatorByte);
         Assert.IsFalse(layout.TryGetByteIndexAt(new System.Windows.Point(10, 23), 2, isAscii: false, out _));
         Assert.IsTrue(layout.TryGetByteIndexAt(new System.Windows.Point(19, 19.9), 2, isAscii: true, out var asciiSecond));
         Assert.AreEqual(1, asciiSecond);
+    }
+
+    [TestMethod]
+    public void HexInterByteWhitespaceSelectsTheNeighborByItsMidpoint()
+    {
+        var layout = new ByteGridLayout(CharacterWidth: 10, LineHeight: 20, HorizontalSpacing: 6, VerticalSpacing: 0);
+
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(22.9, 10), 2, isAscii: false, out var left));
+        Assert.AreEqual(0, left);
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(23, 10), 2, isAscii: false, out var right));
+        Assert.AreEqual(1, right);
+        Assert.IsTrue(layout.TryGetByteIndexAt(new Point(25.9, 10), 2, isAscii: false, out right));
+        Assert.AreEqual(1, right);
+        Assert.IsFalse(layout.TryGetByteIndexAt(new Point(46, 10), 2, isAscii: false, out _));
+    }
+
+    [TestMethod]
+    public void HexInterByteHitTargetsScaleAcrossRowCapacitiesAndSpacing()
+    {
+        foreach (var spacing in new[] { 0, 2, 7, 12 })
+        foreach (var count in new[] { 8, 16, 32 })
+        {
+            var layout = new ByteGridLayout(CharacterWidth: 8, LineHeight: 16, HorizontalSpacing: spacing, VerticalSpacing: 0);
+            var bounds = layout.GetByteBounds(count - 1, isAscii: false);
+            Assert.IsTrue(layout.TryGetByteIndexAt(new Point(bounds.Right - 0.1, 8), count, false, out var last));
+            Assert.AreEqual(count - 1, last);
+            if (spacing == 0) continue;
+
+            var gapLeft = layout.GetByteBounds(0, false).Right;
+            var midpoint = gapLeft + spacing / 2d;
+            Assert.IsTrue(layout.TryGetByteIndexAt(new Point(midpoint - 0.1, 8), count, false, out var left));
+            Assert.AreEqual(0, left);
+            Assert.IsTrue(layout.TryGetByteIndexAt(new Point(midpoint, 8), count, false, out var right));
+            Assert.AreEqual(1, right);
+        }
     }
 
     [TestMethod]
