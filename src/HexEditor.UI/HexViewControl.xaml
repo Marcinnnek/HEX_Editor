@@ -46,7 +46,7 @@
           <StackPanel>
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="100"/><ColumnDefinition Width="Auto" MinWidth="360"/>
+                <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto" MinWidth="360"/>
                 <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto" MinWidth="220">
                   <ColumnDefinition.Style>
                     <Style TargetType="ColumnDefinition">
@@ -57,7 +57,7 @@
                   </ColumnDefinition.Style>
                 </ColumnDefinition>
               </Grid.ColumnDefinitions>
-              <TextBlock Grid.Column="0" Text="Address"/>
+              <TextBlock Grid.Column="0" Text="Address" HorizontalAlignment="Center"/>
               <TextBlock Grid.Column="1" Text="HEX Data"/>
               <TextBlock x:Name="WindowedAsciiHeader" Grid.Column="2" Text="ASCII"/>
             </Grid>
@@ -72,7 +72,7 @@
                 <DataTemplate>
                   <Grid>
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="100"/><ColumnDefinition Width="Auto" MinWidth="360"/>
+                      <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto" MinWidth="360"/>
                       <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto" MinWidth="220">
                         <ColumnDefinition.Style>
                           <Style TargetType="ColumnDefinition">
@@ -162,12 +162,13 @@
             </Style>
         </ui:DataGrid.CellStyle>
         <ui:DataGrid.Columns>
-            <DataGridTemplateColumn Header="Address" Width="100">
+            <DataGridTemplateColumn Header="Address" Width="100" CanUserResize="False">
+                <DataGridTemplateColumn.HeaderTemplate><DataTemplate><TextBlock Text="Address" HorizontalAlignment="Stretch" TextAlignment="Center"/></DataTemplate></DataGridTemplateColumn.HeaderTemplate>
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
                         <Grid>
-                            <TextBlock Text="{Binding Address}" />
-                            <TextBlock Text="{Binding GapDescription}" FontStyle="Italic" TextTrimming="CharacterEllipsis">
+                            <TextBlock Text="{Binding Address}" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                            <TextBlock Text="{Binding GapDescription}" ToolTip="{Binding GapDescription}" FontStyle="Italic" TextAlignment="Left" TextTrimming="CharacterEllipsis" HorizontalAlignment="Stretch">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed" />
