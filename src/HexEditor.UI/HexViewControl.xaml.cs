@@ -30,9 +30,9 @@ public partial class HexViewControl : UserControl
     {
         InitializeComponent();
         DependencyPropertyDescriptor.FromProperty(Control.FontFamilyProperty, typeof(DataGrid))!
-            .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); });
+            .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); UpdateAsciiColumnWidth(); });
         DependencyPropertyDescriptor.FromProperty(Control.FontSizeProperty, typeof(DataGrid))!
-            .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); });
+            .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); UpdateAsciiColumnWidth(); });
     }
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
@@ -137,6 +137,25 @@ public partial class HexViewControl : UserControl
             control.AsciiColumn.Visibility = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
             control.WindowedAsciiHeader.Visibility = (bool)e.NewValue ? Visibility.Visible : Visibility.Collapsed;
             control.RefreshWindow();
+            control.UpdateAsciiColumnWidth();
+        }
+    }
+
+    private void UpdateAsciiColumnWidth()
+    {
+        if (!IsLoaded) return;
+        var sample = new FormattedText("0", System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight, new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, HexGrid.FontWeight, HexGrid.FontStretch), HexGrid.FontSize, Foreground,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var width = BytesPerRow * sample.WidthIncludingTrailingWhitespace + 12;
+        // The DataGrid reserves a three-DIP sorting glyph slot even without a sort indicator.
+        AsciiColumn.Width = new DataGridLength(Math.Max(0, width - 3));
+        WindowedHeaderAsciiColumn.Width = new GridLength(width);
+        foreach (var item in WindowRows)
+        {
+            var container = WindowedRows.ItemContainerGenerator.ContainerFromItem(item) as FrameworkElement;
+            if (container?.FindName("WindowedRowAsciiColumn") is ColumnDefinition column)
+                column.Width = new GridLength(width);
         }
     }
 
@@ -235,6 +254,7 @@ public partial class HexViewControl : UserControl
         UpdateAddressColumnWidth();
         UpdateHexDataWidth(resetHorizontalScroll: false);
         RefreshWindow();
+        UpdateAsciiColumnWidth();
     }
 
     private void Control_Unloaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
@@ -243,7 +263,11 @@ public partial class HexViewControl : UserControl
 
     private static void OnGridGeometryChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
     {
-        if (owner is HexViewControl control) control.UpdateHexDataWidth(resetHorizontalScroll: true);
+        if (owner is HexViewControl control)
+        {
+            control.UpdateHexDataWidth(resetHorizontalScroll: true);
+            control.UpdateAsciiColumnWidth();
+        }
     }
 
     private void UpdateHexDataWidth(bool resetHorizontalScroll)
