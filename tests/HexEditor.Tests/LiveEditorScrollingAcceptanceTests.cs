@@ -75,6 +75,54 @@ public sealed class LiveEditorScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void AsciiColumnUsesRowCapacityAndCollapsesWhenHiddenInBothLayouts()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var model = new HexImageViewModel(MemoryImage.FromSegments([
+                    new MemorySegment(0x1000, Enumerable.Range(0, 19).Select(value => (byte)value).ToArray())]), 16, true);
+                var view = new HexViewControl { ItemsSource = model.Rows, BytesPerRow = 16, Width = 1100, Height = 400 };
+                window = new Window { Content = view, Width = 1120, Height = 420, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var asciiRows = Descendants<HexByteRowControl>(view).Where(control => control.IsAscii).ToArray();
+                Assert.IsGreaterThanOrEqualTo(2, asciiRows.Length);
+                Assert.AreEqual(asciiRows[0].DesiredSize.Width, asciiRows[1].DesiredSize.Width, 0.1,
+                    "A short final row must retain the active row capacity width.");
+                Assert.AreEqual(asciiRows[0].DesiredSize.Width + 3, view.ItemsGrid.Columns[2].ActualWidth, 1,
+                    "The DataGrid ASCII column must match its capacity-sized row content.");
+
+                view.ShowAscii = false;
+                window.UpdateLayout();
+                Assert.AreEqual(Visibility.Collapsed, view.ItemsGrid.Columns[2].Visibility);
+                view.ShowAscii = true;
+                view.UseWindowedScrolling = true;
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+                asciiRows = Descendants<HexByteRowControl>(view).Where(control => control.IsAscii).ToArray();
+                Assert.IsTrue(asciiRows.Length > 0);
+                Assert.IsTrue(asciiRows.All(control => Math.Abs(control.DesiredSize.Width - asciiRows[0].DesiredSize.Width) < 0.1),
+                    "Windowed rows, including a short final row, must use one ASCII width.");
+                view.ShowAscii = false;
+                window.UpdateLayout();
+                Assert.IsFalse(Descendants<HexByteRowControl>(view).Any(control => control.IsAscii && control.IsVisible));
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void ClickingVisibleEditorByteDoesNotMoveTheViewport()
     {
         Exception? failure = null;
