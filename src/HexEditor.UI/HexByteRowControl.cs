@@ -66,6 +66,15 @@ public sealed class HexByteRowControl : Control
         return true;
     }
 
+    internal bool IsOuterInsetAt(Point point)
+    {
+        if (!IsAscii || point.X < 0 || point.Y < 0) return false;
+        EnsureMetrics();
+        var capacity = RowCapacity > 0 ? RowCapacity : Row?.Cells.Count ?? 0;
+        var width = CreateLayout().GetRowSize(capacity, isAscii: true).Width;
+        return point.Y < _lineHeight && point.X < width && (point.X < 6 || point.X >= width - 6);
+    }
+
     protected override Size MeasureOverride(Size constraint)
     {
         EnsureMetrics();
