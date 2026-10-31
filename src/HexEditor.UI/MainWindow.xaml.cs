@@ -304,6 +304,8 @@ public partial class MainWindow : Window
                 ? new LoadedMemoryImage(editorDocument.CurrentImage, editorDocument.SourcePath, editorDocument.SourceFormat)
                 : diskImages.First!;
             var imageB = diskImages.Second;
+            if (!_files.ConfirmMergeFormats(imageA, imageB, mismatch =>
+                    ThemedMessageBox.ShowMergeAnyway(this, mismatch.Message, "Filename format mismatch"))) return;
             var destinationName = editorHasImage
                 ? (editorDocument.SourcePath is null ? "Untitled" : System.IO.Path.GetFileName(editorDocument.SourcePath) ?? "Editor")
                 : System.IO.Path.GetFileName(destinationPath!) ?? "Destination";
