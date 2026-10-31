@@ -32,6 +32,10 @@ public sealed class HexByteRowControl : Control
         nameof(IsAscii), typeof(bool), typeof(HexByteRowControl),
         new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty RowCapacityProperty = DependencyProperty.Register(
+        nameof(RowCapacity), typeof(int), typeof(HexByteRowControl),
+        new FrameworkPropertyMetadata(0, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
+
     public HexViewRow? Row
     {
         get => (HexViewRow?)GetValue(RowProperty);
@@ -42,6 +46,12 @@ public sealed class HexByteRowControl : Control
     {
         get => (bool)GetValue(IsAsciiProperty);
         set => SetValue(IsAsciiProperty, value);
+    }
+
+    public int RowCapacity
+    {
+        get => (int)GetValue(RowCapacityProperty);
+        set => SetValue(RowCapacityProperty, value);
     }
 
     public bool TryGetAddressAt(Point point, out uint address)
@@ -59,7 +69,7 @@ public sealed class HexByteRowControl : Control
     protected override Size MeasureOverride(Size constraint)
     {
         EnsureMetrics();
-        var count = Row?.Cells.Count ?? 0;
+        var count = IsAscii ? Math.Max(Row?.Cells.Count ?? 0, RowCapacity) : Row?.Cells.Count ?? 0;
         var size = CreateLayout().GetRowSize(count, IsAscii);
         return size;
     }
@@ -68,14 +78,14 @@ public sealed class HexByteRowControl : Control
     {
         base.OnRender(drawingContext);
         var row = Row;
-        if (row is null || row.IsGapMarker) return;
         EnsureMetrics();
-
         var layout = CreateLayout();
-        var dataBounds = new Rect(0, 0, layout.GetRowSize(row.Cells.Count, IsAscii).Width, _lineHeight);
+        var count = IsAscii ? Math.Max(row?.Cells.Count ?? 0, RowCapacity) : row?.Cells.Count ?? 0;
+        var dataBounds = new Rect(0, 0, layout.GetRowSize(count, IsAscii).Width, _lineHeight);
         drawingContext.DrawRectangle(Brushes.Transparent, null, dataBounds);
         if (IsAscii && TryFindResource("HexAsciiBackgroundBrush") is Brush asciiBackground)
             drawingContext.DrawRectangle(asciiBackground, null, dataBounds);
+        if (row is null || row.IsGapMarker) return;
         for (var index = 0; index < row.Cells.Count; index++)
         {
             var brush = row.Cells[index].Highlight switch
@@ -203,7 +213,7 @@ public sealed class HexByteRowControl : Control
                 if (glyphs.Count > 0)
                 {
                     var run = new GlyphRun(glyphTypeface, 0, false, FontSize, (float)_pixelsPerDip, glyphs,
-                        new Point(0, Format("0").Baseline), advances, null, characters, null, null, null,
+                        new Point(IsAscii ? 6 : 0, Format("0").Baseline), advances, null, characters, null, null, null,
                         XmlLanguage.GetLanguage("en-US"));
                     context.DrawGlyphRun(Foreground, run);
                 }

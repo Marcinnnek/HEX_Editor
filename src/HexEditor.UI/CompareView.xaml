@@ -60,11 +60,13 @@
                 </GroupBox>
             <local:HexViewControl x:Name="FileAView" Grid.Row="1" Grid.Column="0"
                                   ItemsSource="{Binding ViewModel.FileARows}"
+                                  BytesPerRow="{Binding ViewModel.BytesPerRow}"
                                   ShowAscii="{Binding ViewModel.ShowAscii}"
                                   AddressRangeSelected="ByteAddressSelected" />
             <GridSplitter Grid.Row="1" Grid.Column="1" Width="8" HorizontalAlignment="Stretch" />
             <local:HexViewControl x:Name="FileBView" Grid.Row="1" Grid.Column="2"
                                   ItemsSource="{Binding ViewModel.FileBRows}"
+                                  BytesPerRow="{Binding ViewModel.BytesPerRow}"
                                   ShowAscii="{Binding ViewModel.ShowAscii}"
                                   AddressRangeSelected="ByteAddressSelected" />
         </Grid>

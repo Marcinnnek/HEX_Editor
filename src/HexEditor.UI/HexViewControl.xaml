@@ -42,8 +42,8 @@
         </Setter>
       </Style>
     </UserControl.Resources>
-    <Grid x:Name="Root" Loaded="Control_Loaded">
-    <Grid x:Name="WindowedView" Visibility="Collapsed" SizeChanged="WindowedView_SizeChanged" PreviewMouseLeftButtonDown="AddressRow_PreviewMouseLeftButtonDown">
+    <Grid x:Name="Root" Loaded="Control_Loaded" Unloaded="Control_Unloaded">
+      <Grid x:Name="WindowedView" Visibility="Collapsed" SizeChanged="WindowedView_SizeChanged" PreviewMouseLeftButtonDown="AddressRow_PreviewMouseLeftButtonDown">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition Height="*"/></Grid.RowDefinitions>
         <ScrollViewer x:Name="WindowedScroll" Grid.RowSpan="2" Grid.Column="0"
@@ -53,8 +53,8 @@
           <StackPanel>
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto" MinWidth="360"/>
-                <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto" MinWidth="220">
+                <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
+                <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto">
                   <ColumnDefinition.Style>
                     <Style TargetType="ColumnDefinition">
                       <Style.Triggers><DataTrigger Binding="{Binding ShowAscii, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Value="False">
@@ -64,9 +64,9 @@
                   </ColumnDefinition.Style>
                 </ColumnDefinition>
               </Grid.ColumnDefinitions>
-              <TextBlock Grid.Column="0" Text="Address" HorizontalAlignment="Center"/>
-              <TextBlock Grid.Column="1" Text="HEX Data"/>
-              <TextBlock x:Name="WindowedAsciiHeader" Grid.Column="2" Text="ASCII"/>
+              <TextBlock Grid.Column="0" Text="Address" Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" HorizontalAlignment="Center"/>
+              <TextBlock Grid.Column="1" Text="HEX Data" Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0"/>
+              <TextBlock x:Name="WindowedAsciiHeader" Grid.Column="2" Text="ASCII" Margin="6,0,0,0"/>
             </Grid>
             <ItemsControl x:Name="WindowedRows" ItemsSource="{Binding WindowRows, RelativeSource={RelativeSource AncestorType=UserControl}}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -79,8 +79,8 @@
                 <DataTemplate>
                   <Grid Style="{StaticResource WindowedRowSelectionStyle}">
                     <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto" MinWidth="360"/>
-                      <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto" MinWidth="220">
+                      <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto">
                         <ColumnDefinition.Style>
                           <Style TargetType="ColumnDefinition">
                             <Style.Triggers><DataTrigger Binding="{Binding ShowAscii, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Value="False">
@@ -91,8 +91,8 @@
                       </ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <local:HexRowAddressControl Grid.Column="0" Row="{Binding Row}" MouseLeftButtonDown="AddressCell_Click"/>
-                    <local:HexByteRowControl Grid.Column="1" Row="{Binding Row}" MouseLeftButtonDown="ByteCell_Click"/>
-                    <local:HexByteRowControl x:Name="WindowedAscii" Grid.Column="2" Row="{Binding Row}" IsAscii="True" MouseLeftButtonDown="ByteCell_Click">
+                    <local:HexByteRowControl Grid.Column="1" Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding Row}" MouseLeftButtonDown="ByteCell_Click"/>
+                    <local:HexByteRowControl x:Name="WindowedAscii" Grid.Column="2" Row="{Binding Row}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click">
                       <local:HexByteRowControl.Style>
                         <Style TargetType="local:HexByteRowControl">
                           <Setter Property="Visibility" Value="Visible"/>
@@ -154,6 +154,7 @@
       </Grid>
       <ui:DataGrid x:Name="HexGrid" PreviewMouseLeftButtonDown="AddressRow_PreviewMouseLeftButtonDown"
               AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+              CanUserResizeColumns="False"
               SelectionUnit="Cell" SelectionMode="Extended"
               EnableRowVirtualization="True" EnableColumnVirtualization="True"
               VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
@@ -191,17 +192,26 @@
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTemplateColumn Header="HEX Data" Width="SizeToCells" MinWidth="360">
+            <DataGridTemplateColumn x:Name="HexDataColumn" Header="HEX Data" Width="360">
+                <DataGridTemplateColumn.HeaderTemplate>
+                    <DataTemplate><TextBlock Text="{Binding}" Margin="6,0,0,0"/></DataTemplate>
+                </DataGridTemplateColumn.HeaderTemplate>
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <local:HexByteRowControl Row="{Binding}" MouseLeftButtonDown="ByteCell_Click" />
+                        <local:HexByteRowControl Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding}" MouseLeftButtonDown="ByteCell_Click" />
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTemplateColumn x:Name="AsciiColumn" Header="ASCII" Width="220">
+            <DataGridTemplateColumn x:Name="AsciiColumn" Header="ASCII" Width="192">
+                <DataGridTemplateColumn.HeaderStyle>
+                    <Style TargetType="DataGridColumnHeader">
+                        <Setter Property="HorizontalContentAlignment" Value="Left" />
+                        <Setter Property="Padding" Value="6,0,0,0" />
+                    </Style>
+                </DataGridTemplateColumn.HeaderStyle>
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <local:HexByteRowControl Row="{Binding}" IsAscii="True" MouseLeftButtonDown="ByteCell_Click" />
+                        <local:HexByteRowControl Row="{Binding}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click" />
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>

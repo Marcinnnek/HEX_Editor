@@ -129,6 +129,7 @@
                     <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
                     <local:HexViewControl Grid.Row="2" x:Name="HexRowsView"
                                           ItemsSource="{Binding ViewModel.ImageView.Rows}"
+                                          BytesPerRow="{Binding ViewModel.ImageView.BytesPerRow}"
                                           UseWindowedScrolling="True"
                                           ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
                                           AddressRangeSelected="HexView_AddressRangeSelected">
