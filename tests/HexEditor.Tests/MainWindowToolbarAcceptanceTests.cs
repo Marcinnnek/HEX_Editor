@@ -100,6 +100,61 @@ public sealed class MainWindowToolbarAcceptanceTests
         if (failure is not null) throw failure;
     }
 
+    [TestMethod]
+    public void EditorRowWidthTextAreaIsEditableAndArrowOpensPresets()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var app = new App();
+            app.InitializeComponent();
+            var window = new MainWindow();
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                var widthBox = (ComboBox)window.FindName("RowWidthBox");
+                widthBox.ApplyTemplate();
+                var editor = (TextBox)widthBox.Template.FindName("PART_EditableTextBox", widthBox);
+                Assert.IsTrue(editor.IsVisible);
+                Assert.IsFalse(editor.IsReadOnly);
+                Assert.IsTrue(HasAncestor<TextBox>(widthBox.InputHitTest(new Point(12, widthBox.ActualHeight / 2)) as DependencyObject),
+                    "The value area must receive mouse input for editing.");
+                Assert.IsTrue(HasAncestor<System.Windows.Controls.Primitives.ToggleButton>(
+                    widthBox.InputHitTest(new Point(widthBox.ActualWidth - 10, widthBox.ActualHeight / 2)) as DependencyObject),
+                    "The arrow area must receive mouse input for the preset list.");
+
+                editor.Text = "15";
+                Assert.AreEqual("15", widthBox.Text);
+                CommitWithEnter(widthBox);
+                Assert.AreEqual(15, window.ViewModel.ActiveBytesPerRow);
+
+                var toggle = (System.Windows.Controls.Primitives.ToggleButton)widthBox.Template.FindName("DropDownToggle", widthBox);
+                Assert.IsTrue(toggle.ActualWidth >= 24 && toggle.ActualHeight >= 28,
+                    "The arrow button must fill its click area in the application template.");
+                toggle.IsChecked = true;
+                Assert.IsTrue(widthBox.IsDropDownOpen);
+                CollectionAssert.AreEqual(new[] { 8, 16, 32 }, widthBox.Items.Cast<int>().ToArray());
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window.Close(); app.Shutdown(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private static bool HasAncestor<T>(DependencyObject? element) where T : DependencyObject
+    {
+        while (element is not null)
+        {
+            if (element is T) return true;
+            element = VisualTreeHelper.GetParent(element);
+        }
+        return false;
+    }
+
     private static void CommitWithEnter(ComboBox combo)
     {
         var source = PresentationSource.FromVisual(combo);

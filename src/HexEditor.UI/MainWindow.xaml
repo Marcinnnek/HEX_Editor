@@ -101,6 +101,7 @@
                                  IsReadOnly="False"
                                  IsTextSearchEnabled="False"
                                  StaysOpenOnEdit="True"
+                                 Style="{StaticResource {x:Type ComboBox}}"
                                  ToolTip="Bytes per row"
                                  ItemsSource="{Binding ViewModel.RowWidths}"
                                  IsEnabled="{Binding ViewModel.ActiveIsEditor}"
