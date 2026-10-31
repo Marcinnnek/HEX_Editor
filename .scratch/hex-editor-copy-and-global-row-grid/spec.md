@@ -1,6 +1,6 @@
 # Copying Byte Selections and Global Row Alignment
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
