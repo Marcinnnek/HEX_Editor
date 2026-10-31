@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 using HexEditor.Core;
 using HexEditor.UI;
 
@@ -59,6 +60,54 @@ public sealed class MainWindowToolbarAcceptanceTests
         thread.Start();
         thread.Join();
         if (failure is not null) throw failure;
+    }
+
+    [TestMethod]
+    public void EditorRowWidthControlAcceptsCustomDecimalWidthsAndRestoresInvalidInput()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var window = new MainWindow();
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+                var widthBox = (ComboBox)window.FindName("RowWidthBox");
+
+                Assert.IsTrue(widthBox.IsEditable);
+                Assert.AreEqual(16, window.ViewModel.ActiveBytesPerRow);
+                widthBox.Text = "24";
+                CommitWithEnter(widthBox);
+                Assert.AreEqual(24, window.ViewModel.ActiveBytesPerRow);
+
+                widthBox.Text = "129";
+                CommitWithEnter(widthBox);
+                Assert.AreEqual(24, window.ViewModel.ActiveBytesPerRow);
+                Assert.AreEqual("24", widthBox.Text);
+
+                widthBox.Text = string.Empty;
+                CommitWithEnter(widthBox);
+                Assert.AreEqual(24, window.ViewModel.ActiveBytesPerRow);
+                Assert.AreEqual("24", widthBox.Text);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
+    private static void CommitWithEnter(ComboBox combo)
+    {
+        var source = PresentationSource.FromVisual(combo);
+        var args = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, Key.Enter)
+        {
+            RoutedEvent = Keyboard.PreviewKeyDownEvent
+        };
+        combo.RaiseEvent(args);
     }
 
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject

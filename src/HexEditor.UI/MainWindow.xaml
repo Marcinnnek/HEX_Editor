@@ -91,8 +91,13 @@
                     <ui:Button Content="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
                 </ToolBar>
                 <ToolBar x:Name="ViewToolBar" ToolTip="View">
-                    <ComboBox Width="64" Style="{StaticResource {x:Type ComboBox}}" ToolTip="Bytes per row" ItemsSource="{Binding ViewModel.RowWidths}"
-                              SelectedItem="{Binding ViewModel.ActiveBytesPerRow, UpdateSourceTrigger=PropertyChanged}" />
+                    <ComboBox x:Name="RowWidthBox" Width="64" IsEditable="True" IsTextSearchEnabled="False"
+                              Style="{StaticResource {x:Type ComboBox}}" ToolTip="Bytes per row" ItemsSource="{Binding ViewModel.RowWidths}"
+                              IsEnabled="{Binding ViewModel.ActiveIsEditor}"
+                              Text="{Binding ViewModel.ActiveBytesPerRow, Mode=OneWay}"
+                              SelectionChanged="RowWidthBox_SelectionChanged"
+                              PreviewTextInput="RowWidthBox_PreviewTextInput" PreviewKeyDown="RowWidthBox_PreviewKeyDown"
+                              LostKeyboardFocus="RowWidthBox_LostKeyboardFocus" DataObject.Pasting="RowWidthBox_Pasting" />
                     <CheckBox Content="ASCII" ToolTip="Show ASCII" IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
                               VerticalAlignment="Center" Padding="4,0" />
                 </ToolBar>
