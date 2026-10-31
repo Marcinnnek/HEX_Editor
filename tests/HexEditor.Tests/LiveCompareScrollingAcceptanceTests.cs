@@ -158,6 +158,142 @@ public sealed class LiveCompareScrollingAcceptanceTests
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
+    [TestMethod]
+    public void DoubleClickingWindowedCompareByteActivatesBaseRowOnly()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var baseImage = MemoryImage.FromPatternRange(0, 999_999, [0x12]);
+                var referenceImage = MemoryImage.FromPatternRange(0, 999_999, [0x34]);
+                var workspace = new CompareWorkspaceTabViewModel(
+                    baseImage, referenceImage, "base.hex", "reference.hex");
+                var compare = new CompareView(workspace);
+                var activated = new List<(uint Row, uint Byte)>();
+                var statuses = new List<string>();
+                var raisedDoubleClicks = 0;
+                compare.BaseRowActivated += (row, address) => activated.Add((row, address));
+                compare.StatusRequested += statuses.Add;
+                window = new Window { Content = compare, Width = 1280, Height = 800, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var left = (HexViewControl)compare.FindName("FileAView");
+                var right = (HexViewControl)compare.FindName("FileBView");
+                left.WindowedByteDoubleClicked += (_, _) => raisedDoubleClicks++;
+                Assert.IsTrue(left.UseWindowedScrolling);
+                left.ScrollToRow(50);
+                Pump(window.Dispatcher);
+                var rowAddress = 54u * (uint)compare.ViewModel.BytesPerRow;
+
+                foreach (var ascii in new[] { false, true })
+                {
+                    var row = Descendants<HexByteRowControl>(left)
+                        .Single(item => item.IsAscii == ascii && item.Row?.Address == rowAddress.ToString("X8"));
+                    Assert.IsTrue(row.TryGetAddressAt(new Point(3, 3), out var hitAddress));
+                    Assert.AreEqual(rowAddress, hitAddress);
+                    Assert.AreEqual(CompareRowActivationKind.EditableRow,
+                        workspace.ActivateRow(ComparePanelSide.Base, 54, hitAddress).Kind);
+                    var click = DoubleClick(row);
+                    left.RaiseWindowedByteDoubleClick(row, click, new Point(3, 3));
+                    Assert.AreEqual(ascii ? 2 : 1, raisedDoubleClicks);
+                    Assert.HasCount(ascii ? 2 : 1, activated,
+                        "A double-click in the windowed base panel must activate Edit Row.");
+                    Assert.AreEqual((rowAddress, rowAddress), activated[^1]);
+                    Assert.IsTrue(click.Handled);
+                    Assert.AreEqual(50, left.FirstVisibleRowIndex);
+                    Assert.AreEqual(50, right.FirstVisibleRowIndex);
+                }
+
+                var referenceRow = Descendants<HexByteRowControl>(right)
+                    .Single(item => !item.IsAscii && item.Row?.Address == rowAddress.ToString("X8"));
+                right.RaiseWindowedByteDoubleClick(referenceRow, DoubleClick(referenceRow), new Point(3, 3));
+                Assert.HasCount(2, activated);
+                CollectionAssert.Contains(statuses, "The reference image is read-only.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
+    public void EditingVisibleCompareByteRefreshesItsHighlightWithoutScrolling()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var baseImage = MemoryImage.FromPatternRange(0, 999_999, [0x12]);
+                var referenceImage = MemoryImage.FromPatternRange(0, 999_999, [0x34]);
+                var owner = new MainViewModel();
+                owner.LoadImage(baseImage, null, null);
+                var compare = new CompareView(new CompareWorkspaceTabViewModel(
+                    baseImage, referenceImage, "base.hex", "reference.hex",
+                    baseDocument: owner.Workspace.Document));
+                window = new Window { Content = compare, Width = 1280, Height = 800, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var left = (HexViewControl)compare.FindName("FileAView");
+                left.ScrollToRow(50);
+                Pump(window.Dispatcher);
+                var address = 54u * (uint)compare.ViewModel.BytesPerRow;
+                var rowControls = Descendants<HexByteRowControl>(left)
+                    .Where(item => item.Row?.Address == address.ToString("X8")).ToArray();
+                Assert.HasCount(2, rowControls);
+                Assert.IsTrue(rowControls.All(item => item.Row!.Cells[0].IsEdited == false));
+
+                var edit = owner.Workspace.BeginEditRow(owner.Workspace.Document,
+                    address, address, compare.ViewModel.BytesPerRow);
+                Assert.IsTrue(edit.SetHex(address, "13"));
+                Assert.IsTrue(edit.Commit());
+                Pump(window.Dispatcher);
+
+                Assert.IsTrue(owner.Workspace.Document.IsEditedByte(address));
+                Assert.IsTrue(compare.ViewModel.FileARows[54].Cells[0].IsEdited,
+                    "The Compare model must have the new edit marker before its visible row is checked.");
+                Assert.AreEqual(50, left.FirstVisibleRowIndex);
+                foreach (var row in rowControls)
+                    Assert.IsTrue(row.Row!.Cells[0].IsEdited,
+                        "The edited byte must be highlighted in both visible HEX and ASCII rows immediately.");
+
+                Assert.IsTrue(owner.Workspace.Document.Editing.Undo());
+                Pump(window.Dispatcher);
+                Assert.AreEqual(50, left.FirstVisibleRowIndex);
+                Assert.IsTrue(rowControls.All(item => !item.Row!.Cells[0].IsEdited),
+                    "Undo must clear the visible edit marker without scrolling.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    private static MouseButtonEventArgs DoubleClick(HexByteRowControl row)
+    {
+        var click = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+        {
+            RoutedEvent = UIElement.MouseLeftButtonDownEvent,
+            Source = row
+        };
+        typeof(MouseButtonEventArgs).GetProperty(nameof(MouseButtonEventArgs.ClickCount))!.SetValue(click, 2);
+        return click;
+    }
+
     private static void RaiseWheel(HexViewControl panel)
     {
         var scroll = Descendants<ScrollViewer>(panel).Single(item => ScrollViewer.GetVerticalScrollBarVisibility(item) == ScrollBarVisibility.Disabled);

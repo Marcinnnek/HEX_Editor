@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Collections.ObjectModel;
 using System.Collections;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -118,9 +119,18 @@ public partial class HexViewControl : UserControl
     private static void OnItemsSourceChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
     {
         if (owner is not HexViewControl control) return;
+        if (e.OldValue is INotifyCollectionChanged previous)
+            previous.CollectionChanged -= control.ItemsSource_CollectionChanged;
+        if (e.NewValue is INotifyCollectionChanged current)
+            current.CollectionChanged += control.ItemsSource_CollectionChanged;
         control.HexGrid.ItemsSource = control.UseWindowedScrolling ? null : e.NewValue as IEnumerable;
         control._windowStart = 0;
         control.RefreshWindow();
+    }
+
+    private void ItemsSource_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (UseWindowedScrolling) RefreshWindow();
     }
 
     private static void OnWindowModeChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)

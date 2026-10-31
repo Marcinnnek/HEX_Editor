@@ -50,6 +50,7 @@ public partial class CompareView : UserControl
         grid.SelectionMode = DataGridSelectionMode.Single;
         grid.SelectionChanged += Panel_SelectionChanged;
         panel.ByteClickFailed += Panel_ByteClickFailed;
+        panel.WindowedByteDoubleClicked += Panel_WindowedByteDoubleClicked;
         panel.FirstVisibleRowChanged += Panel_FirstVisibleRowChanged;
         grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
         grid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
@@ -128,17 +129,46 @@ public partial class CompareView : UserControl
             }
             e.Handled = true;
 
-            var activation = Workspace.ActivateRow(side, rowIndex, address);
-            if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected)
-                BaseRowActivated?.Invoke(rowStartAddress, selected);
-            else if (activation.StatusMessage is { } message)
-                StatusRequested?.Invoke(message);
+            ActivateSelectedRow(side, rowIndex, rowStartAddress, address);
         }
         catch (Exception exception)
         {
             ReportInteractionFailure(e.ClickCount == 2 ? "double-click" : "single-click", side, rowIndex,
                 address ?? rowStart, exception);
         }
+    }
+
+    private void Panel_WindowedByteDoubleClicked(object? sender, WindowedByteDoubleClickEventArgs e)
+    {
+        if (sender is not HexViewControl panel) return;
+        var side = SideOf(panel);
+        var rowIndex = -1;
+        uint? address = null;
+        try
+        {
+            if (e.Row.Row is not { IsGapMarker: false } row ||
+                !HexAddressParser.TryParse(row.Address, out var rowStartAddress) ||
+                !e.Row.TryGetAddressAt(e.Position, out var hitAddress) ||
+                !ViewModel.TryNavigateToAddress(rowStartAddress, out rowIndex)) return;
+
+            address = hitAddress;
+            _lastSelectedSide = side;
+            e.MouseEvent.Handled = true;
+            ActivateSelectedRow(side, rowIndex, rowStartAddress, hitAddress);
+        }
+        catch (Exception exception)
+        {
+            ReportInteractionFailure("double-click", side, rowIndex, address, exception);
+        }
+    }
+
+    private void ActivateSelectedRow(ComparePanelSide side, int rowIndex, uint rowStartAddress, uint? hitAddress)
+    {
+        var activation = Workspace.ActivateRow(side, rowIndex, hitAddress);
+        if (activation.Kind == CompareRowActivationKind.EditableRow && activation.Address is uint selected)
+            BaseRowActivated?.Invoke(rowStartAddress, selected);
+        else if (activation.StatusMessage is { } message)
+            StatusRequested?.Invoke(message);
     }
 
     private static T? FindAncestor<T>(DependencyObject? source) where T : DependencyObject
