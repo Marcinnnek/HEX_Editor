@@ -6,6 +6,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Globalization;
+using System.Windows.Media;
 
 namespace HexEditor.UI;
 
@@ -15,6 +17,12 @@ public partial class HexViewControl : UserControl
     private bool _refreshingWindow;
     private int _windowStart;
     private int _visibleRowCount = 24;
+    private static readonly DependencyPropertyKey HexDataColumnWidthPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(HexDataColumnWidth), typeof(double), typeof(HexViewControl), new PropertyMetadata(0d));
+    private static readonly DependencyPropertyKey HexDataContentWidthPropertyKey = DependencyProperty.RegisterReadOnly(
+        nameof(HexDataContentWidth), typeof(double), typeof(HexViewControl), new PropertyMetadata(0d));
+    public static readonly DependencyProperty HexDataColumnWidthProperty = HexDataColumnWidthPropertyKey.DependencyProperty;
+    public static readonly DependencyProperty HexDataContentWidthProperty = HexDataContentWidthPropertyKey.DependencyProperty;
     public WindowedRowCollection WindowRows { get; } = [];
 
     public HexViewControl()
@@ -34,6 +42,9 @@ public partial class HexViewControl : UserControl
     public static readonly DependencyProperty RowGapProperty = DependencyProperty.Register(
         nameof(RowGap), typeof(Thickness), typeof(HexViewControl), new PropertyMetadata(default(Thickness)));
 
+    public static readonly DependencyProperty BytesPerRowProperty = DependencyProperty.Register(
+        nameof(BytesPerRow), typeof(int), typeof(HexViewControl), new PropertyMetadata(16, OnGridGeometryChanged));
+
     public System.Collections.IEnumerable? ItemsSource
     {
         get => (System.Collections.IEnumerable?)GetValue(ItemsSourceProperty);
@@ -51,6 +62,10 @@ public partial class HexViewControl : UserControl
         get => (bool)GetValue(UseWindowedScrollingProperty);
         set => SetValue(UseWindowedScrollingProperty, value);
     }
+
+    public int BytesPerRow { get => (int)GetValue(BytesPerRowProperty); set => SetValue(BytesPerRowProperty, value); }
+    public double HexDataColumnWidth => (double)GetValue(HexDataColumnWidthProperty);
+    public double HexDataContentWidth => (double)GetValue(HexDataContentWidthProperty);
 
     public int FirstVisibleRowIndex => _windowStart;
 
@@ -205,7 +220,46 @@ public partial class HexViewControl : UserControl
     }
 
     private void WindowedView_SizeChanged(object sender, SizeChangedEventArgs e) => RefreshWindow();
-    private void Control_Loaded(object sender, RoutedEventArgs e) => RefreshWindow();
+    private void Control_Loaded(object sender, RoutedEventArgs e)
+    {
+        GridSpacingSettings.SpacingChanged += SpacingChanged;
+        UpdateHexDataWidth(resetHorizontalScroll: false);
+        RefreshWindow();
+    }
+
+    private void Control_Unloaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
+
+    private void SpacingChanged() => Dispatcher.BeginInvoke(() => UpdateHexDataWidth(resetHorizontalScroll: true));
+
+    private static void OnGridGeometryChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
+    {
+        if (owner is HexViewControl control) control.UpdateHexDataWidth(resetHorizontalScroll: true);
+    }
+
+    private void UpdateHexDataWidth(bool resetHorizontalScroll)
+    {
+        if (BytesPerRow is not (8 or 16 or 32)) return;
+        var sample = new FormattedText("0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+            new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, HexGrid.FontWeight, HexGrid.FontStretch),
+            HexGrid.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+        var width = BytesPerRow * 2 * sample.WidthIncludingTrailingWhitespace +
+            (BytesPerRow - 1) * GridSpacingSettings.Current.HorizontalByteSpacing + 12;
+        SetValue(HexDataColumnWidthPropertyKey, width);
+        SetValue(HexDataContentWidthPropertyKey, width - 12);
+        WindowedView.InvalidateMeasure();
+        HexDataColumn.Width = width;
+        if (resetHorizontalScroll) ResetHorizontalScroll();
+    }
+
+    private void ResetHorizontalScroll()
+    {
+        if (UseWindowedScrolling) { WindowedScroll.ScrollToHorizontalOffset(0); return; }
+        var viewer = FindScrollViewer(HexGrid);
+        if (viewer is null) return;
+        var vertical = viewer.VerticalOffset;
+        viewer.ScrollToHorizontalOffset(0);
+        viewer.ScrollToVerticalOffset(vertical);
+    }
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)
     {
