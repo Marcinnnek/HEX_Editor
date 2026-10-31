@@ -77,7 +77,7 @@ public sealed class ComparisonImageLoader(MainViewModel viewModel)
         cancellationToken.ThrowIfCancellationRequested();
         var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
             ?? throw new InvalidOperationException("The selected reference image could not be imported.");
-        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat);
+        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat, preview.FormatMismatch);
     }, cancellationToken);
 }
 
@@ -89,7 +89,8 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
     public async Task<CompareWorkspaceTabViewModel?> StartAsync(
         Func<string, string?, string?> chooseFile, Action baseOpened,
         CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress,
-        EditorDocument? baseDocument = null)
+        EditorDocument? baseDocument = null,
+        Func<MemoryImageFormatMismatch, bool>? confirmMismatch = null)
     {
         ArgumentNullException.ThrowIfNull(chooseFile);
         ArgumentNullException.ThrowIfNull(baseOpened);
@@ -101,6 +102,7 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
             if (basePath is null) return null;
             var preview = await viewModel.PrepareOpenAsync(basePath, cancellationToken, progress);
             cancellationToken.ThrowIfCancellationRequested();
+            if (preview.FormatMismatch is { } baseMismatch && !(confirmMismatch?.Invoke(baseMismatch) ?? false)) return null;
             viewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
             baseOpened();
         }
@@ -114,6 +116,7 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
 
         var reference = await _loader.LoadReferenceAsync(referencePath, cancellationToken, progress);
         cancellationToken.ThrowIfCancellationRequested();
+        if (reference.FormatMismatch is { } mismatch && !(confirmMismatch?.Invoke(mismatch) ?? false)) return null;
         var baseName = document.SourcePath is null ? "Untitled" : Path.GetFileName(document.SourcePath);
         var comparisonProgress = progress is null ? null : new Progress<ComparisonProgress>(update =>
             progress.Report(new MemoryImageFileProgress(update.Stage, update.Completed, update.Total)));
@@ -186,4 +189,5 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
     }
 }
 
-public sealed record LoadedMemoryImage(MemoryImage Image, string? Path, MemoryImageExportFormat? Format);
+public sealed record LoadedMemoryImage(MemoryImage Image, string? Path, MemoryImageExportFormat? Format,
+    MemoryImageFormatMismatch? FormatMismatch = null);
