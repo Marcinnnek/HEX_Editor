@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace HexEditor.Formats;
 
 public sealed class MemoryImageFileService
@@ -337,6 +339,7 @@ public sealed class MemoryImageFileService
         CancellationToken cancellationToken) : Stream
     {
         private long _completed;
+        private long _lastProgressTimestamp;
         private readonly long? _total = inner.CanSeek ? inner.Length - inner.Position : null;
 
         public override bool CanRead => inner.CanRead;
@@ -356,7 +359,7 @@ public sealed class MemoryImageFileService
             if (read > 0)
             {
                 _completed += read;
-                progress?.Report(new MemoryImageFileProgress("Reading file", _completed, _total));
+                ReportProgress();
                 cancellationToken.ThrowIfCancellationRequested();
             }
             return read;
@@ -369,10 +372,19 @@ public sealed class MemoryImageFileService
             if (read > 0)
             {
                 _completed += read;
-                progress?.Report(new MemoryImageFileProgress("Reading file", _completed, _total));
+                ReportProgress();
                 cancellationToken.ThrowIfCancellationRequested();
             }
             return read;
+        }
+
+        private void ReportProgress()
+        {
+            var timestamp = Stopwatch.GetTimestamp();
+            if (_lastProgressTimestamp != 0 &&
+                Stopwatch.GetElapsedTime(_lastProgressTimestamp, timestamp) < TimeSpan.FromMilliseconds(100)) return;
+            _lastProgressTimestamp = timestamp;
+            progress?.Report(new MemoryImageFileProgress("Reading file", _completed, _total));
         }
 
         protected override void Dispose(bool disposing) { }

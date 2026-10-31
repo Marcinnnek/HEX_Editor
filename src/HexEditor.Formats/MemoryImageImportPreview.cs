@@ -7,6 +7,7 @@ public sealed class MemoryImageImportPreview
 {
     private readonly MemoryImage _existingImage;
     private readonly IReadOnlyList<MemorySegment> _records;
+    private readonly MemoryImage? _orderedReplacementImage;
 
     internal MemoryImageImportPreview(
         MemoryImage existingImage,
@@ -21,7 +22,16 @@ public sealed class MemoryImageImportPreview
         DetectedFormat = detectedFormat;
         SourcePath = sourcePath;
         FormatMetadata = metadata;
-        OverlapSummary = BuildOverlapSummary(existingImage, _records, maximumOccupiedByteCount);
+        if (existingImage.OccupiedByteCount == 0 &&
+            TryBuildOrderedReplacement(_records, maximumOccupiedByteCount, out var replacementImage))
+        {
+            _orderedReplacementImage = replacementImage;
+            OverlapSummary = OverlapSummary.Empty;
+        }
+        else
+        {
+            OverlapSummary = BuildOverlapSummary(existingImage, _records, maximumOccupiedByteCount);
+        }
     }
 
     public MemoryImageExportFormat DetectedFormat { get; }
@@ -42,6 +52,11 @@ public sealed class MemoryImageImportPreview
             return null;
         }
 
+        if (_orderedReplacementImage is not null)
+        {
+            return new MemoryImageImportResult(_orderedReplacementImage, DetectedFormat, SourcePath, FormatMetadata);
+        }
+
         var changes = new Dictionary<uint, byte>();
         foreach (var record in _records)
         {
@@ -58,6 +73,36 @@ public sealed class MemoryImageImportPreview
             DetectedFormat,
             SourcePath,
             FormatMetadata);
+    }
+
+    private static bool TryBuildOrderedReplacement(IReadOnlyList<MemorySegment> records,
+        ulong maximumOccupiedByteCount, out MemoryImage image)
+    {
+        image = MemoryImage.Empty;
+        ulong occupiedByteCount = 0;
+        ulong previousEnd = 0;
+        var hasPrevious = false;
+        foreach (var record in records)
+        {
+            if (record.ByteCount == 0) continue;
+            var recordByteCount = (ulong)record.ByteCount;
+            var end = (ulong)record.StartAddress + recordByteCount - 1;
+            if (end > uint.MaxValue || (hasPrevious && record.StartAddress <= previousEnd)) return false;
+            occupiedByteCount = checked(occupiedByteCount + recordByteCount);
+            EnsureWithinLimit(occupiedByteCount, maximumOccupiedByteCount);
+            previousEnd = end;
+            hasPrevious = true;
+        }
+
+        image = records.Count == 0 ? MemoryImage.Empty : MemoryImage.FromSegments(records);
+        return true;
+    }
+
+    private static void EnsureWithinLimit(ulong count, ulong maximum)
+    {
+        if (count > maximum)
+            throw new MemoryImageImportException(
+                $"Image exceeds the maximum of {maximum.ToString("N0", CultureInfo.InvariantCulture)} occupied bytes.");
     }
 
     private static OverlapSummary BuildOverlapSummary(MemoryImage existing, IReadOnlyList<MemorySegment> records,

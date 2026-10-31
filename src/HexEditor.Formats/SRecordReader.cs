@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using HexEditor.Core;
@@ -6,7 +7,7 @@ namespace HexEditor.Formats;
 
 internal static class SRecordReader
 {
-    private sealed record ParsedRecord(char Type, uint Address, byte[] Data, int LineNumber);
+    private readonly record struct ParsedRecord(char Type, uint Address, byte[] Data, int LineNumber);
 
     public static (IReadOnlyList<MemorySegment> Records, SRecordMetadata Metadata) Read(
         Stream input, CancellationToken cancellationToken = default, IProgress<MemoryImageFileProgress>? progress = null)
@@ -18,8 +19,10 @@ internal static class SRecordReader
         }
 
         using var reader = new StreamReader(input, Encoding.ASCII, true, 4096, leaveOpen: true);
-        var dataRecords = new List<ParsedRecord>();
+        var dataRecords = new List<MemorySegment>();
+        var dataRecordCount = 0;
         var lineNumber = 0;
+        var lastProgressTimestamp = 0L;
         var sawTermination = false;
         var sawHeader = false;
         int? declaredDataRecordCount = null;
@@ -31,7 +34,12 @@ internal static class SRecordReader
         {
             cancellationToken.ThrowIfCancellationRequested();
             lineNumber++;
-            progress?.Report(new MemoryImageFileProgress("Parsing records", lineNumber));
+            var progressTimestamp = Stopwatch.GetTimestamp();
+            if (lineNumber == 1 || Stopwatch.GetElapsedTime(lastProgressTimestamp, progressTimestamp) >= TimeSpan.FromMilliseconds(100))
+            {
+                progress?.Report(new MemoryImageFileProgress("Parsing records", lineNumber));
+                lastProgressTimestamp = progressTimestamp;
+            }
             if (sawTermination)
             {
                 throw Error(lineNumber, "No records are allowed after the termination record.");
@@ -41,7 +49,7 @@ internal static class SRecordReader
             switch (record.Type)
             {
                 case '0':
-                    if (sawHeader || dataRecords.Count > 0 || declaredDataRecordCount is not null)
+                    if (sawHeader || dataRecordCount > 0 || declaredDataRecordCount is not null)
                     {
                         throw Error(lineNumber, "The S0 header record must appear once before data and count records.");
                     }
@@ -62,7 +70,14 @@ internal static class SRecordReader
                         throw Error(lineNumber, $"All data records must use the same S-record type and address width; S{record.Type} does not match S{dataRecordType}.");
                     }
 
-                    dataRecords.Add(record);
+                    dataRecordCount++;
+                    if (record.Data.Length > 0)
+                    {
+                        var endAddress = (ulong)record.Address + (ulong)record.Data.Length - 1;
+                        if (endAddress > uint.MaxValue)
+                            throw Error(record.LineNumber, "The data record extends beyond the 32-bit address range.");
+                        dataRecords.Add(new MemorySegment(record.Address, record.Data));
+                    }
                     dataRecordType = record.Type;
                     break;
                 case '5':
@@ -73,9 +88,9 @@ internal static class SRecordReader
                     }
 
                     declaredDataRecordCount = checked((int)record.Address);
-                    if (declaredDataRecordCount != dataRecords.Count)
+                    if (declaredDataRecordCount != dataRecordCount)
                     {
-                        throw Error(lineNumber, $"The count record declares {declaredDataRecordCount} data records, but {dataRecords.Count} were read.");
+                        throw Error(lineNumber, $"The count record declares {declaredDataRecordCount} data records, but {dataRecordCount} were read.");
                     }
 
                     break;
@@ -105,30 +120,15 @@ internal static class SRecordReader
             throw Error(Math.Max(lineNumber, 1), "The file is missing an S7, S8, or S9 termination record.");
         }
 
-        if (declaredDataRecordCount is not null && declaredDataRecordCount != dataRecords.Count)
+        if (declaredDataRecordCount is not null && declaredDataRecordCount != dataRecordCount)
         {
             throw Error(Math.Max(lineNumber, 1), "The S5 or S6 count record does not match the number of data records.");
         }
 
-        var segments = new List<MemorySegment>();
-        foreach (var record in dataRecords)
-        {
-            if (record.Data.Length > 0)
-            {
-                var endAddress = (ulong)record.Address + (ulong)record.Data.Length - 1;
-                if (endAddress > uint.MaxValue)
-                {
-                    throw Error(record.LineNumber, "The data record extends beyond the 32-bit address range.");
-                }
-
-                segments.Add(new MemorySegment(record.Address, record.Data));
-            }
-        }
-
-        return (segments, new SRecordMetadata(
+        return (dataRecords, new SRecordMetadata(
             startAddress,
-            dataRecords.Count,
-            headerRecord is null ? null : checked((ushort)headerRecord.Address),
+            dataRecordCount,
+            headerRecord is null ? null : checked((ushort)headerRecord.Value.Address),
             headerRecord?.Data.ToArray()));
     }
 
@@ -163,12 +163,16 @@ internal static class SRecordReader
             throw Error(lineNumber, $"An S{type} record must contain a {addressByteCount}-byte address and checksum.");
         }
 
-        var bytes = new byte[count];
+        var dataLength = count - addressByteCount - 1;
+        var data = new byte[dataLength];
         var sum = count;
-        for (var index = 0; index < bytes.Length; index++)
+        uint address = 0;
+        for (var index = 0; index < count; index++)
         {
-            bytes[index] = ParseByte(line.AsSpan(4 + index * 2, 2), lineNumber, "record data");
-            sum += bytes[index];
+            var value = ParseByte(line.AsSpan(4 + index * 2, 2), lineNumber, "record data");
+            sum += value;
+            if (index < addressByteCount) address = (address << 8) | value;
+            else if (index < count - 1) data[index - addressByteCount] = value;
         }
 
         if ((sum & 0xFF) != 0xFF)
@@ -176,13 +180,6 @@ internal static class SRecordReader
             throw Error(lineNumber, "The record checksum is invalid.");
         }
 
-        uint address = 0;
-        for (var index = 0; index < addressByteCount; index++)
-        {
-            address = (address << 8) | bytes[index];
-        }
-
-        var dataLength = count - addressByteCount - 1;
         if ((type is '5' or '6') && dataLength != 0)
         {
             throw Error(lineNumber, "An S5 or S6 count record must not contain data bytes.");
@@ -193,7 +190,6 @@ internal static class SRecordReader
             throw Error(lineNumber, "An S7, S8, or S9 termination record must not contain data bytes.");
         }
 
-        var data = bytes.AsSpan(addressByteCount, dataLength).ToArray();
         return new ParsedRecord(type, address, data, lineNumber);
     }
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using HexEditor.Core;
@@ -28,13 +29,19 @@ internal static class IntelHexReader
         ushort? startSegmentCodeSegment = null;
         ushort? startSegmentInstructionPointer = null;
         var lineNumber = 0;
+        var lastProgressTimestamp = 0L;
         var sawEndOfFile = false;
 
         while (reader.ReadLine() is { } line)
         {
             cancellationToken.ThrowIfCancellationRequested();
             lineNumber++;
-            progress?.Report(new MemoryImageFileProgress("Parsing records", lineNumber));
+            var progressTimestamp = Stopwatch.GetTimestamp();
+            if (lineNumber == 1 || Stopwatch.GetElapsedTime(lastProgressTimestamp, progressTimestamp) >= TimeSpan.FromMilliseconds(100))
+            {
+                progress?.Report(new MemoryImageFileProgress("Parsing records", lineNumber));
+                lastProgressTimestamp = progressTimestamp;
+            }
 
             if (sawEndOfFile)
             {
