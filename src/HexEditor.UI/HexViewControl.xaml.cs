@@ -118,15 +118,16 @@ public partial class HexViewControl : UserControl
         HexViewRow? row = null;
         var index = -1;
         if (FindAncestor<DataGridRow>(source) is { Item: HexViewRow dataGridRow } dataRow &&
-            FindAncestor<DataGridCell>(source) is { Column.DisplayIndex: 0 })
+            FindAncestor<DataGridCell>(source) is { } cell &&
+            (cell.Column.DisplayIndex == 0 || FindAncestor<HexByteRowControl>(source) is null))
         {
             row = dataGridRow;
             index = dataRow.GetIndex();
         }
-        else if (FindAncestor<HexRowAddressControl>(source)?.Row is { } addressRow &&
-                 FindAncestor<ContentPresenter>(source)?.DataContext is WindowedRowItem item)
+        else if (FindAncestor<ContentPresenter>(source)?.DataContext is WindowedRowItem item &&
+                 (FindAncestor<HexRowAddressControl>(source) is not null || FindAncestor<HexByteRowControl>(source) is null))
         {
-            row = addressRow;
+            row = FindAncestor<HexRowAddressControl>(source)?.Row ?? item.Row;
             index = item.RowIndex;
         }
         if (row is null || index < 0) return;

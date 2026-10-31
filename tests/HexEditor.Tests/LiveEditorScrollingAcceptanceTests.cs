@@ -331,6 +331,50 @@ public sealed class LiveEditorScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void DataGridAddressClickRaisesRowSelectionWithoutChangingItsViewport()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var image = MemoryImage.FromPatternRange(0x1000, 0x2FFF, [0x2A]);
+                var viewModel = new HexImageViewModel(image, 16, showAscii: true);
+                var view = new HexViewControl { ItemsSource = viewModel.Rows, Width = 900, Height = 340 };
+                AddressRowSelectedEventArgs? selected = null;
+                view.AddressRowSelected += (_, args) => selected = args;
+                window = new Window { Content = view, Width = 920, Height = 360, Left = -3000, Top = -3000, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                var grid = view.ItemsGrid;
+                grid.ScrollIntoView(grid.Items[80]);
+                grid.UpdateLayout();
+                var scroll = Descendants<ScrollViewer>(grid).First();
+                var offset = scroll.VerticalOffset;
+                var address = grid.Columns[0].GetCellContent(grid.Items[80]);
+                Assert.IsNotNull(address);
+                var click = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
+                {
+                    RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+                    Source = address
+                };
+                grid.RaiseEvent(click);
+                Assert.AreEqual(80, view.SelectedRowIndex);
+                Assert.AreEqual("00001500", selected?.Row.Address);
+                Assert.AreEqual(offset, scroll.VerticalOffset, 0.1,
+                    "Selecting an already visible address row does not scroll the DataGrid.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void EditorWindowMapsWheelAndThumbToGlobalRowsAndRendersWithinOneHundredMilliseconds()
     {
         Exception? failure = null;
