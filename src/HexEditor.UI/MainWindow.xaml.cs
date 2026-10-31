@@ -1172,7 +1172,15 @@ public partial class MainWindow : Window
 
     private void Editor_AddressRowSelected(object? sender, AddressRowSelectedEventArgs e)
     {
-        if (e.Row.IsGapMarker || !HexAddressParser.TryParse(e.Row.Address, out var address)) return;
+        if (e.Row.IsGapMarker)
+        {
+            var currentAddress = ViewModel.EditorStatus.CurrentAddress;
+            _selectionStart = _selectionEnd = currentAddress;
+            if (currentAddress is { } selectedAddress)
+                ViewModel.EditorStatus.SetSelection(selectedAddress, selectedAddress);
+            return;
+        }
+        if (!HexAddressParser.TryParse(e.Row.Address, out var address)) return;
         _selectionStart = _selectionEnd = address;
         ViewModel.EditorStatus.SetSelection(address, address);
     }

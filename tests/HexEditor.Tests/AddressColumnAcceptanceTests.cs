@@ -44,6 +44,8 @@ public sealed class AddressColumnAcceptanceTests
                         Assert.AreEqual(expected, view.ItemsGrid.Columns[0].ActualWidth, 0.5);
                         var gap = Descendants<TextBlock>(view).First(block => block.Text == rows[1].GapDescription);
                         Assert.AreEqual(rows[1].GapDescription, gap.ToolTip);
+                        Assert.AreEqual(6, gap.Margin.Left, 0.1,
+                            "Gap descriptions must share the windowed address control's six-unit left inset.");
                     }
                     window.Close();
                     window = null;
