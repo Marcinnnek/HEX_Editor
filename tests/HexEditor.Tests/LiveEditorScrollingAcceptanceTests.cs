@@ -144,6 +144,54 @@ public sealed class LiveEditorScrollingAcceptanceTests
         Assert.IsLessThan(TimeSpan.FromMilliseconds(100), thumbElapsed);
     }
 
+    [TestMethod]
+    public void WindowedEditorScrollbarHasLineButtonsAtBothEnds()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var image = MemoryImage.FromSegments([new MemorySegment(0, new byte[4096])]);
+                var viewModel = new HexImageViewModel(image, 32, showAscii: true);
+                var view = new HexViewControl { ItemsSource = viewModel.Rows, UseWindowedScrolling = true, Width = 720, Height = 480 };
+                window = new Window { Content = view, Width = 740, Height = 500, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var bar = Descendants<ScrollBar>(view).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                var lineUp = bar.Template.FindName("PART_LineUpButton", bar) as RepeatButton;
+                var lineDown = bar.Template.FindName("PART_LineDownButton", bar) as RepeatButton;
+                Assert.IsNotNull(lineUp, "The custom scrollbar template must include its top line-up button.");
+                Assert.IsNotNull(lineDown, "The custom scrollbar template must include its bottom line-down button.");
+                Assert.AreEqual(ScrollBar.LineUpCommand, lineUp.Command);
+                Assert.AreEqual(ScrollBar.LineDownCommand, lineDown.Command);
+                Assert.AreSame(bar, lineUp.CommandTarget);
+                Assert.AreSame(bar, lineDown.CommandTarget);
+                Assert.IsGreaterThan(0d, lineUp.ActualHeight);
+                Assert.IsGreaterThan(0d, lineDown.ActualHeight);
+                Assert.AreEqual(0d, lineUp.TranslatePoint(new Point(0, 0), bar).Y, 1d,
+                    "Line Up must remain anchored to the top edge of the scrollbar.");
+                Assert.AreEqual(bar.ActualHeight,
+                    lineDown.TranslatePoint(new Point(0, lineDown.ActualHeight), bar).Y, 1d,
+                    "Line Down must remain anchored to the bottom edge of the scrollbar.");
+                bar.Value = 20;
+                ((RoutedCommand)lineUp.Command).Execute(null, bar);
+                Assert.IsLessThan(20d, bar.Value, "The top button must scroll toward earlier rows.");
+                ((RoutedCommand)lineDown.Command).Execute(null, bar);
+                Assert.AreEqual(20d, bar.Value, "The bottom button must scroll toward later rows.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     private static void RaiseWheel(HexViewControl view, Window window)
     {
         var target = Descendants<ScrollViewer>(view).Single(item => ScrollViewer.GetVerticalScrollBarVisibility(item) == ScrollBarVisibility.Disabled);

@@ -88,7 +88,8 @@ public partial class HexViewControl : UserControl
         if (scrollViewer is null) return;
         scrollViewer.ScrollToHorizontalOffset(0);
         // DataGrid item scrolling leaves a sliver of the prior row at an exact item offset.
-        scrollViewer.ScrollToVerticalOffset(rowIndex + 1);
+        //scrollViewer.ScrollToVerticalOffset(rowIndex + 1);
+        scrollViewer.ScrollToVerticalOffset(rowIndex);
         HexGrid.UpdateLayout();
     }
 

@@ -3,6 +3,38 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:HexEditor.UI"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <UserControl.Resources>
+      <Style x:Key="ScrollBarLineButtonStyle" TargetType="RepeatButton">
+        <Setter Property="Background" Value="{DynamicResource HexRaisedBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource HexBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="RepeatButton">
+              <Border x:Name="Chrome" Background="{TemplateBinding Background}"
+                      BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+              <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HexSelectionBrush}"/></Trigger>
+                <Trigger Property="IsPressed" Value="True"><Setter TargetName="Chrome" Property="Background" Value="{DynamicResource HexFocusBrush}"/></Trigger>
+              </ControlTemplate.Triggers>
+            </ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+      <Style x:Key="ScrollBarPageButtonStyle" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+          <Setter.Value>
+            <ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate>
+          </Setter.Value>
+        </Setter>
+      </Style>
+    </UserControl.Resources>
     <Grid x:Name="Root" Loaded="Control_Loaded">
       <Grid x:Name="WindowedView" Visibility="Collapsed" SizeChanged="WindowedView_SizeChanged">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -76,15 +108,39 @@
                    ValueChanged="RowThumb_ValueChanged">
           <ScrollBar.Template>
             <ControlTemplate TargetType="ScrollBar">
-              <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True">
-                <Track.DecreaseRepeatButton><RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Focusable="False"/></Track.DecreaseRepeatButton>
-                <Track.Thumb>
-                  <Thumb MinHeight="30" Background="#777">
-                    <Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="{TemplateBinding Background}" CornerRadius="4"/></ControlTemplate></Thumb.Template>
-                  </Thumb>
-                </Track.Thumb>
-                <Track.IncreaseRepeatButton><RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Focusable="False"/></Track.IncreaseRepeatButton>
-              </Track>
+              <Grid Background="{DynamicResource HexSurfaceBrush}">
+                <Grid.RowDefinitions><RowDefinition Height="18"/><RowDefinition Height="*"/><RowDefinition Height="18"/></Grid.RowDefinitions>
+                <RepeatButton x:Name="PART_LineUpButton" Grid.Row="0" Height="18"
+                              Style="{StaticResource ScrollBarLineButtonStyle}"
+                              Command="{x:Static ScrollBar.LineUpCommand}"
+                              CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}">
+                  <Path Data="M 0,4 L 4,0 L 8,4 Z" Fill="{DynamicResource HexTextBrush}" Width="8" Height="4"/>
+                </RepeatButton>
+                <Track x:Name="PART_Track" Grid.Row="1" Orientation="Vertical" IsDirectionReversed="True">
+                  <Track.DecreaseRepeatButton>
+                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource ScrollBarPageButtonStyle}"/>
+                  </Track.DecreaseRepeatButton>
+                  <Track.Thumb>
+                    <Thumb MinHeight="30" MinWidth="16" Background="#777">
+                      <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                          <Border Margin="2,1" Background="{TemplateBinding Background}" CornerRadius="8"
+                                  SnapsToDevicePixels="True"/>
+                        </ControlTemplate>
+                      </Thumb.Template>
+                    </Thumb>
+                  </Track.Thumb>
+                  <Track.IncreaseRepeatButton>
+                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Style="{StaticResource ScrollBarPageButtonStyle}"/>
+                  </Track.IncreaseRepeatButton>
+                </Track>
+                <RepeatButton x:Name="PART_LineDownButton" Grid.Row="2" Height="18"
+                              Style="{StaticResource ScrollBarLineButtonStyle}"
+                              Command="{x:Static ScrollBar.LineDownCommand}"
+                              CommandTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}">
+                  <Path Data="M 0,0 L 4,4 L 8,0 Z" Fill="{DynamicResource HexTextBrush}" Width="8" Height="4"/>
+                </RepeatButton>
+              </Grid>
             </ControlTemplate>
           </ScrollBar.Template>
         </ScrollBar>

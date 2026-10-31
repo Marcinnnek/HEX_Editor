@@ -51,6 +51,26 @@ public sealed class MemoryImageFileServiceTests
     }
 
     [TestMethod]
+    public void Import_EnforcesLimitAgainstExistingImageUnion()
+    {
+        var service = new MemoryImageFileService(maximumOccupiedByteCount: 2);
+        var existing = MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x11]),
+            new MemorySegment(0x2000, [0x22])]);
+
+        using var overlapOnly = new MemoryStream(Encoding.ASCII.GetBytes(":0110000033BC\n:00000001FF\n"));
+        var imported = service.PrepareImport(overlapOnly, existing).Apply(OverlapDecision.OverwriteIncoming)!;
+        Assert.AreEqual(2UL, imported.Image.OccupiedByteCount);
+        Assert.IsTrue(imported.Image.TryGetByte(0x1000, out var replaced));
+        Assert.AreEqual((byte)0x33, replaced);
+
+        using var overlapAndNewAddress = new MemoryStream(Encoding.ASCII.GetBytes(
+            ":0110000033BC\n:01300000448B\n:00000001FF\n"));
+        var error = Assert.Throws<MemoryImageImportException>(() => service.PrepareImport(overlapAndNewAddress, existing));
+        StringAssert.Contains(error.Message, "maximum of 2 occupied bytes");
+    }
+
+    [TestMethod]
     public void Import_AllowsSparseAddressesAcrossFullDomainWithinOccupiedByteLimit()
     {
         var expected = MemoryImage.FromSegments([
@@ -94,7 +114,8 @@ public sealed class MemoryImageFileServiceTests
         var source = new MemoryStream(Encoding.ASCII.GetBytes(":020001000102FA\n:00000001FF\n"));
         var existing = MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xEE);
 
-        var imported = new MemoryImageFileService().PrepareImport(source, existing).Apply(OverlapDecision.OverwriteIncoming)!;
+        var imported = new MemoryImageFileService(maximumOccupiedByteCount: 4_294_967_296)
+            .PrepareImport(source, existing).Apply(OverlapDecision.OverwriteIncoming)!;
 
         Assert.AreEqual(4_294_967_296UL, imported.Image.OccupiedByteCount);
         Assert.IsTrue(imported.Image.TryGetByte(0, out var before));

@@ -111,7 +111,8 @@ public sealed class MemoryImageImportPreview
         var ranges = new List<OverlapRange>();
         var run = new OverlapRun();
         var seenIncoming = new Dictionary<uint, byte>();
-        ulong uniqueIncomingCount = 0;
+        var resultingOccupiedByteCount = existing.OccupiedByteCount;
+        EnsureWithinLimit(resultingOccupiedByteCount, maximumOccupiedByteCount);
         var overlaps = new Dictionary<uint, (long Identical, long Different)>();
         foreach (var record in records)
         {
@@ -125,14 +126,12 @@ public sealed class MemoryImageImportPreview
                 }
                 else if (existing.TryGetByte(address, out var existingValue))
                 {
-                    uniqueIncomingCount++;
-                    EnsureWithinLimit(uniqueIncomingCount, maximumOccupiedByteCount);
                     AddOverlap(address, existingValue, value);
                 }
                 else
                 {
-                    uniqueIncomingCount++;
-                    EnsureWithinLimit(uniqueIncomingCount, maximumOccupiedByteCount);
+                    resultingOccupiedByteCount++;
+                    EnsureWithinLimit(resultingOccupiedByteCount, maximumOccupiedByteCount);
                 }
                 seenIncoming[address] = value;
             }
@@ -150,12 +149,6 @@ public sealed class MemoryImageImportPreview
                 : (counts.Identical, counts.Different + 1);
         }
 
-        static void EnsureWithinLimit(ulong count, ulong maximum)
-        {
-            if (count > maximum)
-                throw new MemoryImageImportException(
-                    $"Image exceeds the maximum of {maximum.ToString("N0", CultureInfo.InvariantCulture)} occupied bytes.");
-        }
     }
 
     private sealed class OverlapRun
