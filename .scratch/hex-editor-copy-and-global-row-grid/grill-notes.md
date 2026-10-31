@@ -23,7 +23,14 @@ Status: agreed
 - Ctrl+C writes uppercase two-digit hex tokens separated by a single space. Do not include addresses, ASCII text, line breaks, or gap placeholders.
 - When the selection spans an address gap, copy only occupied bytes, in ascending address order.
 - In Compare, copy from the panel that owns the active byte/range selection.
-- Verify Compare's row alignment against the same examples; its row builder already appears to floor addresses globally.
+- Verify Compare's row alignment against the same examples; current arithmetic floors absolute addresses by width and may need to use the confirmed regional origin instead.
+
+## Alignment clarification
+
+- The user confirmed that for width 17, a byte at `0xA0000002` belongs to row `0xA0000000`, and a byte at `0xA0001002` belongs to row `0xA0001001`.
+- Therefore each 16 MiB address region has a fixed grid origin at its region start (lower 24 address bits zero). Rows advance by the configured width from that origin and do not reset for Blocks or source records within the region.
+- In the region starting at zero, S-Record data at `0x0002`, `0x0012`, and `0x0022` uses the grid starting at `0x00000000`.
+- This user-confirmed row-origin rule supersedes the earlier interpretation of strict numeric multiples of width across all 32-bit addresses.
 
 ## Not in scope
 

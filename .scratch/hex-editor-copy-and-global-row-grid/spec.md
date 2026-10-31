@@ -10,7 +10,7 @@ Users can select an occupied byte or a range with Shift+click, but Ctrl+C does n
 
 ## Solution
 
-For a configured width `W`, display rows begin at multiples of `W` from address zero. Each occupied byte appears at the cell for its absolute address within that row. Unoccupied cells remain blank. For example, at width 17 (`0x11`), row starts include `0x00000000`, `0x00000011`, `0x00000022`, and so on. A byte at `0xA0000002` appears at offset 2 in row `0xA0000000`.
+For a configured width `W`, each 16 MiB address region has one row-grid origin at its start (the lower 24 address bits are zero). Within that region, rows start at `origin + n * W`; the grid does not reset at memory Block or source-record boundaries. Each occupied byte appears at the cell for its absolute offset from that region's origin. Unoccupied cells remain blank. For example, at width 17 (`0x11`), row starts in the region beginning at `0xA0000000` include `0xA0000000`, `0xA0000011`, `0xA0000022`, and so on. A byte at `0xA0000002` appears at offset 2 in row `0xA0000000`; a byte at `0xA0001002` appears in row `0xA0001001`. In the region beginning at zero, a byte at `0x00000002` appears in row `0x00000000`.
 
 Ctrl+C copies the active byte or selected range to the system clipboard as uppercase, two-digit hexadecimal tokens separated by one space, such as `B6 5A C6`. A single-byte selection produces one token. When the selection spans an address gap, copy only occupied bytes in ascending address order and omit gap placeholders.
 
@@ -18,7 +18,7 @@ Editor and Compare use the same row alignment. Compare's current model appears t
 
 ## User Stories
 
-1. As an Editor user, I want rows to start at global multiples of the configured width, so that row addresses are consistent across the whole address space.
+1. As an Editor user, I want rows to start on one width-based grid within each 16 MiB address region, so that Block and source-record boundaries do not shift row addresses.
 2. As an Editor user, I want a segment beginning at `0xA0000002` to appear in the row beginning at `0xA0000000` when the width is 17, so that the address offset remains visible.
 3. As an Editor user, I want the next width-17 row to begin at `0xA0000011`, so that custom-width row addresses advance by the configured width.
 4. As an Editor user, I want occupied bytes to remain at cells matching their absolute addresses, so that changing row width does not shift data.
@@ -29,9 +29,9 @@ Editor and Compare use the same row alignment. Compare's current model appears t
 9. As an Editor user, I want the last partial row near `0xFFFFFFFF` to remain safe, so that the highest valid addresses can be displayed without overflow.
 10. As an Editor user, I want address navigation to open the globally aligned row containing that address, so that navigation agrees with the visible grid.
 11. As an Editor user, I want selection and editing to retain the byte's absolute address after realignment, so that grid changes do not alter which data I selected.
-12. As a Compare user, I want both panels to use the same global row boundaries, so that corresponding addresses remain aligned.
-13. As a Compare user, I want differences-only navigation to use globally aligned row starts, so that filtered and full views agree.
-14. As a user, I want Compare's existing global alignment behavior verified with nonzero offsets and custom widths, so that it cannot regress while Editor alignment changes.
+12. As a Compare user, I want both panels to use the same row-grid origin for each address region, so that corresponding addresses remain aligned.
+13. As a Compare user, I want differences-only navigation to use the same region-aligned row starts, so that filtered and full views agree.
+14. As a user, I want Compare's row alignment verified with nonzero offsets and custom widths, so that it follows the same rule as Editor.
 15. As an Editor user, I want Ctrl+C to copy a selected byte to the system clipboard, so that I can paste its hex value into another application.
 16. As an Editor user, I want Ctrl+C to copy a selected range as a space-separated byte sequence, so that I can reuse multiple values directly.
 17. As a user, I want copied bytes formatted as uppercase two-digit hex, so that output is consistent regardless of their displayed column or current focus.
@@ -51,9 +51,9 @@ Editor and Compare use the same row alignment. Compare's current model appears t
 - Format clipboard text as uppercase `XX` values with one ASCII space between adjacent copied values. Do not include addresses, ASCII characters, line breaks, or placeholders for address gaps.
 - Read only occupied bytes in the selected range and emit them in ascending address order.
 - Keep system clipboard copying separate from the existing internal sparse-image clipboard used by Paste.
-- Align display rows from zero using the current width. Determine a cell's address from the global row start plus its column offset; never rebase a row to the beginning of an individual Block or source record.
+- Anchor rows at each 16 MiB address-region start. Within a region, determine row starts from that fixed origin and the current width; never rebase a row to the beginning of an individual Block or source record.
 - Preserve sparse memory semantics. Address gaps remain blank and do not become occupied through display alignment or copying.
-- Keep Editor and Compare row mappings consistent for ordinary navigation, difference navigation, selection, and address boundaries. Compare already appears to use global row arithmetic; verify before changing its behavior.
+- Keep Editor and Compare row mappings consistent for ordinary navigation, difference navigation, selection, and address boundaries. Use the address region's 16 MiB boundary as the fixed origin shared across all Blocks and both Compare panels.
 - Preserve current selection addresses when a row width changes and show the globally aligned row that contains the selection start.
 - Keep behavior consistent for normal and windowed large-image views.
 - No glossary term or ADR is required. These decisions use existing concepts of memory image, occupied byte, address gap, and selection and do not introduce a difficult-to-reverse architecture choice.
@@ -64,8 +64,8 @@ Editor and Compare use the same row alignment. Compare's current model appears t
 - Extend the existing STA WPF acceptance seams for Editor and Compare selection to invoke Ctrl+C and observe plain-text clipboard output. Keep tests serialized because WPF and the system clipboard are process-level resources.
 - Cover the same interaction in normal and windowed Editor layouts, and in both Compare panels, where the existing acceptance setup permits.
 - Cover one byte; multiple selected occupied bytes; ascending order; uppercase formatting; exact spacing; and ranges crossing rows and address gaps.
-- Cover Editor widths 1, 3, 17, 24, 80, and 128, including a segment starting at `0xA0000002`, source records that begin at offset 2 and continue every `0x10`, sparse segments, and the final address `0xFFFFFFFF`.
-- Cover Compare at custom widths and verify ordinary and differences-only navigation map to globally aligned rows. Test both equal-width panels at identical addresses.
+- Cover Editor widths 1, 3, 17, 24, 80, and 128, including a segment starting at `0xA0000002`, source records that begin at offset 2 and continue every `0x10`, sparse Blocks within one address region, neighboring 16 MiB regions, and the final address `0xFFFFFFFF`.
+- Cover Compare at custom widths and verify ordinary and differences-only navigation use the address-region origin in both panels. Test both equal-width panels at identical addresses.
 - Assert that changing width preserves selected absolute addresses and that blank cells remain unoccupied.
 - Existing prior art includes public model tests for Editor and Compare row mapping, Editor and Compare WPF selection acceptance tests, and row-width acceptance tests.
 
@@ -79,6 +79,7 @@ Editor and Compare use the same row alignment. Compare's current model appears t
 
 ## Further Notes
 
-- A width-17 example with S-Record records beginning at `0x0002`, `0x0012`, and `0x0022` places bytes at offsets 2, 1, and 0 of global rows beginning at `0x0000`, `0x0011`, and `0x0022`, respectively. Record starts do not force row starts.
-- The companion issues separate Editor row alignment from selection-to-system-clipboard behavior. Compare alignment is included as a verification criterion because existing comparison model tests already cover global rows for several widths.
+- A width-17 example with S-Record records beginning at `0x0002`, `0x0012`, and `0x0022` places bytes according to one grid anchored at `0x00000000`; record starts do not force row starts.
+- The user confirmed that the width-17 grid in the region beginning at `0xA0000000` continues through `0xA0001002`, whose containing row begins at `0xA0001001`.
+- The companion issues separate Editor row alignment from selection-to-system-clipboard behavior. Compare alignment is included as a verification criterion because its existing model arithmetic must be checked against the confirmed region-origin rule.
 - The settled clipboard gap rule is: omit unoccupied addresses and copy only occupied bytes in the inclusive selected range.
