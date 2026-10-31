@@ -52,6 +52,19 @@ public partial class MainWindow : Window
         ViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.WindowTitle)) Title = ViewModel.WindowTitle;
+            if (e.PropertyName == nameof(MainViewModel.ActiveBytesPerRow))
+            {
+                if (RowWidthBox.Text != ViewModel.ActiveBytesPerRow.ToString(CultureInfo.InvariantCulture))
+                    RowWidthBox.Text = ViewModel.ActiveBytesPerRow.ToString(CultureInfo.InvariantCulture);
+                if (!ViewModel.ActiveIsEditor) return;
+                var address = ViewModel.EditorStatus.CurrentAddress;
+                if (address is null) return;
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (ViewModel.TryNavigateToAddress(address.Value, out var rowIndex))
+                        HexRowsView.ScrollToMatch(rowIndex);
+                });
+            }
         };
         _imageEdits = new ImageEditWorkflow(ViewModel);
         _checksums = new ChecksumWorkflow(ViewModel);
@@ -202,6 +215,44 @@ public partial class MainWindow : Window
     private void RowWidth8_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 8;
     private void RowWidth16_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 16;
     private void RowWidth32_Click(object sender, RoutedEventArgs e) => ViewModel.ActiveBytesPerRow = 32;
+
+    private static bool IsDecimalWidthText(string text) => text.All(char.IsAsciiDigit);
+
+    private void RowWidthBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RowWidthBox.SelectedItem is int width && width != ViewModel.ActiveBytesPerRow)
+            ViewModel.ActiveBytesPerRow = width;
+    }
+
+    private void RowWidthBox_PreviewTextInput(object sender, TextCompositionEventArgs e) =>
+        e.Handled = !IsDecimalWidthText(e.Text);
+
+    private void RowWidthBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        CommitRowWidth();
+        e.Handled = true;
+    }
+
+    private void RowWidthBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitRowWidth();
+
+    private void RowWidthBox_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
+            e.SourceDataObject.GetData(DataFormats.UnicodeText) is not string pasted || !IsDecimalWidthText(pasted))
+            e.CancelCommand();
+    }
+
+    private void CommitRowWidth()
+    {
+        if (int.TryParse(RowWidthBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var width) && width is >= 1 and <= 128)
+        {
+            ViewModel.ActiveBytesPerRow = width;
+            RowWidthBox.Text = width.ToString(CultureInfo.InvariantCulture);
+            return;
+        }
+        RowWidthBox.Text = ViewModel.ActiveBytesPerRow.ToString(CultureInfo.InvariantCulture);
+    }
 
     private void WorkspaceTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {

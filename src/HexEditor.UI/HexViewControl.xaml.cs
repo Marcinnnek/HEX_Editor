@@ -409,7 +409,7 @@ public partial class HexViewControl : UserControl
 
     private void UpdateHexDataWidth(bool resetHorizontalScroll)
     {
-        if (BytesPerRow is not (8 or 16 or 32)) return;
+        if (BytesPerRow is < 1 or > 128) return;
 
         var sample = new FormattedText(
             "0",

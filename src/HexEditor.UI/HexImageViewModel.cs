@@ -154,8 +154,8 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
     private static void ValidateRowWidth(int bytesPerRow)
     {
-        if (bytesPerRow is not (8 or 16 or 32))
-            throw new ArgumentOutOfRangeException(nameof(bytesPerRow), "Row width must be 8, 16, or 32 bytes.");
+        if (bytesPerRow is < 1 or > 128)
+            throw new ArgumentOutOfRangeException(nameof(bytesPerRow), "Row width must be between 1 and 128 bytes.");
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
