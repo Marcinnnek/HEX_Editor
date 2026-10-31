@@ -374,16 +374,38 @@ public partial class HexViewControl : UserControl
     private void UpdateHexDataWidth(bool resetHorizontalScroll)
     {
         if (BytesPerRow is not (8 or 16 or 32)) return;
-        var sample = new FormattedText("0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            new Typeface(HexGrid.FontFamily, HexGrid.FontStyle, HexGrid.FontWeight, HexGrid.FontStretch),
-            HexGrid.FontSize, Brushes.Black, VisualTreeHelper.GetDpi(this).PixelsPerDip);
-        var width = BytesPerRow * 2 * sample.WidthIncludingTrailingWhitespace +
-            (BytesPerRow - 1) * GridSpacingSettings.Current.HorizontalByteSpacing + 12;
-        SetValue(HexDataColumnWidthPropertyKey, width);
-        SetValue(HexDataContentWidthPropertyKey, width - 12);
+
+        var sample = new FormattedText(
+            "0",
+            CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight,
+            new Typeface(
+                HexGrid.FontFamily,
+                HexGrid.FontStyle,
+                HexGrid.FontWeight,
+                HexGrid.FontStretch),
+            HexGrid.FontSize,
+            Brushes.Black,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip);
+
+        var contentWidth =
+            BytesPerRow * 2 * sample.WidthIncludingTrailingWhitespace +
+            (BytesPerRow - 1) * GridSpacingSettings.Current.HorizontalByteSpacing;
+
+        const double leftMargin = 6;
+        const double rightMargin = 6;
+
+        SetValue(HexDataContentWidthPropertyKey, contentWidth);
+        SetValue(HexDataColumnWidthPropertyKey,
+            contentWidth + leftMargin + rightMargin);
+
+        HexDataColumn.Width = new DataGridLength(
+            contentWidth + leftMargin + rightMargin);
+
         WindowedView.InvalidateMeasure();
-        HexDataColumn.Width = width;
-        if (resetHorizontalScroll) ResetHorizontalScroll();
+
+        if (resetHorizontalScroll)
+            ResetHorizontalScroll();
     }
 
     private void ResetHorizontalScroll()
