@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Collections;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 
 namespace HexEditor.UI;
@@ -155,10 +156,26 @@ public partial class HexViewControl : UserControl
         _windowStart = Math.Clamp(_windowStart, 0, maxStart);
         _refreshingWindow = true;
         RowThumb.Maximum = maxStart;
-        RowThumb.ViewportSize = _visibleRowCount;
+        RowThumb.ViewportSize = GetVisibleThumbViewport(maxStart);
         RowThumb.Value = _windowStart;
         _refreshingWindow = false;
         WindowRows.ReplaceAll(rows, _windowStart, Math.Min(rows.Count, _windowStart + _visibleRowCount));
+    }
+
+    private double GetVisibleThumbViewport(int maxStart)
+    {
+        // WPF's Track reserves space from ViewportSize before Thumb.MinHeight is applied.
+        // A tiny viewport can therefore place the Page Down button over most of the thumb.
+        const double minimumReservedThumbHeight = 32;
+        var track = RowThumb.Template?.FindName("PART_Track", RowThumb) as Track;
+        var trackHeight = track is { ActualHeight: > 0 }
+            ? track.ActualHeight
+            : Math.Max(0, WindowedView.ActualHeight - 36);
+        if (maxStart == 0 || trackHeight <= minimumReservedThumbHeight) return _visibleRowCount;
+
+        var minimumViewport = Math.Ceiling((double)maxStart * minimumReservedThumbHeight /
+            (trackHeight - minimumReservedThumbHeight));
+        return Math.Max(_visibleRowCount, minimumViewport);
     }
 
     private void RowThumb_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

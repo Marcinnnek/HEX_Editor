@@ -121,7 +121,7 @@
                     <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource ScrollBarPageButtonStyle}"/>
                   </Track.DecreaseRepeatButton>
                   <Track.Thumb>
-                    <Thumb MinHeight="30" MinWidth="16" Background="#777">
+                    <Thumb MinHeight="15" MinWidth="16" Background="#777">
                       <Thumb.Template>
                         <ControlTemplate TargetType="Thumb">
                           <Border Margin="2,1" Background="{TemplateBinding Background}" CornerRadius="8"

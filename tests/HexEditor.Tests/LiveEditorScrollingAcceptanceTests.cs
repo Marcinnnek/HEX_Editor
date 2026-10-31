@@ -153,7 +153,7 @@ public sealed class LiveEditorScrollingAcceptanceTests
             Window? window = null;
             try
             {
-                var image = MemoryImage.FromSegments([new MemorySegment(0, new byte[4096])]);
+                var image = MemoryImage.FromPatternRange(0, 99_999_999, [0]);
                 var viewModel = new HexImageViewModel(image, 32, showAscii: true);
                 var view = new HexViewControl { ItemsSource = viewModel.Rows, UseWindowedScrolling = true, Width = 720, Height = 480 };
                 window = new Window { Content = view, Width = 740, Height = 500, ShowInTaskbar = false };
@@ -162,6 +162,13 @@ public sealed class LiveEditorScrollingAcceptanceTests
                 Pump(window.Dispatcher);
 
                 var bar = Descendants<ScrollBar>(view).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                bar.Value = bar.Maximum / 2;
+                window.UpdateLayout();
+                var track = (Track)bar.Template.FindName("PART_Track", bar);
+                var thumbBottom = track.Thumb.TranslatePoint(new Point(0, track.Thumb.ActualHeight), bar).Y;
+                var pageDownTop = track.IncreaseRepeatButton.TranslatePoint(new Point(), bar).Y;
+                Assert.IsGreaterThanOrEqualTo(thumbBottom - 0.5, pageDownTop,
+                    $"The Page Down area must not cover the bottom of the visible thumb (thumb={track.Thumb.ActualHeight}, viewport={bar.ViewportSize}, track={track.ActualHeight}).");
                 var lineUp = bar.Template.FindName("PART_LineUpButton", bar) as RepeatButton;
                 var lineDown = bar.Template.FindName("PART_LineDownButton", bar) as RepeatButton;
                 Assert.IsNotNull(lineUp, "The custom scrollbar template must include its top line-up button.");
@@ -182,6 +189,17 @@ public sealed class LiveEditorScrollingAcceptanceTests
                 Assert.IsLessThan(20d, bar.Value, "The top button must scroll toward earlier rows.");
                 ((RoutedCommand)lineDown.Command).Execute(null, bar);
                 Assert.AreEqual(20d, bar.Value, "The bottom button must scroll toward later rows.");
+
+                view.Height = 320;
+                window.Height = 340;
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+                bar.Value = bar.Maximum / 2;
+                window.UpdateLayout();
+                thumbBottom = track.Thumb.TranslatePoint(new Point(0, track.Thumb.ActualHeight), bar).Y;
+                pageDownTop = track.IncreaseRepeatButton.TranslatePoint(new Point(), bar).Y;
+                Assert.IsGreaterThanOrEqualTo(thumbBottom - 0.5, pageDownTop,
+                    "Resizing the window must keep the full thumb visible.");
             }
             catch (Exception exception) { failure = exception; }
             finally { window?.Close(); }
