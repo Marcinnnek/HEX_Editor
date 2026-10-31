@@ -219,38 +219,13 @@ public sealed class HexByteRowControl : Control
         var group = new DrawingGroup();
         using (var context = group.Open())
         {
-            var typefaceInfo = new Typeface(FontFamily, FontStyle, FontWeight, FontStretch);
-            if (typefaceInfo.TryGetGlyphTypeface(out var glyphTypeface))
+            for (var index = 0; index < row.Cells.Count; index++)
             {
-                var characters = new List<char>(row.Cells.Count * (IsAscii ? 1 : 2));
-                var glyphs = new List<ushort>(characters.Capacity);
-                var advances = new List<double>(characters.Capacity);
-                for (var index = 0; index < row.Cells.Count; index++)
-                {
-                    var cellText = IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex;
-                    for (var charIndex = 0; charIndex < cellText.Length; charIndex++)
-                    {
-                        var character = cellText[charIndex];
-                        characters.Add(character);
-                        glyphs.Add(glyphTypeface.CharacterToGlyphMap.TryGetValue(character, out var glyph)
-                            ? glyph
-                            : glyphTypeface.CharacterToGlyphMap['?']);
-                        var isLastCellCharacter = index == row.Cells.Count - 1 && charIndex == cellText.Length - 1;
-                        var isByteSeparator = !IsAscii && charIndex == cellText.Length - 1 && !isLastCellCharacter;
-                        advances.Add(_characterWidth + (isByteSeparator ? layout.HorizontalSpacing : 0));
-                    }
-                }
-                if (glyphs.Count > 0)
-                {
-                    var run = new GlyphRun(glyphTypeface, 0, false, FontSize, (float)_pixelsPerDip, glyphs,
-                        new Point(IsAscii ? 6 : 0, Format("0").Baseline), advances, null, characters, null, null, null,
-                        XmlLanguage.GetLanguage("en-US"));
-                    context.DrawGlyphRun(Foreground, run);
-                }
+                // Draw each cell at its own grid position. Empty HEX cells must still
+                // reserve their slot so later bytes stay under their absolute address.
+                var cellText = IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex;
+                context.DrawText(Format(cellText), layout.GetByteBounds(index, IsAscii).TopLeft);
             }
-            else
-                for (var index = 0; index < row.Cells.Count; index++)
-                    context.DrawText(Format(IsAscii ? row.Cells[index].Ascii : row.Cells[index].Hex), layout.GetByteBounds(index, IsAscii).TopLeft);
         }
         group.Freeze();
         if (RowDrawingCache.Count >= MaxCachedRows)
