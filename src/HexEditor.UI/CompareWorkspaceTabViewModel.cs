@@ -10,7 +10,8 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
 {
     public CompareWorkspaceTabViewModel(MemoryImage fileA, MemoryImage fileB, string nameA, string nameB,
         string? pathA = null, string? pathB = null, EditorDocument? baseDocument = null,
-        CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null)
+        CancellationToken cancellationToken = default, IProgress<ComparisonProgress>? progress = null,
+        int bytesPerRow = 16)
     {
         ArgumentNullException.ThrowIfNull(fileA);
         ArgumentNullException.ThrowIfNull(fileB);
@@ -26,7 +27,7 @@ public sealed class CompareWorkspaceTabViewModel : INotifyPropertyChanged
             BaseDocument.ImageChanged += OnBaseDocumentChanged;
             BaseDocument.PropertyChanged += OnBaseDocumentPropertyChanged;
         }
-        Comparison = new CompareViewModel(fileA, fileB, cancellationToken: cancellationToken, progress: progress,
+        Comparison = new CompareViewModel(fileA, fileB, bytesPerRow: bytesPerRow, cancellationToken: cancellationToken, progress: progress,
             isBaseByteEdited: BaseDocument is { } document ? document.IsEditedByte : null);
         BlocksA = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileA));
         BlocksB = new ObservableCollection<CompareMemoryBlockRow>(CreateRows(fileB));

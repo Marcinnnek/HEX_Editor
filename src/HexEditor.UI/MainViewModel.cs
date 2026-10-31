@@ -19,6 +19,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private CompareWorkspaceTabViewModel? _activeComparisonWorkspace;
     private int _selectedSegmentIndex = -1;
     private bool _isOpenReplacementLoading;
+    private int _defaultBytesPerRow = 16;
 
     public MainViewModel(MemoryImage? image = null)
     {
@@ -78,6 +79,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         get => _activeComparison?.BytesPerRow ?? ImageView.BytesPerRow;
         set { if (_activeComparison is not null) _activeComparison.BytesPerRow = value; else ImageView.BytesPerRow = value; Raise(nameof(ActiveBytesPerRow)); }
+    }
+    public int DefaultBytesPerRow
+    {
+        get => _defaultBytesPerRow;
+        set
+        {
+            RowWidthSettings.Validate(value);
+            _defaultBytesPerRow = value;
+        }
     }
     public bool ActiveShowAscii
     {
@@ -202,7 +212,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!Workspace.ApplyImport(preview, decision)) return;
 
         Checksum.Clear();
-        RefreshImage();
+        RefreshImage(bytesPerRow: DefaultBytesPerRow);
         RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(preview.InputFormat);
@@ -226,7 +236,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         var previousImage = CurrentImage;
         Workspace.OpenImage(image, sourcePath, format);
         Checksum.Clear();
-        RefreshImage();
+        RefreshImage(bytesPerRow: DefaultBytesPerRow);
         RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(format?.ToString());
@@ -384,10 +394,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void NotifyImageChanged(MemoryImage previousImage, MemoryImage updatedImage) => ImageChanged?.Invoke(previousImage, updatedImage);
 
-    private void RefreshImage(bool clearSelection = true)
+    private void RefreshImage(bool clearSelection = true, int? bytesPerRow = null)
     {
         if (clearSelection) EditorStatus.ClearSelection();
-        ImageView = new HexImageViewModel(CurrentImage, ImageView.BytesPerRow, ImageView.ShowAscii, Workspace.Document);
+        ImageView = new HexImageViewModel(CurrentImage, bytesPerRow ?? ImageView.BytesPerRow, ImageView.ShowAscii, Workspace.Document);
         Segments.Clear();
         foreach (var (block, index) in CurrentImage.Blocks.Select((block, index) => (block, index)))
             Segments.Add(new MemorySegmentRow(block.StartAddress.ToString("X8"), block.EndAddress.ToString("X8"), checked((long)block.ByteCount), index));
