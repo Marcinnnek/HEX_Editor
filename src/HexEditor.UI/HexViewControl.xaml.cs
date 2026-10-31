@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Globalization;
 using System.Windows.Media;
 using System.ComponentModel;
+using HexEditor.Compare;
 
 namespace HexEditor.UI;
 
@@ -273,10 +274,32 @@ public partial class HexViewControl : UserControl
         if (owner is not HexViewControl control) return;
         if (e.OldValue is INotifyCollectionChanged previous)
             previous.CollectionChanged -= control.ItemsSource_CollectionChanged;
+
+        var nextStart = 0;
+        if (e.OldValue is SparseRowList<HexViewRow> oldRows &&
+            e.NewValue is SparseRowList<HexViewRow> newRows &&
+            oldRows.SourceIdentity is not null &&
+            ReferenceEquals(oldRows.SourceIdentity, newRows.SourceIdentity))
+        {
+            if (control.RowThumb.Maximum > 0 && control._windowStart >= control.RowThumb.Maximum)
+            {
+                nextStart = Math.Max(0, newRows.Count - control._visibleRowCount);
+            }
+            else if ((uint)control._windowStart < (uint)oldRows.Count)
+            {
+                var oldRow = oldRows[control._windowStart];
+                if (!oldRow.IsGapMarker && HexAddressParser.TryParse(oldRow.Address, out var address) &&
+                    newRows.TryGetRowIndex(address, out var rowIndex))
+                    nextStart = rowIndex;
+                else
+                    nextStart = (int)((long)control._windowStart * newRows.Count / oldRows.Count);
+            }
+        }
+
         if (e.NewValue is INotifyCollectionChanged current)
             current.CollectionChanged += control.ItemsSource_CollectionChanged;
         control.HexGrid.ItemsSource = control.UseWindowedScrolling ? null : e.NewValue as IEnumerable;
-        control._windowStart = 0;
+        control._windowStart = nextStart;
         control.RefreshWindow();
     }
 

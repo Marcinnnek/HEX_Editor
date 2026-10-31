@@ -53,24 +53,36 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="{x:Type ComboBox}">
                             <Grid>
-                                <ToggleButton Focusable="False" ClickMode="Press"
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="26" />
+                                </Grid.ColumnDefinitions>
+                                <ToggleButton Grid.ColumnSpan="2" Focusable="False" ClickMode="Press"
                                               IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                                     <ToggleButton.Template>
                                         <ControlTemplate TargetType="{x:Type ToggleButton}">
                                             <Border Background="{DynamicResource HexSurfaceBrush}" BorderBrush="{DynamicResource HexBorderBrush}"
-                                                    BorderThickness="1" CornerRadius="3" Padding="6,3">
-                                                <Grid>
-                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                                    <ContentPresenter IsHitTestVisible="False" VerticalAlignment="Center"
-                                                                      Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType={x:Type ComboBox}}}" />
-                                                    <Path Grid.Column="1" Data="M 0 0 L 4 4 L 8 0 Z" Fill="{DynamicResource HexTextBrush}"
-                                                          VerticalAlignment="Center" Margin="8,0,1,0" />
-                                                </Grid>
-                                            </Border>
+                                                    BorderThickness="1" CornerRadius="3" />
                                         </ControlTemplate>
                                     </ToggleButton.Template>
                                 </ToggleButton>
-                                <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" Focusable="False"
+                                <ContentPresenter x:Name="ContentSite" Grid.Column="0" IsHitTestVisible="False"
+                                                  Margin="6,3,0,3" VerticalAlignment="Center"
+                                                  Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  ContentTemplateSelector="{Binding ItemTemplateSelector, RelativeSource={RelativeSource TemplatedParent}}" />
+                                <TextBox x:Name="PART_EditableTextBox" Grid.Column="0" Margin="6,2,0,2"
+                                         VerticalContentAlignment="Center" Background="{DynamicResource HexSurfaceBrush}"
+                                         Foreground="{TemplateBinding Foreground}" BorderThickness="0"
+                                         IsReadOnly="{TemplateBinding IsReadOnly}"
+                                         Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         Visibility="Hidden" />
+                                <Border Grid.Column="1" BorderBrush="{DynamicResource HexBorderBrush}"
+                                        BorderThickness="1,0,0,0" Margin="0,4" IsHitTestVisible="False" />
+                                <Path Grid.Column="1" Data="M 0 0 L 4 4 L 8 0 Z"
+                                      Fill="{DynamicResource HexTextBrush}" HorizontalAlignment="Center"
+                                      VerticalAlignment="Center" IsHitTestVisible="False" />
+                                <Popup x:Name="PART_Popup" Grid.ColumnSpan="2" Placement="Bottom" AllowsTransparency="True" Focusable="False"
                                        IsOpen="{TemplateBinding IsDropDownOpen}">
                                     <Border Background="{DynamicResource HexSurfaceBrush}" BorderBrush="{DynamicResource HexBorderBrush}"
                                             BorderThickness="1" Padding="2">
@@ -80,6 +92,12 @@
                                     </Border>
                                 </Popup>
                             </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsEditable" Value="True">
+                                    <Setter TargetName="ContentSite" Property="Visibility" Value="Hidden" />
+                                    <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
                         </ControlTemplate>
                     </Setter.Value>
                 </Setter>

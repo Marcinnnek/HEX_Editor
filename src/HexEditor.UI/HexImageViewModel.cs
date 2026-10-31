@@ -96,7 +96,7 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
     private SparseRowList<HexViewRow> CreateRows(MemoryImage image, int bytesPerRow, bool showAscii) =>
         new(BuildRanges(image, bytesPerRow), bytesPerRow, position => position.IsGap
             ? HexViewRow.Gap((uint)position.GapStartAddress, (uint)position.GapEndAddress)
-            : CreateRow(image, bytesPerRow, showAscii, (uint)position.RowAddress));
+            : CreateRow(image, bytesPerRow, showAscii, (uint)position.RowAddress), sourceIdentity: image);
 
     private HexViewRow CreateRow(MemoryImage image, int bytesPerRow, bool showAscii, uint rowAddress)
     {

@@ -45,6 +45,7 @@ public sealed class HexImageViewModelTests
     [DataRow(1)]
     [DataRow(3)]
     [DataRow(8)]
+    [DataRow(15)]
     [DataRow(16)]
     [DataRow(24)]
     [DataRow(32)]

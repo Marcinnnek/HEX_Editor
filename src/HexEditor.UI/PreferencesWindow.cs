@@ -35,7 +35,7 @@ public sealed class PreferencesWindow : Window
         panel.Children.Add(modes);
 
         panel.Children.Add(new TextBlock { Text = "Default bytes per row", Margin = new Thickness(0, 0, 0, 4) });
-        var rowWidth = new ComboBox { Name = "DefaultRowWidthSelector", Width = 120, IsEditable = true,
+        var rowWidth = new ComboBox { Name = "DefaultRowWidthSelector", Width = 120, MinHeight = 28, IsEditable = true,
             IsTextSearchEnabled = false, HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0, 0, 0, 16), ItemsSource = new[] { 8, 16, 32 } };
         rowWidth.Text = choices.DefaultBytesPerRow.ToString(System.Globalization.CultureInfo.InvariantCulture);

@@ -16,16 +16,19 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
     private readonly uint _rowWidth;
     private int _count;
 
-    public SparseRowList(IEnumerable<SparseRowSpan> spans, int bytesPerRow, Func<SparseRowPosition, T> createItem)
+    public SparseRowList(IEnumerable<SparseRowSpan> spans, int bytesPerRow, Func<SparseRowPosition, T> createItem,
+        object? sourceIdentity = null)
     {
         if (bytesPerRow <= 0) throw new ArgumentOutOfRangeException(nameof(bytesPerRow));
         _rowWidth = (uint)bytesPerRow;
         _createItem = createItem ?? throw new ArgumentNullException(nameof(createItem));
+        SourceIdentity = sourceIdentity;
 
         (_spans, _count) = SparseRowIndexBuilder.Build(spans, _rowWidth);
     }
 
     public override int Count => _count;
+    public object? SourceIdentity { get; }
     public event NotifyCollectionChangedEventHandler? CollectionChanged;
 
     protected override T GetAt(int index)

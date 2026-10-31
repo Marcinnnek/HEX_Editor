@@ -18,7 +18,7 @@
         </Border>
         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" VerticalAlignment="Center">
             <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <ComboBox x:Name="RowWidthBox" Width="70" IsEditable="True" IsTextSearchEnabled="False"
+            <ComboBox x:Name="RowWidthBox" Width="72" MinHeight="28" IsEditable="True" IsTextSearchEnabled="False"
                       Style="{StaticResource {x:Type ComboBox}}" ItemsSource="{Binding RowWidths}"
                       Text="{Binding ViewModel.BytesPerRow, Mode=OneWay}"
                       SelectionChanged="RowWidthBox_SelectionChanged"

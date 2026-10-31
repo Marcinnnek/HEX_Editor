@@ -497,8 +497,10 @@ public sealed class LiveEditorScrollingAcceptanceTests
         Assert.IsLessThan(TimeSpan.FromMilliseconds(100), thumbElapsed);
     }
 
+    [DataRow(15)]
+    [DataRow(32)]
     [TestMethod]
-    public void LastWindowedRowIsFullyVisibleAtTheBottomOfTheScrollbar()
+    public void LastWindowedRowIsFullyVisibleAtTheBottomOfTheScrollbar(int bytesPerRow)
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -507,10 +509,10 @@ public sealed class LiveEditorScrollingAcceptanceTests
             try
             {
                 var image = MemoryImage.FromPatternRange(0, 99_999_999, [0x5A]);
-                var model = new HexImageViewModel(image, 32, showAscii: true);
+                var model = new HexImageViewModel(image, bytesPerRow, showAscii: true);
                 var view = new HexViewControl
                 {
-                    ItemsSource = model.Rows, UseWindowedScrolling = true,
+                    ItemsSource = model.Rows, BytesPerRow = bytesPerRow, UseWindowedScrolling = true,
                     Width = 720, Height = 480
                 };
                 view.ItemsGrid.FontSize = 18;
@@ -526,6 +528,8 @@ public sealed class LiveEditorScrollingAcceptanceTests
 
                 Assert.AreEqual(model.Rows.Count - 1, view.WindowRows[^1].RowIndex,
                     $"maximum={bar.Maximum}, viewport={bar.ViewportSize}, value={bar.Value}, first={view.FirstVisibleRowIndex}, visible={view.WindowRows.Count}");
+                Assert.AreEqual(model.Rows[^1].Address, view.WindowRows[^1].Row.Address,
+                    "The last address must remain at the end of the grid after scrolling to the bottom.");
                 var lastAddress = Descendants<HexRowAddressControl>(view)
                     .Single(item => item.Row?.Address == view.WindowRows[^1].Row.Address);
                 var viewport = Descendants<ScrollContentPresenter>(view).Single(item => item.IsVisible);
@@ -536,6 +540,48 @@ public sealed class LiveEditorScrollingAcceptanceTests
             }
             catch (Exception exception) { failure = exception; }
             finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [DataRow(99_999)]
+    [DataRow(9_999_999)]
+    [TestMethod]
+    public void ChangingEditorWidthToFifteenAtTheEndKeepsTheLastRowAtTheEnd(int lastAddress)
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            MainWindow? main = null;
+            try
+            {
+                main = new MainWindow();
+                main.ViewModel.LoadImage(MemoryImage.FromPatternRange(0, (uint)lastAddress, [0x5A]), null, null);
+                main.Show();
+                Pump(main.Dispatcher);
+                var view = (HexViewControl)main.FindName("HexRowsView");
+                Assert.IsTrue(view.UseWindowedScrolling);
+                var bar = Descendants<ScrollBar>(view).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                bar.Value = bar.Maximum;
+                Pump(main.Dispatcher);
+
+                main.ViewModel.ActiveBytesPerRow = 15;
+                Pump(main.Dispatcher);
+
+                Assert.AreEqual(main.ViewModel.ImageView.Rows.Count - 1, view.WindowRows[^1].RowIndex);
+                Assert.AreEqual(((uint)lastAddress / 15 * 15).ToString("X8"), view.WindowRows[^1].Row.Address,
+                    "The final 15-byte row must stay at the end instead of appearing at the beginning.");
+
+                main.ViewModel.LoadImage(MemoryImage.FromPatternRange(0x1000, 0x1FFF, [0xA5]), null, null);
+                Pump(main.Dispatcher);
+                Assert.AreEqual(0, view.FirstVisibleRowIndex,
+                    "Opening a different image starts at its first row.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { main?.Close(); }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
