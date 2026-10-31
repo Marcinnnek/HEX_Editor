@@ -42,6 +42,61 @@ public sealed class HexImageViewModelTests
         Assert.AreEqual(0x1237u, row.Cells[7].Address);
     }
 
+    [DataRow(1)]
+    [DataRow(3)]
+    [DataRow(8)]
+    [DataRow(16)]
+    [DataRow(24)]
+    [DataRow(32)]
+    [DataRow(80)]
+    [DataRow(128)]
+    [TestMethod]
+    public void Editor_RendersCustomWidthsOnGlobalRowsAcrossSparseAndFinalAddresses(int bytesPerRow)
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x00000002, [0xA1, 0xA2]),
+            new MemorySegment(0xFFFFFFFF, [0xFE])]);
+        var view = new HexImageViewModel(image, bytesPerRow);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0x00000002, out var firstIndex));
+        var first = view.Rows[firstIndex];
+        Assert.AreEqual((2 / bytesPerRow * bytesPerRow).ToString("X8"), first.Address);
+        Assert.AreEqual(bytesPerRow, first.Cells.Count);
+        Assert.AreEqual("A1", first.Cells[2 % bytesPerRow].Hex);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0xFFFFFFFF, out var lastIndex));
+        var last = view.Rows[lastIndex];
+        var lastRowStart = (uint)((ulong)uint.MaxValue / (uint)bytesPerRow * (uint)bytesPerRow);
+        Assert.AreEqual(lastRowStart.ToString("X8"), last.Address);
+        var lastOffset = (int)(uint.MaxValue - lastRowStart);
+        Assert.AreEqual("FE", last.Cells[lastOffset].Hex);
+        Assert.AreEqual(uint.MaxValue, last.Cells[lastOffset].Address);
+        Assert.IsTrue(last.Cells.Skip(lastOffset + 1).All(cell => cell.Address is null));
+    }
+
+    [TestMethod]
+    public void Editor_WidthChangePreservesCurrentAddressAndSelection()
+    {
+        var model = new MainViewModel(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20, 0x30]) ]));
+        model.EditorStatus.SetSelection(0x1001, 0x1002);
+
+        model.ActiveBytesPerRow = 3;
+
+        Assert.AreEqual(3, model.ActiveBytesPerRow);
+        Assert.AreEqual(0x1001u, model.EditorStatus.CurrentAddress);
+        Assert.AreEqual(2, model.EditorStatus.SelectionLength);
+        Assert.IsTrue(model.TryNavigateToAddress(0x1001, out var rowIndex));
+        Assert.AreEqual((0x1001 / 3 * 3).ToString("X8"), model.ImageView.Rows[rowIndex].Address);
+    }
+
+    [TestMethod]
+    [DataRow(0)]
+    [DataRow(129)]
+    public void Editor_RejectsRowWidthsOutsideOneThrough128(int bytesPerRow)
+    {
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => new HexImageViewModel(MemoryImage.Empty, bytesPerRow));
+    }
+
     [TestMethod]
     public void EditedByteHighlightTracksCurrentOccupiedValuesAgainstLastSavedImage()
     {

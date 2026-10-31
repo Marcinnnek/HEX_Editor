@@ -13,7 +13,7 @@ public sealed class EditRowSession
 
     internal EditRowSession(EditorDocument document, uint rowStartAddress, uint selectedAddress, int bytesPerRow)
     {
-        if (bytesPerRow is not (8 or 16 or 32)) throw new ArgumentOutOfRangeException(nameof(bytesPerRow));
+        if (bytesPerRow is < 1 or > 128) throw new ArgumentOutOfRangeException(nameof(bytesPerRow));
         if (selectedAddress < rowStartAddress || (ulong)selectedAddress >= (ulong)rowStartAddress + (uint)bytesPerRow)
             throw new ArgumentOutOfRangeException(nameof(selectedAddress));
         _document = document;

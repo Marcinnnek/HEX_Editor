@@ -11,27 +11,37 @@ public class EditRowSessionTests
     [DataRow(8)]
     [DataRow(16)]
     [DataRow(32)]
+    [DataRow(1)]
+    [DataRow(3)]
+    [DataRow(24)]
+    [DataRow(80)]
+    [DataRow(128)]
     public void EditRowUsesSelectedRowWidthAndCancelPreservesSparseImage(int bytesPerRow)
     {
         var workspace = new EditorDocumentWorkspace();
-        var lastAddress = 0x1000u + (uint)bytesPerRow - 1;
-        workspace.OpenImage(MemoryImage.FromSegments([
-            new MemorySegment(0x1000, [0x41]), new MemorySegment(lastAddress, [0x5A])
-        ]), null, null);
+        var rowStartAddress = (uint)(0x1000 / bytesPerRow * bytesPerRow);
+        var lastAddress = rowStartAddress + (uint)bytesPerRow - 1;
+        var segments = bytesPerRow == 1
+            ? new[] { new MemorySegment(rowStartAddress, new byte[] { 0x5A }) }
+            : new[] { new MemorySegment(rowStartAddress, new byte[] { 0x41 }), new MemorySegment(lastAddress, new byte[] { 0x5A }) };
+        workspace.OpenImage(MemoryImage.FromSegments(segments), null, null);
 
-        var edit = workspace.BeginEditRow(0x1000, lastAddress, bytesPerRow);
+        var edit = workspace.BeginEditRow(rowStartAddress, lastAddress, bytesPerRow);
 
         Assert.HasCount(bytesPerRow, edit.Cells);
         Assert.AreEqual("00", edit.Cells[0].OffsetText);
         Assert.AreEqual((bytesPerRow - 1).ToString("X2"), edit.Cells[^1].OffsetText);
         Assert.AreEqual(lastAddress, edit.SelectedAddress);
         Assert.AreEqual("Z", edit.Cells[^1].Ascii);
-        Assert.IsFalse(edit.Cells[1].IsOccupied);
-        Assert.IsFalse(edit.SetHex(0x1001, "20"));
+        if (bytesPerRow > 1)
+        {
+            Assert.IsFalse(edit.Cells[1].IsOccupied);
+            Assert.IsFalse(edit.SetHex(rowStartAddress + 1, "20"));
+        }
         Assert.IsTrue(edit.SetHex(lastAddress, "21"));
         edit.Cancel();
         Assert.IsFalse(workspace.Document.IsModified);
-        Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(0x1001, out _));
+        if (bytesPerRow > 1) Assert.IsFalse(workspace.Document.CurrentImage.TryGetByte(rowStartAddress + 1, out _));
         Assert.IsTrue(workspace.Document.CurrentImage.TryGetByte(lastAddress, out var unchanged));
         Assert.AreEqual((byte)'Z', unchanged);
     }
