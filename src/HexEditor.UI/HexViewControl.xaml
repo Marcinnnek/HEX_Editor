@@ -103,8 +103,8 @@
                       </ColumnDefinition>
                     </Grid.ColumnDefinitions>
                     <local:HexRowAddressControl Grid.Column="0" Row="{Binding Row}" MouseLeftButtonDown="AddressCell_Click"/>
-                    <local:HexByteRowControl Grid.Column="1" Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding Row}" MouseLeftButtonDown="ByteCell_Click"/>
-                    <local:HexByteRowControl x:Name="WindowedAscii" Grid.Column="2" Row="{Binding Row}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click">
+                    <local:HexByteRowControl Grid.Column="1" Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding Row}" SelectionStart="{Binding SelectionStart, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" SelectionEnd="{Binding SelectionEnd, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click"/>
+                    <local:HexByteRowControl x:Name="WindowedAscii" Grid.Column="2" Row="{Binding Row}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" SelectionStart="{Binding SelectionStart, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" SelectionEnd="{Binding SelectionEnd, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click">
                       <local:HexByteRowControl.Style>
                         <Style TargetType="local:HexByteRowControl">
                           <Setter Property="Visibility" Value="Visible"/>
@@ -235,7 +235,7 @@
                 </DataGridTemplateColumn.HeaderTemplate>
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <local:HexByteRowControl Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding}" MouseLeftButtonDown="ByteCell_Click" />
+                        <local:HexByteRowControl Width="{Binding HexDataContentWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" Margin="6,0" Row="{Binding}" SelectionStart="{Binding SelectionStart, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" SelectionEnd="{Binding SelectionEnd, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click" />
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
@@ -249,7 +249,7 @@
                 </DataGridTemplateColumn.HeaderStyle>
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
-                        <local:HexByteRowControl Row="{Binding}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click" />
+                        <local:HexByteRowControl Row="{Binding}" IsAscii="True" RowCapacity="{Binding BytesPerRow, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" SelectionStart="{Binding SelectionStart, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" SelectionEnd="{Binding SelectionEnd, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}" MouseLeftButtonDown="ByteCell_Click" />
                     </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
