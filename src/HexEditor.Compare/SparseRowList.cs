@@ -50,7 +50,10 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         {
             var middle = low + ((high - low) / 2);
             var span = _spans[middle];
-            var spanEnd = Math.Min((ulong)uint.MaxValue, span.EndAddress + _rowWidth - 1);
+            var spanEnd = span.IsGap ? span.EndAddress
+                : Math.Min((ulong)uint.MaxValue, span.EndAddress + _rowWidth - 1);
+            if (middle + 1 < _spans.Count)
+                spanEnd = Math.Min(spanEnd, _spans[middle + 1].StartAddress - 1);
             if (address < span.StartAddress)
             {
                 high = middle - 1;
@@ -61,7 +64,9 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
             }
             else
             {
-                var rowAddress = span.StartAddress + ((address - span.StartAddress) / _rowWidth) * _rowWidth;
+                var rowAddress = span.IsGap
+                    ? Math.Max(span.StartAddress, (ulong)(address / _rowWidth) * _rowWidth)
+                    : span.StartAddress + ((address - span.StartAddress) / _rowWidth) * _rowWidth;
                 if (span.IsGap)
                 {
                     ExpandNavigationRow(span, rowAddress);
@@ -89,9 +94,9 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
             }
 
             if (rowAddress > span.StartAddress)
-                ranges.Add(new SparseRowSpan(span.StartAddress, rowAddress - _rowWidth, IsGap: true));
+                ranges.Add(new SparseRowSpan(span.StartAddress, rowAddress - 1, IsGap: true));
             ranges.Add(new SparseRowSpan(rowAddress, rowAddress));
-            if (rowAddress < span.EndAddress)
+            if (rowAddress + _rowWidth <= span.EndAddress)
                 ranges.Add(new SparseRowSpan(rowAddress + _rowWidth, span.EndAddress, IsGap: true));
         }
 

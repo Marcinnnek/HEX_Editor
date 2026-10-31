@@ -629,6 +629,41 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void Navigation_ToSecondBlockDoesNotExpandThePrecedingGap()
+    {
+        var image = MemoryImage.FromSegments(
+        [
+            new MemorySegment(0x1000, [0x11]),
+            new MemorySegment(0x2000, [0x22])
+        ]);
+        var view = new HexImageViewModel(image, bytesPerRow: 11);
+        var originalRowCount = view.Rows.Count;
+
+        Assert.IsTrue(view.TryNavigateToSegment(0, out var firstRowIndex));
+        Assert.AreEqual("00001000", view.Rows[firstRowIndex].Address);
+        Assert.IsTrue(view.TryNavigateToSegment(1, out var rowIndex));
+
+        Assert.AreEqual("00002000", view.Rows[rowIndex].Address);
+        Assert.HasCount(originalRowCount, view.Rows);
+    }
+
+    [TestMethod]
+    public void Navigation_AtEndOfGapKeepsNextBlockReachable()
+    {
+        var image = MemoryImage.FromSegments(
+        [
+            new MemorySegment(0x1000, [0x11]),
+            new MemorySegment(0x2000, [0x22])
+        ]);
+        var view = new HexImageViewModel(image, bytesPerRow: 11);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0x1FFF, out var gapRow));
+        Assert.IsFalse(view.Rows[gapRow].IsGapMarker);
+        Assert.IsTrue(view.TryNavigateToSegment(1, out var blockRow));
+        Assert.AreEqual("00002000", view.Rows[blockRow].Address);
+    }
+
+    [TestMethod]
     public void Navigation_IntoCollapsedLargeGapCreatesOnlyTargetRow()
     {
         var image = MemoryImage.FromSegments(

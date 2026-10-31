@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -10,6 +11,42 @@ namespace HexEditor.Tests;
 [DoNotParallelize]
 public sealed class AddressColumnAcceptanceTests
 {
+    [TestMethod]
+    public void GapDescriptionDoesNotDrawOverTheFollowingRow()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var grid = new Grid { Width = 100, Height = 36 };
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(18) });
+                grid.Children.Add(new HexRowAddressControl
+                {
+                    Row = HexViewRow.Gap(0x1001, 0x1FFF),
+                    FontFamily = new FontFamily("Consolas"), FontSize = 16,
+                    Foreground = Brushes.Black
+                });
+                grid.Measure(new Size(100, 36));
+                grid.Arrange(new Rect(0, 0, 100, 36));
+                var bitmap = new RenderTargetBitmap(100, 36, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(grid);
+                var pixels = new byte[100 * 36 * 4];
+                bitmap.CopyPixels(pixels, 100 * 4, 0);
+                for (var y = 18; y < 36; y++)
+                    for (var x = 0; x < 100; x++)
+                        Assert.AreEqual((byte)0, pixels[(y * 100 + x) * 4 + 3],
+                            $"Gap description paints over the next row at ({x}, {y}).");
+            }
+            catch (Exception exception) { failure = exception; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     [TestMethod]
     public void AddressColumnUsesMeasuredEightDigitWidthAndGapTextKeepsItsTooltipInBothLayouts()
     {

@@ -36,6 +36,7 @@ public sealed class HexRowAddressControl : Control
             FontSize, Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip)
         {
             MaxTextWidth = width,
+            MaxLineCount = 1,
             TextAlignment = isGap ? TextAlignment.Left : TextAlignment.Center,
             Trimming = TextTrimming.CharacterEllipsis
         };
