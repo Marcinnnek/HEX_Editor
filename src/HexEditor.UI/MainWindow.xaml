@@ -133,6 +133,11 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
                     <GroupBox Grid.Row="0" Header="{Binding ViewModel.EditorBlockListHeader}" Margin="0,0,0,8" MaxHeight="130">
+                        <GroupBox.HeaderTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Margin="6,4,4,6" />
+                            </DataTemplate>
+                        </GroupBox.HeaderTemplate>
                         <ListBox x:Name="SegmentsGrid" ItemsSource="{Binding ViewModel.Segments}"
                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                                  SelectionMode="Extended" SelectionChanged="SegmentsGrid_SelectionChanged"
