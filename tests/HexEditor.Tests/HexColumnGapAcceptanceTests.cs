@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using HexEditor.Core;
+using HexEditor.Formats;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -10,6 +11,76 @@ namespace HexEditor.Tests;
 [DoNotParallelize]
 public sealed class HexColumnGapAcceptanceTests
 {
+    [TestMethod]
+    public void RowDoesNotRepeatBytesFromTheNextBlockAfterAnAddressGap()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0xA0000002, [0x63, 0xDE, 0xCC, 0xC8, 0x86, 0x7A, 0x20, 0x10, 0x48, 0xFE, 0xD9, 0x92]),
+            new MemorySegment(0xA0000010, [0x9E, 0x2B, 0xDC])]);
+        var model = new HexImageViewModel(image);
+
+        var firstRow = model.Rows[0];
+        Assert.AreEqual("A0000002", firstRow.Address);
+        Assert.AreEqual("", firstRow.Cells[14].Hex);
+        Assert.AreEqual("", firstRow.Cells[15].Hex);
+        Assert.AreEqual("A0000010", model.Rows[1].Address);
+        Assert.AreEqual("9E", model.Rows[1].Cells[0].Hex);
+        Assert.AreEqual(1, model.Rows.Count(row => row.Cells.Any(cell => cell.Hex == "9E")));
+    }
+
+    [TestMethod]
+    public void RaggedIntelHexAndSRecordRowsKeepEveryByteAtOneAddress()
+    {
+        var intelHex = string.Join("\n",
+            IntelRecord(0x1002, Enumerable.Range(0x63, 12).Select(value => (byte)value)),
+            IntelRecord(0x1010, [0x9E, 0x2B, 0xDC]),
+            IntelRecord(0x1040, [0xF1, 0x90]),
+            ":00000001FF");
+        var sRecord = string.Join("\n",
+            S1Record(0x1002, Enumerable.Range(0x63, 12).Select(value => (byte)value)),
+            S1Record(0x1010, [0x9E, 0x2B, 0xDC]),
+            S1Record(0x1040, [0xF1, 0x90]),
+            "S9030000FC");
+
+        foreach (var contents in new[] { intelHex, sRecord })
+        {
+            using var stream = new MemoryStream(System.Text.Encoding.ASCII.GetBytes(contents));
+            var image = new MemoryImageFileService().PrepareImport(stream)
+                .Apply(OverlapDecision.OverwriteIncoming)!.Image;
+            var rows = new HexImageViewModel(image).Rows;
+
+            AssertRowByteCount(rows, 0x1002, 12);
+            AssertRowByteCount(rows, 0x1010, 3);
+            AssertRowByteCount(rows, 0x1040, 2);
+            Assert.AreEqual(1, rows.Sum(row => row.Cells.Count(cell => cell.Hex == "9E")),
+                "A byte after a short address gap must not also appear at the end of the preceding row.");
+            Assert.AreEqual(1, rows.Sum(row => row.Cells.Count(cell => cell.Hex == "F1")),
+                "A byte in a later block must appear only in that block's row.");
+        }
+    }
+
+    private static void AssertRowByteCount(IList<HexViewRow> rows, uint address, int expected)
+    {
+        var row = rows.Single(item => item.Address == address.ToString("X8"));
+        Assert.AreEqual(expected, row.Cells.Count(cell => cell.Hex.Length > 0), $"Unexpected bytes in row {address:X8}.");
+    }
+
+    private static string IntelRecord(ushort address, IEnumerable<byte> data)
+    {
+        var bytes = data.ToArray();
+        var fields = new[] { (byte)bytes.Length, (byte)(address >> 8), (byte)address, (byte)0 }.Concat(bytes).ToArray();
+        var checksum = unchecked((byte)-fields.Sum(value => value));
+        return $":{string.Concat(fields.Select(value => value.ToString("X2")))}{checksum:X2}";
+    }
+
+    private static string S1Record(ushort address, IEnumerable<byte> data)
+    {
+        var bytes = data.ToArray();
+        var fields = new[] { (byte)(bytes.Length + 3), (byte)(address >> 8), (byte)address }.Concat(bytes).ToArray();
+        var checksum = unchecked((byte)~fields.Sum(value => value));
+        return $"S1{string.Concat(fields.Select(value => value.ToString("X2")))}{checksum:X2}";
+    }
+
     [TestMethod]
     public void FullHexRowEndsTwelveUnitsBeforeFirstAsciiGlyph()
     {

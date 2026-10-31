@@ -100,6 +100,11 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
     private HexViewRow CreateRow(MemoryImage image, int bytesPerRow, bool showAscii, uint rowAddress)
     {
+        // A row can start partway through a memory block. Do not let its trailing
+        // cells read bytes from a later block after an address gap: that block has
+        // its own row in the view.
+        var blockEnd = image.Blocks.First(block =>
+            rowAddress >= block.StartAddress && rowAddress <= block.EndAddress).EndAddress;
         var hex = new StringBuilder((bytesPerRow * 3) - 1);
         var ascii = showAscii ? new StringBuilder(bytesPerRow) : null;
         var cells = new HexByteCell[bytesPerRow];
@@ -107,7 +112,7 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         {
             if (offset > 0) hex.Append(' ');
             var address = (ulong)rowAddress + (uint)offset;
-            byte? value = address <= uint.MaxValue && image.TryGetByte((uint)address, out var present) ? present : null;
+            byte? value = address <= blockEnd && image.TryGetByte((uint)address, out var present) ? present : null;
             var text = ByteText.FromByte(value);
             hex.Append(text.HexColumn);
             ascii?.Append(text.Ascii);
