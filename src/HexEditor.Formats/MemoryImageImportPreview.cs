@@ -21,6 +21,7 @@ public sealed class MemoryImageImportPreview
         _records = Array.AsReadOnly(records.ToArray());
         DetectedFormat = detectedFormat;
         SourcePath = sourcePath;
+        FormatMismatch = MemoryImageFormatClassifier.GetExtensionMismatch(sourcePath, detectedFormat);
         FormatMetadata = metadata;
         if (existingImage.OccupiedByteCount == 0 &&
             TryBuildOrderedReplacement(_records, maximumOccupiedByteCount, out var replacementImage))
@@ -37,6 +38,7 @@ public sealed class MemoryImageImportPreview
     public MemoryImageExportFormat DetectedFormat { get; }
     public string InputFormat => DetectedFormat.GetDisplayName();
     public string? SourcePath { get; }
+    public MemoryImageFormatMismatch? FormatMismatch { get; }
     public MemoryImageFormatMetadata? FormatMetadata { get; }
     public OverlapSummary OverlapSummary { get; }
 
