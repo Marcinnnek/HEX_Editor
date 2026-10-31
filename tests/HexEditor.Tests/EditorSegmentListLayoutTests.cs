@@ -121,6 +121,7 @@ public sealed class EditorSegmentListLayoutTests
             {
                 var window = new MainWindow();
                 window.ViewModel.LoadImage(MemoryImage.FromRepeatedRange(0, uint.MaxValue, 0xA5), null, null);
+                window.ViewModel.ActiveBytesPerRow = 16;
                 window.Show();
                 window.UpdateLayout();
 

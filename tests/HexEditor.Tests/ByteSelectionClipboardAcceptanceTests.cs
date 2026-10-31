@@ -25,6 +25,7 @@ public sealed class ByteSelectionClipboardAcceptanceTests
                     main.ViewModel.LoadImage(MemoryImage.FromSegments([
                         new MemorySegment(0x1000, [0xB6, 0x5A]),
                         new MemorySegment(0x1010, [0xC6])]), null, null);
+                    main.ViewModel.ActiveBytesPerRow = 16;
                     main.Show();
                     main.UpdateLayout();
                     var view = (HexViewControl)main.FindName("HexRowsView");

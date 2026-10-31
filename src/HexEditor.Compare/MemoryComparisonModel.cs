@@ -159,6 +159,7 @@ public sealed class MemoryComparisonModel
     internal ComparePanelRow CreatePanel(uint rowAddress, bool fileA)
     {
         var image = fileA ? _fileA : _fileB;
+        var regionEnd = AddressRowGrid.RegionEnd(rowAddress);
         var cells = new CompareByteCell[_bytesPerRow];
         var hex = new StringBuilder((_bytesPerRow * 3) - 1);
         var ascii = _showAscii ? new StringBuilder(_bytesPerRow) : null;
@@ -166,13 +167,13 @@ public sealed class MemoryComparisonModel
         {
             if (offset > 0) hex.Append(' ');
             var rawAddress = (ulong)rowAddress + (uint)offset;
-            var inSelectedRange = rawAddress <= uint.MaxValue && IsInSelectedAddressRange((uint)rawAddress);
+            var inSelectedRange = rawAddress <= regionEnd && IsInSelectedAddressRange((uint)rawAddress);
             byte value = 0;
-            var hasValue = inSelectedRange && rawAddress <= uint.MaxValue && image.TryGetByte((uint)rawAddress, out value);
-            var state = inSelectedRange && rawAddress <= uint.MaxValue ? GetState((uint)rawAddress) : CompareByteState.Equal;
+            var hasValue = inSelectedRange && image.TryGetByte((uint)rawAddress, out value);
+            var state = inSelectedRange ? GetState((uint)rawAddress) : CompareByteState.Equal;
             var text = ByteText.FromByte(hasValue ? value : null);
             cells[offset] = new CompareByteCell(text.Hex, text.Ascii.ToString(), state,
-                inSelectedRange && rawAddress <= uint.MaxValue ? (uint)rawAddress : null);
+                inSelectedRange ? (uint)rawAddress : null);
             hex.Append(text.HexColumn);
             ascii?.Append(text.Ascii);
         }
@@ -326,7 +327,7 @@ public sealed class MemoryComparisonModel
         foreach (var address in GetOccupiedAddresses())
         {
             if (GetState(address) == CompareByteState.Equal) continue;
-            var row = address / (uint)_bytesPerRow * (uint)_bytesPerRow;
+            var row = (uint)AddressRowGrid.RowStart(address, (uint)_bytesPerRow);
             if (lastRow == row) continue;
             lastRow = row;
             yield return row;
@@ -345,10 +346,11 @@ public sealed class MemoryComparisonModel
             var address = (uint)position.RowAddress;
             var a = CreatePanel(address, true);
             var b = CreatePanel(address, false);
+            var regionEnd = AddressRowGrid.RegionEnd(address);
             var states = Enumerable.Range(0, _bytesPerRow).Select(offset =>
             {
                 var cellAddress = (ulong)address + (uint)offset;
-                return cellAddress <= uint.MaxValue && IsInSelectedAddressRange((uint)cellAddress)
+                return cellAddress <= regionEnd && IsInSelectedAddressRange((uint)cellAddress)
                     ? GetState((uint)cellAddress)
                     : CompareByteState.Equal;
             }).ToArray();
@@ -363,14 +365,14 @@ public sealed class MemoryComparisonModel
             var intervals = GetDifferenceRows().Select(address => ((ulong)address, (ulong)address));
             if (_navigationAddress is uint navigationAddress)
             {
-                var rowAddress = (ulong)(navigationAddress / width) * width;
+                var rowAddress = AddressRowGrid.RowStart(navigationAddress, width);
                 intervals = intervals.Append((rowAddress, rowAddress));
             }
             return BuildSparseRanges(intervals, width, includeOneBlankRow: false, markLargeGaps: false);
         }
 
         var intervalsToDisplay = _fileA.Ranges.Concat(_fileB.Ranges)
-            .Select(range =>
+            .SelectMany(range =>
             {
                 var start = (ulong)range.StartAddress;
                 var end = (ulong)range.EndAddress;
@@ -380,18 +382,17 @@ public sealed class MemoryComparisonModel
                     end = Math.Min(end, _rangeEnd);
                 }
                 return start <= end
-                    ? ((ulong)((start / width) * width), (ulong)((end / width) * width))
-                    : ((ulong)uint.MaxValue + 1, (ulong)uint.MaxValue + 1);
+                    ? AddressRowGrid.RowsForRange(start, end, width)
+                    : Enumerable.Empty<(ulong First, ulong Last)>();
             })
-            .Where(interval => interval.Item1 <= uint.MaxValue)
             .ToList();
         if (_navigationAddress is uint address &&
             (_viewMode != CompareViewMode.AddressRange || IsInSelectedAddressRange(address)))
         {
-            var rowAddress = (ulong)(address / width) * width;
+            var rowAddress = AddressRowGrid.RowStart(address, width);
             intervalsToDisplay.Add((rowAddress, rowAddress));
         }
-        intervalsToDisplay.Sort((left, right) => left.Item1.CompareTo(right.Item1));
+        intervalsToDisplay.Sort((left, right) => left.First.CompareTo(right.First));
         return BuildSparseRanges(intervalsToDisplay, width, includeOneBlankRow: true, markLargeGaps: true);
     }
 
@@ -404,11 +405,12 @@ public sealed class MemoryComparisonModel
         var end = spans[0].End;
         foreach (var span in spans.Skip(1))
         {
+            var sameRegion = AddressRowGrid.RegionStart(span.Start) == AddressRowGrid.RegionStart(start);
             var mergeLimit = includeOneBlankRow ? end + width * 2UL : end + width;
-            if (span.Start <= mergeLimit) { end = Math.Max(end, span.End); continue; }
+            if (sameRegion && span.Start <= mergeLimit) { end = Math.Max(end, span.End); continue; }
             ranges.Add(new SparseRowSpan(start, end));
-            if (span.Start > end + width && markLargeGaps)
-                ranges.Add(new SparseRowSpan(end + width, span.Start - width, IsGap: true));
+            if (span.Start > AddressRowGrid.RowEnd(end, width) + width && markLargeGaps)
+                ranges.Add(new SparseRowSpan(AddressRowGrid.RowEnd(end, width) + 1, span.Start - width, IsGap: true));
             start = span.Start;
             end = span.End;
         }

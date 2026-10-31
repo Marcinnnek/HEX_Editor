@@ -100,11 +100,7 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
 
     private HexViewRow CreateRow(MemoryImage image, int bytesPerRow, bool showAscii, uint rowAddress)
     {
-        // A row can start partway through a memory block. Do not let its trailing
-        // cells read bytes from a later block after an address gap: that block has
-        // its own row in the view.
-        var blockEnd = image.Blocks.First(block =>
-            rowAddress >= block.StartAddress && rowAddress <= block.EndAddress).EndAddress;
+        var regionEnd = AddressRowGrid.RegionEnd(rowAddress);
         var hex = new StringBuilder((bytesPerRow * 3) - 1);
         var ascii = showAscii ? new StringBuilder(bytesPerRow) : null;
         var cells = new HexByteCell[bytesPerRow];
@@ -112,11 +108,11 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         {
             if (offset > 0) hex.Append(' ');
             var address = (ulong)rowAddress + (uint)offset;
-            byte? value = address <= blockEnd && image.TryGetByte((uint)address, out var present) ? present : null;
+            byte? value = address <= regionEnd && image.TryGetByte((uint)address, out var present) ? present : null;
             var text = ByteText.FromByte(value);
             hex.Append(text.HexColumn);
             ascii?.Append(text.Ascii);
-            var byteAddress = address <= uint.MaxValue ? (uint?)address : null;
+            var byteAddress = address <= regionEnd ? (uint?)address : null;
             var isFindMatch = byteAddress is uint current && _findMatchStart is uint matchStart &&
                 current >= matchStart && current <= _findMatchEnd!.Value;
             var isEdited = byteAddress is uint editedAddress && value is not null && _document?.IsEditedByte(editedAddress) == true;
@@ -129,23 +125,30 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
     {
         if (image.Ranges.Count == 0) return Array.Empty<SparseRowSpan>();
         var width = (uint)bytesPerRow;
-        var rowRanges = image.Ranges.Select(range =>
-        {
-            var first = (ulong)range.StartAddress;
-            var last = first + (((ulong)range.EndAddress - first) / width) * width;
-            return (First: first, Last: last);
-        }).ToArray();
+        var rowRanges = image.Ranges
+            .SelectMany(range => AddressRowGrid.RowsForRange(range.StartAddress, range.EndAddress, width))
+            .ToArray();
 
         var ranges = new List<SparseRowSpan>();
-        ranges.Add(new SparseRowSpan(rowRanges[0].First, rowRanges[0].Last));
+        var start = rowRanges[0].First;
+        var end = rowRanges[0].Last;
         for (var index = 1; index < rowRanges.Length; index++)
         {
             var next = rowRanges[index];
-            var previousEnd = image.Ranges[index - 1].EndAddress;
-            if ((ulong)next.First > (ulong)previousEnd + (2UL * width))
-                ranges.Add(new SparseRowSpan((ulong)previousEnd + 1, next.First - 1, IsGap: true));
-            ranges.Add(new SparseRowSpan(next.First, next.Last));
+            var sameRegion = AddressRowGrid.RegionStart(next.First) == AddressRowGrid.RegionStart(start);
+            if (sameRegion && next.First <= end + (2UL * width))
+            {
+                end = Math.Max(end, next.Last);
+                continue;
+            }
+
+            ranges.Add(new SparseRowSpan(start, end));
+            if (next.First > end + (2UL * width))
+                ranges.Add(new SparseRowSpan(AddressRowGrid.RowEnd(end, width) + 1, next.First - width, IsGap: true));
+            start = next.First;
+            end = next.Last;
         }
+        ranges.Add(new SparseRowSpan(start, end));
         return ranges;
     }
 

@@ -47,6 +47,7 @@ public sealed class HexImageViewModelTests
     [DataRow(8)]
     [DataRow(15)]
     [DataRow(16)]
+    [DataRow(17)]
     [DataRow(24)]
     [DataRow(32)]
     [DataRow(80)]
@@ -64,15 +65,79 @@ public sealed class HexImageViewModelTests
         Assert.AreEqual((2 / bytesPerRow * bytesPerRow).ToString("X8"), first.Address);
         Assert.AreEqual(bytesPerRow, first.Cells.Count);
         Assert.AreEqual("A1", first.Cells[2 % bytesPerRow].Hex);
+        Assert.IsTrue(first.Cells.Take(2 % bytesPerRow).All(cell => cell.Hex.Length == 0));
 
         Assert.IsTrue(view.TryNavigateToAddress(0xFFFFFFFF, out var lastIndex));
         var last = view.Rows[lastIndex];
-        var lastRowStart = (uint)((ulong)uint.MaxValue / (uint)bytesPerRow * (uint)bytesPerRow);
+        var finalRegionStart = 0xFF000000u;
+        var lastRowStart = (uint)((ulong)finalRegionStart +
+            (((ulong)uint.MaxValue - finalRegionStart) / (uint)bytesPerRow * (uint)bytesPerRow));
         Assert.AreEqual(lastRowStart.ToString("X8"), last.Address);
         var lastOffset = (int)(uint.MaxValue - lastRowStart);
         Assert.AreEqual("FE", last.Cells[lastOffset].Hex);
         Assert.AreEqual(uint.MaxValue, last.Cells[lastOffset].Address);
         Assert.IsTrue(last.Cells.Skip(lastOffset + 1).All(cell => cell.Address is null));
+    }
+
+    [TestMethod]
+    public void Editor_CombinesSparseBlocksWithinTheirSharedGlobalRow()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0xA0000002, [0xA1]),
+            new MemorySegment(0xA0000008, [0xB2])]);
+        var view = new HexImageViewModel(image, bytesPerRow: 17);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0xA0000002, out var firstIndex));
+        Assert.IsTrue(view.TryNavigateToAddress(0xA0000008, out var secondIndex));
+        Assert.AreEqual(firstIndex, secondIndex);
+        var row = view.Rows[firstIndex];
+        Assert.AreEqual("A0000000", row.Address);
+        Assert.AreEqual("A1", row.Cells[2].Hex);
+        Assert.IsTrue(row.Cells.Take(2).All(cell => cell.Hex.Length == 0));
+        Assert.IsTrue(row.Cells.Skip(3).Take(5).All(cell => cell.Hex.Length == 0));
+        Assert.AreEqual("B2", row.Cells[8].Hex);
+    }
+
+    [TestMethod]
+    public void Editor_UsesOneRowGridAcrossSourceRecordLikeSegmentStarts()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0x0002, [0xA1]),
+            new MemorySegment(0x0012, [0xA2]),
+            new MemorySegment(0x0022, [0xA3])]);
+        var view = new HexImageViewModel(image, bytesPerRow: 17);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0x0002, out var firstIndex));
+        Assert.AreEqual("00000000", view.Rows[firstIndex].Address);
+        Assert.AreEqual("A1", view.Rows[firstIndex].Cells[2].Hex);
+        Assert.IsTrue(view.TryNavigateToAddress(0x0012, out var secondIndex));
+        Assert.AreEqual("00000011", view.Rows[secondIndex].Address);
+        Assert.AreEqual("A2", view.Rows[secondIndex].Cells[1].Hex);
+        Assert.IsTrue(view.TryNavigateToAddress(0x0022, out var thirdIndex));
+        Assert.AreEqual("00000022", view.Rows[thirdIndex].Address);
+        Assert.AreEqual("A3", view.Rows[thirdIndex].Cells[0].Hex);
+    }
+
+    [TestMethod]
+    public void Editor_ResetsGridOriginAtEach16MiBRegionBoundary()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0xA0001002, [0xC3]),
+            new MemorySegment(0xA0FFFFFF, [0xA1]),
+            new MemorySegment(0xA1000002, [0xB2])]);
+        var view = new HexImageViewModel(image, bytesPerRow: 17);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0xA0FFFFFF, out var beforeBoundaryIndex));
+        Assert.IsTrue(view.TryNavigateToAddress(0xA1000002, out var afterBoundaryIndex));
+        Assert.AreEqual("A0FFFFFF", view.Rows[beforeBoundaryIndex].Address);
+        Assert.AreEqual("A1000000", view.Rows[afterBoundaryIndex].Address);
+        Assert.AreEqual("A1", view.Rows[beforeBoundaryIndex].Cells[0].Hex);
+        Assert.IsTrue(view.Rows[beforeBoundaryIndex].Cells.Skip(1).All(cell => cell.Address is null));
+        Assert.AreEqual("B2", view.Rows[afterBoundaryIndex].Cells[2].Hex);
+
+        Assert.IsTrue(view.TryNavigateToAddress(0xA0001002, out var interiorRegionIndex));
+        Assert.AreEqual("A0001001", view.Rows[interiorRegionIndex].Address);
+        Assert.AreEqual("C3", view.Rows[interiorRegionIndex].Cells[1].Hex);
     }
 
     [TestMethod]
@@ -640,10 +705,10 @@ public sealed class HexImageViewModelTests
         var originalRowCount = view.Rows.Count;
 
         Assert.IsTrue(view.TryNavigateToSegment(0, out var firstRowIndex));
-        Assert.AreEqual("00001000", view.Rows[firstRowIndex].Address);
+        Assert.AreEqual("00000FFC", view.Rows[firstRowIndex].Address);
         Assert.IsTrue(view.TryNavigateToSegment(1, out var rowIndex));
 
-        Assert.AreEqual("00002000", view.Rows[rowIndex].Address);
+        Assert.AreEqual("00001FF8", view.Rows[rowIndex].Address);
         Assert.HasCount(originalRowCount, view.Rows);
     }
 
@@ -660,7 +725,7 @@ public sealed class HexImageViewModelTests
         Assert.IsTrue(view.TryNavigateToAddress(0x1FFF, out var gapRow));
         Assert.IsFalse(view.Rows[gapRow].IsGapMarker);
         Assert.IsTrue(view.TryNavigateToSegment(1, out var blockRow));
-        Assert.AreEqual("00002000", view.Rows[blockRow].Address);
+        Assert.AreEqual("00001FF8", view.Rows[blockRow].Address);
     }
 
     [TestMethod]

@@ -8,6 +8,37 @@ internal sealed record IndexedSparseRowSpan(ulong StartAddress, ulong EndAddress
 
 internal readonly record struct SparseRowPosition(bool IsGap, ulong RowAddress, ulong GapStartAddress, ulong GapEndAddress);
 
+internal static class AddressRowGrid
+{
+    private const ulong RegionSize = 0x01000000;
+    private const ulong RegionMask = 0xFF000000;
+
+    public static ulong RegionStart(ulong address) => address & RegionMask;
+
+    public static ulong RegionEnd(ulong address) => Math.Min(RegionStart(address) + RegionSize - 1, uint.MaxValue);
+
+    public static ulong RowStart(ulong address, uint rowWidth)
+    {
+        var regionStart = RegionStart(address);
+        return regionStart + ((address - regionStart) / rowWidth) * rowWidth;
+    }
+
+    public static ulong RowEnd(ulong rowStart, uint rowWidth) =>
+        Math.Min(rowStart + rowWidth - 1, RegionEnd(rowStart));
+
+    public static IEnumerable<(ulong First, ulong Last)> RowsForRange(ulong startAddress, ulong endAddress, uint rowWidth)
+    {
+        var current = startAddress;
+        while (current <= endAddress)
+        {
+            var regionEnd = RegionEnd(current);
+            var chunkEnd = Math.Min(endAddress, regionEnd);
+            yield return (RowStart(current, rowWidth), RowStart(chunkEnd, rowWidth));
+            current = chunkEnd + 1;
+        }
+    }
+}
+
 /// <summary>Indexes visible address spans and collapsed gaps without materializing each row.</summary>
 internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollectionChanged where T : class
 {
@@ -50,8 +81,7 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         {
             var middle = low + ((high - low) / 2);
             var span = _spans[middle];
-            var spanEnd = span.IsGap ? span.EndAddress
-                : Math.Min((ulong)uint.MaxValue, span.EndAddress + _rowWidth - 1);
+            var spanEnd = span.IsGap ? span.EndAddress : AddressRowGrid.RowEnd(span.EndAddress, _rowWidth);
             if (middle + 1 < _spans.Count)
                 spanEnd = Math.Min(spanEnd, _spans[middle + 1].StartAddress - 1);
             if (address < span.StartAddress)
@@ -65,7 +95,7 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
             else
             {
                 var rowAddress = span.IsGap
-                    ? Math.Max(span.StartAddress, (ulong)(address / _rowWidth) * _rowWidth)
+                    ? Math.Max(span.StartAddress, AddressRowGrid.RowStart(address, _rowWidth))
                     : span.StartAddress + ((address - span.StartAddress) / _rowWidth) * _rowWidth;
                 if (span.IsGap)
                 {
@@ -96,8 +126,9 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
             if (rowAddress > span.StartAddress)
                 ranges.Add(new SparseRowSpan(span.StartAddress, rowAddress - 1, IsGap: true));
             ranges.Add(new SparseRowSpan(rowAddress, rowAddress));
-            if (rowAddress + _rowWidth <= span.EndAddress)
-                ranges.Add(new SparseRowSpan(rowAddress + _rowWidth, span.EndAddress, IsGap: true));
+            var afterRow = AddressRowGrid.RowEnd(rowAddress, _rowWidth) + 1;
+            if (afterRow <= span.EndAddress)
+                ranges.Add(new SparseRowSpan(afterRow, span.EndAddress, IsGap: true));
         }
 
         (_spans, _count) = SparseRowIndexBuilder.Build(ranges, _rowWidth);

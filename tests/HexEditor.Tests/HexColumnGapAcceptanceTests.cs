@@ -20,7 +20,7 @@ public sealed class HexColumnGapAcceptanceTests
         var model = new HexImageViewModel(image);
 
         var firstRow = model.Rows[0];
-        Assert.AreEqual("A0000002", firstRow.Address);
+        Assert.AreEqual("A0000000", firstRow.Address);
         Assert.AreEqual("", firstRow.Cells[14].Hex);
         Assert.AreEqual("", firstRow.Cells[15].Hex);
         Assert.AreEqual("A0000010", model.Rows[1].Address);
@@ -49,7 +49,7 @@ public sealed class HexColumnGapAcceptanceTests
                 .Apply(OverlapDecision.OverwriteIncoming)!.Image;
             var rows = new HexImageViewModel(image).Rows;
 
-            AssertRowByteCount(rows, 0x1002, 12);
+            AssertRowByteCount(rows, 0x1000, 12);
             AssertRowByteCount(rows, 0x1010, 3);
             AssertRowByteCount(rows, 0x1040, 2);
             Assert.AreEqual(1, rows.Sum(row => row.Cells.Count(cell => cell.Hex == "9E")),
@@ -137,9 +137,9 @@ public sealed class HexColumnGapAcceptanceTests
                 foreach (var windowed in new[] { false, true })
                 {
                     main = new MainWindow();
-                    main.ViewModel.ActiveBytesPerRow = bytesPerRow;
                     main.ViewModel.LoadImage(MemoryImage.FromSegments([
                         new MemorySegment(0x1000, Enumerable.Range(0, 64).Select(value => (byte)value).ToArray())]), null, null);
+                    main.ViewModel.ActiveBytesPerRow = bytesPerRow;
                     main.Width = 1200;
                     main.Show();
                     main.UpdateLayout();

@@ -10,6 +10,53 @@ namespace HexEditor.Tests;
 public sealed class CompareViewModelTests
 {
     [TestMethod]
+    public void CompareRows_UseGlobalCustomWidthForOccupiedAndDifferencesOnlyRows()
+    {
+        var baseImage = MemoryImage.FromSegments([
+            new MemorySegment(0xA0000002, [0x10]),
+            new MemorySegment(0xA0000012, [0x20]),
+            new MemorySegment(0xA0000022, [0x30]),
+            new MemorySegment(0xA0001002, [0x40]),
+            new MemorySegment(0xA1000002, [0x50])]);
+        var referenceImage = MemoryImage.FromSegments([
+            new MemorySegment(0xA0000002, [0x11]),
+            new MemorySegment(0xA0000012, [0x21]),
+            new MemorySegment(0xA0000022, [0x31]),
+            new MemorySegment(0xA0001002, [0x41]),
+            new MemorySegment(0xA1000002, [0x51])]);
+        var comparison = new CompareViewModel(baseImage, referenceImage, bytesPerRow: 17);
+
+        foreach (var (address, expectedRow, expectedOffset, baseHex, referenceHex) in new[]
+        {
+            (0xA0000002u, "A0000000", 2, "10", "11"),
+            (0xA0000012u, "A0000011", 1, "20", "21"),
+            (0xA0000022u, "A0000022", 0, "30", "31"),
+            (0xA0001002u, "A0001001", 1, "40", "41"),
+            (0xA1000002u, "A1000000", 2, "50", "51")
+        })
+        {
+            Assert.IsTrue(comparison.TryNavigateToAddress(address, out var rowIndex));
+            var row = comparison.Rows[rowIndex];
+            Assert.AreEqual(expectedRow, row.Address);
+            Assert.AreEqual(address, row.FileA.Cells[expectedOffset].Address);
+            Assert.AreEqual(baseHex, row.FileA.Cells[expectedOffset].Hex);
+            Assert.AreEqual(address, row.FileB.Cells[expectedOffset].Address);
+            Assert.AreEqual(referenceHex, row.FileB.Cells[expectedOffset].Hex);
+        }
+
+        comparison.ViewMode = CompareViewMode.DifferencesOnly;
+        Assert.AreEqual("A0000000", comparison.Rows[0].Address);
+        Assert.AreEqual("A0000011", comparison.Rows[1].Address);
+        Assert.AreEqual("A0000022", comparison.Rows[2].Address);
+        Assert.AreEqual("A0001001", comparison.Rows[3].Address);
+        Assert.AreEqual("A1000000", comparison.Rows[4].Address);
+        Assert.IsTrue(comparison.TryNavigateToAddress(0xA0001002, out var regionRow));
+        Assert.AreEqual("A0001001", comparison.Rows[regionRow].Address);
+        Assert.IsTrue(comparison.TryNavigateToAddress(0xA1000002, out var nextRegionRow));
+        Assert.AreEqual("A1000000", comparison.Rows[nextRegionRow].Address);
+    }
+
+    [TestMethod]
     public void SelectingOccupiedCompareBytesKeepsBothSparsePanelsStable()
     {
         var comparison = new CompareViewModel(
