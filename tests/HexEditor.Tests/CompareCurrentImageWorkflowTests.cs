@@ -328,6 +328,57 @@ public sealed class CompareCurrentImageWorkflowTests
     [TestMethod]
     [DataRow("firmware.hex", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
     [DataRow("firmware.srec", MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord)]
+    public void SaveAsFormatMismatchCanBeCanceledWithoutCreatingOrReplacingTarget(string fileName,
+        MemoryImageExportFormat outputFormat, MemoryImageExportFormat expectedFormat)
+    {
+        var target = Path.Combine(Path.GetTempPath(), $"save-as-mismatch-{Guid.NewGuid():N}-{fileName}");
+        var existingContents = "existing target contents";
+        File.WriteAllText(target, existingContents);
+        try
+        {
+            var viewModel = new MainViewModel();
+            viewModel.EditByte(0x1000, 0xAA, OverlapDecision.OverwriteIncoming);
+            var document = viewModel.Workspace.Document;
+            var workflow = new MemoryImageFileWorkflow(viewModel);
+            MemoryImageFormatMismatch? shown = null;
+
+            var allowed = workflow.ConfirmSaveAsFormat(target, outputFormat, mismatch =>
+            {
+                shown = mismatch;
+                return false;
+            });
+            if (allowed) document.SaveAs(target, outputFormat, overwriteExisting: true);
+
+            Assert.IsFalse(allowed);
+            Assert.IsNotNull(shown);
+            Assert.AreEqual(Path.GetFileName(target), shown.FileName);
+            Assert.AreEqual(expectedFormat, shown.ExpectedFormat);
+            Assert.AreEqual(outputFormat, shown.DetectedFormat);
+            Assert.IsTrue(document.IsModified);
+            Assert.IsNull(document.SourcePath);
+            Assert.AreEqual(existingContents, File.ReadAllText(target));
+        }
+        finally { File.Delete(target); }
+    }
+
+    [TestMethod]
+    public void SaveAsFormatConfirmationAllowsMismatchAndSkipsMatchingOrUnknownExtensions()
+    {
+        var workflow = new MemoryImageFileWorkflow(new MainViewModel());
+        var promptCount = 0;
+
+        Assert.IsTrue(workflow.ConfirmSaveAsFormat("firmware.hex", MemoryImageExportFormat.SRecord,
+            mismatch => { promptCount++; return mismatch.ExpectedFormat == MemoryImageExportFormat.IntelHex; }));
+        Assert.IsTrue(workflow.ConfirmSaveAsFormat("firmware.srec", MemoryImageExportFormat.SRecord,
+            _ => { promptCount++; return false; }));
+        Assert.IsTrue(workflow.ConfirmSaveAsFormat("firmware.custom", MemoryImageExportFormat.IntelHex,
+            _ => { promptCount++; return false; }));
+        Assert.AreEqual(1, promptCount);
+    }
+
+    [TestMethod]
+    [DataRow("firmware.hex", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.srec", MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord)]
     public void ExportFormatMismatchRequiresConfirmationForEveryExportScope(string fileName,
         MemoryImageExportFormat outputFormat, MemoryImageExportFormat expectedFormat)
     {
