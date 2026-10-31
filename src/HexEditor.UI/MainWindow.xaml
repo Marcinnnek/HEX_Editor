@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:HexEditor.UI"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         mc:Ignorable="d"
-        Title="HEX Editor" Height="620" Width="980" MinHeight="420" MinWidth="640"
+        Title="{Binding ViewModel.WindowTitle}" Height="620" Width="980" MinHeight="420" MinWidth="640"
         WindowStyle="SingleBorderWindow" ResizeMode="CanResize"
         PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Window.Resources>

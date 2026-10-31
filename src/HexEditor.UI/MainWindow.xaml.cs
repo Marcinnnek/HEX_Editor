@@ -51,7 +51,6 @@ public partial class MainWindow : Window
         ViewModel.ImageChanged += (_, _) => InvalidateFind("Image changed. Search again.");
         ViewModel.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(MainViewModel.WindowTitle)) Title = ViewModel.WindowTitle;
             if (e.PropertyName == nameof(MainViewModel.ActiveBytesPerRow))
             {
                 if (RowWidthBox.Text != ViewModel.ActiveBytesPerRow.ToString(CultureInfo.InvariantCulture))
@@ -278,7 +277,6 @@ public partial class MainWindow : Window
                 () =>
                 {
                     WorkspaceTabs.SelectedIndex = 0;
-                    Title = ViewModel.WindowTitle;
                 }, token, progress, baseDocument,
                 mismatch => ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch")));
             if (comparison is null) return;
@@ -370,7 +368,6 @@ public partial class MainWindow : Window
             var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
             if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides,
                     () => ConfirmCloseImage(ViewModel.Workspace.Document))) return;
-            Title = ViewModel.WindowTitle;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
@@ -436,7 +433,6 @@ public partial class MainWindow : Window
                 return;
             CloseDocumentViews(replacedDocument);
             ViewModel.ActivateEditor();
-            Title = ViewModel.WindowTitle;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Open"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
@@ -640,7 +636,6 @@ public partial class MainWindow : Window
         if (!ConfirmCloseImage(document)) return;
         CloseDocumentViews(document);
         if (ReferenceEquals(document, ViewModel.Workspace.Document)) ViewModel.CloseImage();
-        Title = ViewModel.WindowTitle;
     }
 
     private void RefreshSavedDocumentTabs(EditorDocument document)
@@ -651,21 +646,18 @@ public partial class MainWindow : Window
             if (tab.Content is not CompareView view || !ReferenceEquals(view.Workspace.BaseDocument, document)) continue;
             tab.Header = CreateCompareTabHeader(view.Workspace, tab);
         }
-        if (ReferenceEquals(document, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void Undo_Click(object sender, RoutedEventArgs e)
     {
         if (!ViewModel.CanEdit) return;
         ViewModel.Undo();
-        if (ReferenceEquals(ActiveDocument, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void Redo_Click(object sender, RoutedEventArgs e)
     {
         if (!ViewModel.CanEdit) return;
         ViewModel.Redo();
-        if (ReferenceEquals(ActiveDocument, ViewModel.Workspace.Document)) Title = ViewModel.WindowTitle;
     }
 
     private void EditInsert_Click(object sender, RoutedEventArgs e)
@@ -677,7 +669,6 @@ public partial class MainWindow : Window
             var dialog = new RangeEditDialog(RangeEditDialogKind.Insert, start, end) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
             _imageEdits.Insert(input.Start, input.Pattern!, AskOverlap);
-            Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
@@ -696,7 +687,6 @@ public partial class MainWindow : Window
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
             await RunFileOperationAsync((token, progress) => ViewModel.FillRangeAsync(
                 input.Start, input.End, input.Pattern!, input.FillPolicy, token, progress));
-            Title = ViewModel.WindowTitle;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Fill"); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
@@ -713,7 +703,6 @@ public partial class MainWindow : Window
         {
             var dialog = new ChecksumDialog(ViewModel, AskOverlap) { Owner = this };
             dialog.ShowDialog();
-            Title = ViewModel.WindowTitle;
         }
         catch (Exception exception)
         {
@@ -733,7 +722,6 @@ public partial class MainWindow : Window
         {
             var (address, _) = GetSelectionDefaults();
             _imageEdits.Paste(address, AskPasteOverlap);
-            Title = ViewModel.WindowTitle;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
@@ -745,7 +733,7 @@ public partial class MainWindow : Window
     private void RunRangeEdit(Action action)
     {
         if (!ViewModel.CanEdit) return;
-        try { action(); Title = ViewModel.WindowTitle; }
+        try { action(); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
         {
             RecordError("Edit selection", exception);

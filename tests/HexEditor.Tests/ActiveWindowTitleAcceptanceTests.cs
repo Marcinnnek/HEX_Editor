@@ -23,23 +23,26 @@ public sealed class ActiveWindowTitleAcceptanceTests
             {
                 window.Show();
                 window.UpdateLayout();
-                AssertNativeCaption(window, "Untitled - HEX Editor");
+                AssertNativeCaption(window, "HexEditor");
+                var handle = new WindowInteropHelper(window).Handle;
+                if (DwmGetWindowAttribute(handle, 36, out var captionTextColor, sizeof(int)) >= 0)
+                    Assert.AreEqual(0x00000000, captionTextColor, "Light title bars need visible dark caption text.");
 
                 window.ViewModel.LoadImage(Image(0x10), "C:\\images\\editor.hex", MemoryImageExportFormat.IntelHex);
-                AssertNativeCaption(window, "editor.hex - HEX Editor");
+                AssertNativeCaption(window, "editor.hex - HexEditor");
                 window.ViewModel.EditByte(0x1000, 0x11, OverlapDecision.OverwriteIncoming);
-                AssertNativeCaption(window, "editor.hex * - HEX Editor");
+                AssertNativeCaption(window, "editor.hex * - HexEditor");
 
                 var savedAs = Path.Combine(Path.GetTempPath(), $"title-{Guid.NewGuid():N}.hex");
                 var savedAsName = Path.GetFileName(savedAs);
                 try
                 {
                     window.ViewModel.SaveAs(savedAs, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
-                    AssertNativeCaption(window, $"{savedAsName} - HEX Editor");
+                    AssertNativeCaption(window, $"{savedAsName} - HexEditor");
                     window.ViewModel.EditByte(0x1000, 0x12, OverlapDecision.OverwriteIncoming);
-                    AssertNativeCaption(window, $"{savedAsName} * - HEX Editor");
+                    AssertNativeCaption(window, $"{savedAsName} * - HexEditor");
                     window.ViewModel.Save();
-                    AssertNativeCaption(window, $"{savedAsName} - HEX Editor");
+                    AssertNativeCaption(window, $"{savedAsName} - HexEditor");
                     var baseDocument = window.ViewModel.Workspace.Document;
                     var first = new CompareWorkspaceTabViewModel(baseDocument.CurrentImage, Image(0x20),
                         savedAsName, "reference-a.hex", baseDocument.SourcePath, "reference-a.hex", baseDocument);
@@ -53,28 +56,30 @@ public sealed class ActiveWindowTitleAcceptanceTests
 
                     tabs.SelectedItem = firstTab;
                     window.UpdateLayout();
-                    AssertNativeCaption(window, $"Compare: {savedAsName} ↔ reference-a.hex - HEX Editor");
+                    AssertNativeCaption(window, $"Compare: {savedAsName} ↔ reference-a.hex - HexEditor");
                     first.BaseDocument!.Editing.EditByte(0x1000, 0x13, OverlapDecision.OverwriteIncoming);
-                    AssertNativeCaption(window, $"Compare: {savedAsName} * ↔ reference-a.hex - HEX Editor");
+                    AssertNativeCaption(window, $"Compare: {savedAsName} * ↔ reference-a.hex - HexEditor");
 
                     var compareBaseAs = Path.Combine(Path.GetTempPath(), $"compare-title-{Guid.NewGuid():N}.hex");
                     try
                     {
                         window.ViewModel.SaveAs(compareBaseAs, MemoryImageExportFormat.IntelHex, overwriteExisting: false);
                         var compareBaseAsName = Path.GetFileName(compareBaseAs);
-                        AssertNativeCaption(window, $"Compare: {compareBaseAsName} ↔ reference-a.hex - HEX Editor");
+                        AssertNativeCaption(window, $"Compare: {compareBaseAsName} ↔ reference-a.hex - HexEditor");
 
                         tabs.SelectedItem = secondTab;
                         window.UpdateLayout();
-                        AssertNativeCaption(window, "Compare: other-base.hex ↔ reference-b.hex - HEX Editor");
+                        AssertNativeCaption(window, "Compare: other-base.hex ↔ reference-b.hex - HexEditor");
                         tabs.SelectedItem = firstTab;
-                        AssertNativeCaption(window, $"Compare: {compareBaseAsName} ↔ reference-a.hex - HEX Editor");
+                        AssertNativeCaption(window, $"Compare: {compareBaseAsName} ↔ reference-a.hex - HexEditor");
                         tabs.SelectedItem = tabs.Items[0];
-                        AssertNativeCaption(window, $"{compareBaseAsName} - HEX Editor");
+                        AssertNativeCaption(window, $"{compareBaseAsName} - HexEditor");
                         window.ViewModel.EditByte(0x1000, 0x14, OverlapDecision.OverwriteIncoming);
-                        AssertNativeCaption(window, $"{compareBaseAsName} * - HEX Editor");
+                        AssertNativeCaption(window, $"{compareBaseAsName} * - HexEditor");
                         window.ViewModel.Save();
-                        AssertNativeCaption(window, $"{compareBaseAsName} - HEX Editor");
+                        AssertNativeCaption(window, $"{compareBaseAsName} - HexEditor");
+                        window.ViewModel.CloseImage();
+                        AssertNativeCaption(window, "HexEditor");
                     }
                     finally { if (File.Exists(compareBaseAs)) File.Delete(compareBaseAs); }
                 }
@@ -107,4 +112,7 @@ public sealed class ActiveWindowTitleAcceptanceTests
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out int value, int size);
 }

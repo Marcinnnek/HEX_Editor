@@ -13,7 +13,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private readonly MemoryImageFileService _fileService = new();
     private HexImageViewModel _imageView = new(MemoryImage.Empty);
     private string _statusMessage = "Open an Intel HEX or Motorola S-Record file to inspect its occupied memory segments.";
-    private string _windowTitle = "HEX Editor";
+    private string _windowTitle = "HexEditor";
     private CompareViewModel? _activeComparison;
     private EditorDocument? _activeComparisonDocument;
     private CompareWorkspaceTabViewModel? _activeComparisonWorkspace;
@@ -411,11 +411,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (_activeComparisonWorkspace is { } comparison)
         {
             var dirtyMarker = _activeComparisonDocument?.IsModified == true ? " *" : string.Empty;
-            WindowTitle = $"Compare: {comparison.NameA}{dirtyMarker} ↔ {comparison.NameB} - HEX Editor";
+            WindowTitle = $"Compare: {comparison.NameA}{dirtyMarker} ↔ {comparison.NameB} - HexEditor";
             return;
         }
 
-        WindowTitle = $"{(string.IsNullOrWhiteSpace(SourcePath) ? "Untitled" : Path.GetFileName(SourcePath))}{(IsModified ? " *" : "")} - HEX Editor";
+        WindowTitle = string.IsNullOrWhiteSpace(SourcePath)
+            ? "HexEditor"
+            : $"{Path.GetFileName(SourcePath)}{(IsModified ? " *" : "")} - HexEditor";
     }
     private void RefreshModifiedTitle() => RefreshTitle();
 
