@@ -304,9 +304,10 @@ public partial class HexViewControl : UserControl
     private void RefreshWindow()
     {
         if (!UseWindowedScrolling || !IsLoaded || ItemsSource is not IList<HexViewRow> rows) return;
-        _visibleRowCount = Math.Max(1, (int)Math.Ceiling(Math.Max(1, WindowedView.ActualHeight - 25) / 18d) + 1);
+        var wasAtEnd = RowThumb.Maximum > 0 && _windowStart >= RowThumb.Maximum;
+        _visibleRowCount = GetVisibleRowCount();
         var maxStart = Math.Max(0, rows.Count - _visibleRowCount);
-        _windowStart = Math.Clamp(_windowStart, 0, maxStart);
+        _windowStart = wasAtEnd ? maxStart : Math.Clamp(_windowStart, 0, maxStart);
         _refreshingWindow = true;
         RowThumb.Maximum = maxStart;
         RowThumb.ViewportSize = GetVisibleThumbViewport(maxStart);
@@ -314,6 +315,32 @@ public partial class HexViewControl : UserControl
         _refreshingWindow = false;
         WindowRows.ReplaceAll(rows, _windowStart, Math.Min(rows.Count, _windowStart + _visibleRowCount));
         foreach (var item in WindowRows) item.IsSelected = item.RowIndex == _selectedRowIndex;
+    }
+
+    private int GetVisibleRowCount()
+    {
+        // CanContentScroll reports logical units through ScrollViewer.ViewportHeight;
+        // the presenter gives the physical height available to the rendered rows.
+        var presenter = WindowedScroll.Template?.FindName("PART_ScrollContentPresenter", WindowedScroll)
+            as ScrollContentPresenter;
+        var viewportHeight = presenter is { ActualHeight: > 0 }
+            ? presenter.ActualHeight
+            : WindowedView.ActualHeight;
+        var headerHeight = WindowedRows.TranslatePoint(new Point(), WindowedScroll).Y;
+        if (headerHeight <= 0) headerHeight = 25;
+
+        var firstRow = WindowedRows.ItemContainerGenerator.ContainerFromIndex(0) as FrameworkElement;
+        var rowHeight = firstRow?.ActualHeight > 0 ? firstRow.ActualHeight : 0;
+        if (rowHeight <= 0)
+        {
+            var sample = new FormattedText("0", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface(WindowedScroll.FontFamily, WindowedScroll.FontStyle,
+                    WindowedScroll.FontWeight, WindowedScroll.FontStretch), WindowedScroll.FontSize,
+                Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            rowHeight = Math.Max(18, sample.Height + GridSpacingSettings.Current.VerticalRowSpacing);
+        }
+
+        return Math.Max(1, (int)Math.Floor(Math.Max(1, viewportHeight - headerHeight) / rowHeight));
     }
 
     private double GetVisibleThumbViewport(int maxStart)

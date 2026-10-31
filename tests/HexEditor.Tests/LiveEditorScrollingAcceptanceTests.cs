@@ -452,6 +452,52 @@ public sealed class LiveEditorScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void LastWindowedRowIsFullyVisibleAtTheBottomOfTheScrollbar()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var image = MemoryImage.FromPatternRange(0, 99_999_999, [0x5A]);
+                var model = new HexImageViewModel(image, 32, showAscii: true);
+                var view = new HexViewControl
+                {
+                    ItemsSource = model.Rows, UseWindowedScrolling = true,
+                    Width = 720, Height = 480
+                };
+                view.ItemsGrid.FontSize = 18;
+                window = new Window { Content = view, Width = 740, Height = 500, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var bar = Descendants<ScrollBar>(view).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                bar.Value = bar.Maximum;
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                Assert.AreEqual(model.Rows.Count - 1, view.WindowRows[^1].RowIndex,
+                    $"maximum={bar.Maximum}, viewport={bar.ViewportSize}, value={bar.Value}, first={view.FirstVisibleRowIndex}, visible={view.WindowRows.Count}");
+                var lastAddress = Descendants<HexRowAddressControl>(view)
+                    .Single(item => item.Row?.Address == view.WindowRows[^1].Row.Address);
+                var viewport = Descendants<ScrollContentPresenter>(view).Single(item => item.IsVisible);
+                var top = lastAddress.TranslatePoint(new Point(), viewport).Y;
+                Assert.IsGreaterThanOrEqualTo(-0.5, top, "The last address row must enter the viewport.");
+                Assert.IsLessThanOrEqualTo(viewport.ActualHeight + 0.5, top + lastAddress.ActualHeight,
+                    $"The last row is clipped below the viewport (top={top:F1}, height={lastAddress.ActualHeight:F1}, viewport={viewport.ActualHeight:F1}).");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void WindowedEditorScrollbarHasLineButtonsAtBothEnds()
     {
         Exception? failure = null;
