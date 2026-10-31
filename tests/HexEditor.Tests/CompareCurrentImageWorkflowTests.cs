@@ -218,6 +218,44 @@ public sealed class CompareCurrentImageWorkflowTests
     }
 
     [TestMethod]
+    public void MergeFormatMismatchCanBeCancelledBeforeTheMergeIsApplied()
+    {
+        var viewModel = new MainViewModel();
+        var document = viewModel.Workspace.Document;
+        var destinationImage = MemoryImage.FromRepeatedRange(0x1000, 0x1000, 0x10);
+        var sourceImage = MemoryImage.FromRepeatedRange(0x1000, 0x1000, 0x20);
+        var mismatch = new MemoryImageFormatMismatch("source.hex", MemoryImageExportFormat.IntelHex,
+            MemoryImageExportFormat.SRecord);
+        var destination = new LoadedMemoryImage(destinationImage, "destination.hex", MemoryImageExportFormat.IntelHex);
+        var source = new LoadedMemoryImage(sourceImage, "source.hex", MemoryImageExportFormat.SRecord, mismatch);
+        MemoryImageFormatMismatch? prompted = null;
+
+        var mayContinue = new MemoryImageFileWorkflow(viewModel).ConfirmMergeFormats(destination, source,
+            value => { prompted = value; return false; });
+
+        Assert.IsFalse(mayContinue);
+        Assert.AreSame(mismatch, prompted);
+        Assert.AreSame(document, viewModel.Workspace.Document);
+        Assert.AreEqual(0UL, viewModel.Workspace.Document.CurrentImage.OccupiedByteCount);
+        Assert.AreEqual(0, viewModel.Workspace.ComparisonViews.Count);
+    }
+
+    [TestMethod]
+    public void MergeFormatMismatchAllowsContinuingWhenUserAcceptsDetectedFormat()
+    {
+        var viewModel = new MainViewModel();
+        var mismatch = new MemoryImageFormatMismatch("source.srec", MemoryImageExportFormat.SRecord,
+            MemoryImageExportFormat.IntelHex);
+        var destination = new LoadedMemoryImage(MemoryImage.Empty, "destination.hex", MemoryImageExportFormat.IntelHex);
+        var source = new LoadedMemoryImage(MemoryImage.Empty, "source.srec", MemoryImageExportFormat.IntelHex, mismatch);
+
+        var mayContinue = new MemoryImageFileWorkflow(viewModel).ConfirmMergeFormats(destination, source,
+            value => ReferenceEquals(value, mismatch));
+
+        Assert.IsTrue(mayContinue);
+    }
+
+    [TestMethod]
     public async Task CompareFromCompareUsesSameBaseDocumentAndEachReferenceKeepsLiveSharedEdits()
     {
         var basePath = CreateImageFile(0x10);
