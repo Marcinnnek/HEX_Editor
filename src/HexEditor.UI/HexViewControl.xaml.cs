@@ -63,6 +63,7 @@ public partial class HexViewControl : UserControl
     public event EventHandler<AddressRangeSelectedEventArgs>? AddressRangeSelected;
     public event EventHandler<ByteClickFailedEventArgs>? ByteClickFailed;
     public event EventHandler<WindowedByteDoubleClickEventArgs>? WindowedByteDoubleClicked;
+    public event EventHandler? FirstVisibleRowChanged;
 
     public void ScrollToRow(int rowIndex)
     {
@@ -136,17 +137,19 @@ public partial class HexViewControl : UserControl
     {
         if (ItemsSource is not IList<HexViewRow> rows || rows.Count == 0) return;
         var max = Math.Max(0, rows.Count - _visibleRowCount);
+        var previousStart = _windowStart;
         _windowStart = Math.Clamp(index, 0, max);
         _refreshingWindow = true;
         RowThumb.Value = _windowStart;
         _refreshingWindow = false;
         RefreshWindow();
+        if (_windowStart != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshWindow()
     {
         if (!UseWindowedScrolling || !IsLoaded || ItemsSource is not IList<HexViewRow> rows) return;
-        _visibleRowCount = Math.Max(1, (int)Math.Ceiling(Math.Max(1, WindowedView.ActualHeight - 25) / 18d) + 2);
+        _visibleRowCount = Math.Max(1, (int)Math.Ceiling(Math.Max(1, WindowedView.ActualHeight - 25) / 18d) + 1);
         var maxStart = Math.Max(0, rows.Count - _visibleRowCount);
         _windowStart = Math.Clamp(_windowStart, 0, maxStart);
         _refreshingWindow = true;
@@ -160,8 +163,10 @@ public partial class HexViewControl : UserControl
     private void RowThumb_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_refreshingWindow || !UseWindowedScrolling) return;
+        var previousStart = _windowStart;
         _windowStart = (int)Math.Round(e.NewValue);
         RefreshWindow();
+        if (_windowStart != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void WindowedScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)

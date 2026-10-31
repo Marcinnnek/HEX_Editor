@@ -22,6 +22,9 @@ public partial class CompareView : UserControl
         RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
+        var useWindowedScrolling = ViewModel.Rows.Count > 50_000;
+        FileAView.UseWindowedScrolling = useWindowedScrolling;
+        FileBView.UseWindowedScrolling = useWindowedScrolling;
         ConfigurePanel(FileAView);
         ConfigurePanel(FileBView);
     }
@@ -46,6 +49,7 @@ public partial class CompareView : UserControl
         grid.SelectionMode = DataGridSelectionMode.Single;
         grid.SelectionChanged += Panel_SelectionChanged;
         panel.ByteClickFailed += Panel_ByteClickFailed;
+        panel.FirstVisibleRowChanged += Panel_FirstVisibleRowChanged;
         grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
         grid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
             new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
@@ -219,7 +223,9 @@ public partial class CompareView : UserControl
 
     private uint? SelectedAddress()
     {
-        if (FileAView.ItemsGrid.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var rowAddress))
+        var selected = FileAView.UseWindowedScrolling && FileAView.WindowRows.Count > 0
+            ? FileAView.WindowRows[0].Row : FileAView.ItemsGrid.SelectedItem as HexViewRow;
+        if (selected is { } row && HexAddressParser.TryParse(row.Address, out var rowAddress))
         {
             if (HexAddressParser.TryParse(AddressBox.Text, out var byteAddress) &&
                 (ulong)byteAddress >= rowAddress && (ulong)byteAddress < (ulong)rowAddress + (uint)ViewModel.BytesPerRow)
@@ -241,10 +247,13 @@ public partial class CompareView : UserControl
         _syncingScroll = true;
         try
         {
-            FileAView.ItemsGrid.SelectedIndex = index;
-            FileBView.ItemsGrid.SelectedIndex = index;
-            FileAView.ItemsGrid.ScrollIntoView(FileAView.ItemsGrid.Items[index]);
-            FileBView.ItemsGrid.ScrollIntoView(FileBView.ItemsGrid.Items[index]);
+            if (!FileAView.UseWindowedScrolling)
+            {
+                FileAView.ItemsGrid.SelectedIndex = index;
+                FileBView.ItemsGrid.SelectedIndex = index;
+            }
+            FileAView.ScrollToRow(index);
+            FileBView.ScrollToRow(index);
         }
         finally { _syncingScroll = false; }
     }
@@ -255,8 +264,11 @@ public partial class CompareView : UserControl
         _syncingScroll = true;
         try
         {
-            FileAView.ItemsGrid.SelectedIndex = index;
-            FileBView.ItemsGrid.SelectedIndex = index;
+            if (!FileAView.UseWindowedScrolling)
+            {
+                FileAView.ItemsGrid.SelectedIndex = index;
+                FileBView.ItemsGrid.SelectedIndex = index;
+            }
             FileAView.ScrollToMatch(index);
             FileBView.ScrollToMatch(index);
         }
@@ -315,6 +327,26 @@ public partial class CompareView : UserControl
         {
             uint? address = HexAddressParser.TryParse(AddressBox.Text, out var parsed) ? parsed : null;
             ReportInteractionFailure("scroll", side, source.SelectedIndex, address, exception);
+        }
+        finally { _syncingScroll = false; }
+    }
+
+    private void Panel_FirstVisibleRowChanged(object? sender, EventArgs e)
+    {
+        if (_syncingScroll || sender is not HexViewControl source) return;
+        try
+        {
+            var target = ReferenceEquals(source, FileAView) ? FileBView : FileAView;
+            _syncingScroll = true;
+            target.ScrollToRow(source.FirstVisibleRowIndex);
+            if (source.WindowRows.Count > 0 && HexAddressParser.TryParse(source.WindowRows[0].Row.Address, out var address))
+                AddressBox.Text = address.ToString("X8");
+        }
+        catch (Exception exception)
+        {
+            var side = SideOf(source);
+            ReportInteractionFailure("scroll", side, source.FirstVisibleRowIndex,
+                HexAddressParser.TryParse(AddressBox.Text, out var parsed) ? parsed : null, exception);
         }
         finally { _syncingScroll = false; }
     }
