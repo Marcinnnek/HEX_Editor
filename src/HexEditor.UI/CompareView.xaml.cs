@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -14,6 +16,9 @@ public partial class CompareView : UserControl
     private bool _syncingScroll;
     private ComparePanelSide _lastSelectedSide = ComparePanelSide.Base;
     private uint? _selectedByteAddress;
+    private uint? _rowWidthChangeAddress;
+    private bool _rowWidthChangeHadByteSelection;
+    private ComparePanelSide _rowWidthChangeSide;
 
     public CompareView(CompareWorkspaceTabViewModel workspace)
     {
@@ -23,6 +28,9 @@ public partial class CompareView : UserControl
         RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
+        _rowWidthChangeSide = _lastSelectedSide;
+        ViewModel.BytesPerRowChanging += ViewModel_BytesPerRowChanging;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         var useWindowedScrolling = ViewModel.Rows.Count > 50_000;
         FileAView.UseWindowedScrolling = useWindowedScrolling;
         FileBView.UseWindowedScrolling = useWindowedScrolling;
@@ -249,6 +257,75 @@ public partial class CompareView : UserControl
     private void PreviousDifference_Click(object sender, RoutedEventArgs e)
     {
         NavigateDifference(forward: false);
+    }
+
+    private static bool IsDecimalWidthText(string text) => text.All(char.IsAsciiDigit);
+
+    private void RowWidthBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RowWidthBox.SelectedItem is int width && width != ViewModel.BytesPerRow)
+            ApplyRowWidth(width);
+    }
+
+    private void RowWidthBox_PreviewTextInput(object sender, TextCompositionEventArgs e) =>
+        e.Handled = !IsDecimalWidthText(e.Text);
+
+    private void RowWidthBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        CommitRowWidth();
+        e.Handled = true;
+    }
+
+    private void RowWidthBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitRowWidth();
+
+    private void RowWidthBox_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
+            e.SourceDataObject.GetData(DataFormats.UnicodeText) is not string pasted || !IsDecimalWidthText(pasted))
+            e.CancelCommand();
+    }
+
+    private void CommitRowWidth()
+    {
+        if (int.TryParse(RowWidthBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var width) && width is >= 1 and <= 128)
+        {
+            ApplyRowWidth(width);
+            RowWidthBox.Text = width.ToString(CultureInfo.InvariantCulture);
+            return;
+        }
+        RowWidthBox.Text = ViewModel.BytesPerRow.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private void ApplyRowWidth(int width)
+    {
+        ViewModel.BytesPerRow = width;
+        RowWidthBox.Text = width.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private void ViewModel_BytesPerRowChanging()
+    {
+        _rowWidthChangeAddress = SelectedAddress();
+        _rowWidthChangeHadByteSelection = _selectedByteAddress is not null;
+        _rowWidthChangeSide = _lastSelectedSide;
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(CompareViewModel.BytesPerRow)) return;
+
+        var address = _rowWidthChangeAddress;
+        var hadByteSelection = _rowWidthChangeHadByteSelection;
+        _lastSelectedSide = _rowWidthChangeSide;
+        _rowWidthChangeAddress = null;
+        _rowWidthChangeHadByteSelection = false;
+
+        var useWindowedScrolling = ViewModel.Rows.Count > 50_000;
+        FileAView.UseWindowedScrolling = useWindowedScrolling;
+        FileBView.UseWindowedScrolling = useWindowedScrolling;
+        if (address is not uint selectedAddress || !ViewModel.TryNavigateToAddress(selectedAddress, out var rowIndex)) return;
+        if (hadByteSelection) _selectedByteAddress = selectedAddress;
+        SelectRow(rowIndex);
     }
 
     private void NavigateDifference(bool forward)

@@ -46,6 +46,54 @@ public sealed class MemoryComparisonModelTests
     }
 
     [TestMethod]
+    public void ComparisonModel_UsesArbitraryWidthsForGlobalRowsAndDifferenceNavigation()
+    {
+        foreach (var width in new[] { 1, 3, 24, 80, 128 })
+        {
+            var left = MemoryImage.FromSegments([
+                new MemorySegment(0x1001, [0x10, 0x11, 0x12, 0x13, 0x14, 0x15]),
+                new MemorySegment(0x90000003, [0x20])]);
+            var right = MemoryImage.FromSegments([
+                new MemorySegment(0x1001, [0x10, 0x11, 0x99, 0x13, 0x14, 0x15]),
+                new MemorySegment(0x90000003, [0x21])]);
+            var comparison = new MemoryComparisonModel(left, right, bytesPerRow: width);
+
+            Assert.IsTrue(comparison.TryNavigateToAddress(0x1003, out var rowIndex), $"width {width}");
+            var expectedStart = (0x1003 / width) * width;
+            Assert.AreEqual(expectedStart.ToString("X8"), comparison.Rows[rowIndex].Address, $"width {width}");
+            Assert.AreEqual(width, comparison.Rows[rowIndex].FileA.Cells.Count, $"File A width {width}");
+            Assert.AreEqual(width, comparison.Rows[rowIndex].FileB.Cells.Count, $"File B width {width}");
+            Assert.AreEqual(CompareByteState.Different,
+                comparison.Rows[rowIndex].States[0x1003 - expectedStart], $"width {width}");
+
+            comparison.ViewMode = CompareViewMode.DifferencesOnly;
+            Assert.IsTrue(comparison.TryNavigateToAddress(0x1002, out var differenceRow), $"difference row width {width}");
+            var differenceAddress = comparison.Rows[differenceRow].Address;
+            Assert.AreEqual(((0x1002 / width) * width).ToString("X8"), differenceAddress, $"difference row width {width}");
+            Assert.AreEqual(width, comparison.Rows[differenceRow].FileA.Cells.Count, $"File A difference width {width}");
+            Assert.AreEqual(width, comparison.Rows[differenceRow].FileB.Cells.Count, $"File B difference width {width}");
+            Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(0x1001, null, out var next), $"next difference width {width}");
+            Assert.AreEqual(0x1003u, next, $"next difference width {width}");
+        }
+    }
+
+    [TestMethod]
+    public void ComparisonModel_CustomWidthShowsPartialFinalRowWithoutOverflow()
+    {
+        var left = MemoryImage.FromPatternRange(uint.MaxValue, uint.MaxValue, [0xA5]);
+        var right = MemoryImage.Empty;
+        var comparison = new MemoryComparisonModel(left, right, bytesPerRow: 128);
+
+        Assert.IsTrue(comparison.TryNavigateToAddress(uint.MaxValue, out var rowIndex));
+        var row = comparison.Rows[rowIndex];
+        Assert.AreEqual("FFFFFF80", row.Address);
+        Assert.AreEqual(128, row.FileA.Cells.Count);
+        Assert.AreEqual(uint.MaxValue, row.FileA.Cells[127].Address);
+        Assert.AreEqual(string.Empty, row.FileA.Cells[126].Hex);
+        Assert.AreEqual(CompareByteState.OnlyA, row.FileA.Cells[127].State);
+    }
+
+    [TestMethod]
     public void ComparisonModel_RefreshUpdatesDifferenceStatusAndRows()
     {
         var left = MemoryImage.FromSegments([new MemorySegment(0x2000, [0x10])]);
