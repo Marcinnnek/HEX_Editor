@@ -158,6 +158,76 @@ public sealed class LiveEditorScrollingAcceptanceTests
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
+    [STATestMethod]
+    [DoNotParallelize]
+    public void HexDataColumnTracksRowCapacityAndSpacingInBothLayouts()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            var settings = GridSpacingSettings.Current;
+            var oldHorizontal = settings.HorizontalByteSpacing;
+            var oldVertical = settings.VerticalRowSpacing;
+            try
+            {
+                settings.SetSpacing(2, oldVertical);
+                var image = MemoryImage.FromSegments([new MemorySegment(0, Enumerable.Range(0, 2048).Select(x => (byte)x).ToArray())]);
+                var model = new HexImageViewModel(image, 8, showAscii: false);
+                var view = new HexViewControl { ItemsSource = model.Rows, BytesPerRow = 8, ShowAscii = false, UseWindowedScrolling = true, Width = 360, Height = 300 };
+                window = new Window { Content = view, Width = 380, Height = 320, ShowInTaskbar = false };
+                window.Show();
+                Pump(window.Dispatcher);
+
+                var width8 = view.HexDataColumnWidth;
+                model.BytesPerRow = 16;
+                view.ItemsSource = model.Rows;
+                view.BytesPerRow = 16;
+                Pump(window.Dispatcher);
+                var width16 = view.HexDataColumnWidth;
+                model.BytesPerRow = 32;
+                view.ItemsSource = model.Rows;
+                view.BytesPerRow = 32;
+                Pump(window.Dispatcher);
+                var width32 = view.HexDataColumnWidth;
+                Assert.IsTrue(width8 < width16 && width16 < width32, "HEX width follows the configured bytes per row.");
+                var horizontalScroll = Descendants<ScrollViewer>(view).Single(item => item.IsVisible && item.HorizontalScrollBarVisibility == ScrollBarVisibility.Auto);
+                Assert.IsGreaterThan(horizontalScroll.ViewportWidth, horizontalScroll.ExtentWidth,
+                    "A 32-byte row overflows a narrow view and remains horizontally reachable.");
+
+                view.UseWindowedScrolling = false;
+                Pump(window.Dispatcher);
+                Assert.AreEqual(width32, view.ItemsGrid.Columns[1].ActualWidth, 0.1,
+                    "The DataGrid uses the same computed HEX width as the windowed rows.");
+                Assert.IsFalse(view.ItemsGrid.CanUserResizeColumns);
+                view.UseWindowedScrolling = true;
+                Pump(window.Dispatcher);
+
+                view.ScrollToRow(20);
+                horizontalScroll.ScrollToHorizontalOffset(150);
+                Pump(window.Dispatcher);
+                Assert.IsGreaterThan(0, horizontalScroll.HorizontalOffset);
+                var beforeSpacing = width32;
+                settings.SetSpacing(5, oldVertical);
+                Pump(window.Dispatcher);
+                Assert.AreEqual(31 * 3, view.HexDataColumnWidth - beforeSpacing, 0.1,
+                    "Each of the 31 inter-byte gaps contributes the configured spacing change.");
+                Assert.AreEqual(0, horizontalScroll.HorizontalOffset, 0.1);
+                Assert.AreEqual(20, view.FirstVisibleRowIndex, "Recalculating HEX width keeps the vertical row in place.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally
+            {
+                window?.Close();
+                settings.SetSpacing(oldHorizontal, oldVertical);
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     [TestMethod]
     public void EditorWindowMapsWheelAndThumbToGlobalRowsAndRendersWithinOneHundredMilliseconds()
     {
