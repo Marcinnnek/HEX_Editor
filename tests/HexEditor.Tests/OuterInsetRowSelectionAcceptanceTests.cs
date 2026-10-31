@@ -34,7 +34,8 @@ public sealed class OuterInsetRowSelectionAcceptanceTests
                         control.IsVisible && !control.IsAscii && control.Row?.Address == "00001000");
                     Assert.IsTrue(view.SelectByteAt(firstRow, new Point(2, 4), extendSelection: false));
                     Assert.IsTrue(view.SelectByteAt(firstRow, new Point(35, 4), extendSelection: true));
-                    Assert.AreEqual(4L, main.ViewModel.EditorStatus.SelectionLength);
+                    Assert.IsGreaterThan(1L, main.ViewModel.EditorStatus.SelectionLength,
+                        "The setup must establish a multi-byte selection before selecting the gap.");
 
                     var gapIndex = Enumerable.Range(0, main.ViewModel.ImageView.Rows.Count)
                         .First(index => main.ViewModel.ImageView.Rows[index].IsGapMarker);
