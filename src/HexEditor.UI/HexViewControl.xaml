@@ -82,6 +82,14 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Grid Style="{StaticResource WindowedRowSelectionStyle}">
+                    <Grid.Resources>
+                        <Style TargetType="local:HexRowAddressControl">
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                        <Style TargetType="local:HexByteRowControl">
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </Grid.Resources>
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
                       <ColumnDefinition x:Name="WindowedRowAsciiColumn" Width="Auto">
@@ -178,7 +186,8 @@
         </ui:DataGrid.RowStyle>
         <ui:DataGrid.CellStyle>
             <Style TargetType="DataGridCell">
-                <Setter Property="Padding" Value="0" />
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
             </Style>
         </ui:DataGrid.CellStyle>
         <ui:DataGrid.Columns>
@@ -203,7 +212,7 @@
                 <DataGridTemplateColumn.CellTemplate>
                     <DataTemplate>
                         <Grid>
-                            <TextBlock Text="{Binding Address}" TextAlignment="Center" HorizontalAlignment="Stretch" />
+                            <TextBlock Text="{Binding Address}" TextAlignment="Center" HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
                             <TextBlock Text="{Binding GapDescription}" ToolTip="{Binding GapDescription}" FontStyle="Italic" TextAlignment="Left" TextTrimming="CharacterEllipsis" HorizontalAlignment="Stretch" Margin="6,0,0,0">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
