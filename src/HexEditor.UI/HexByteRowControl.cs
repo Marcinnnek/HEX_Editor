@@ -110,12 +110,6 @@ public sealed class HexByteRowControl : Control
         for (var index = 0; index < row.Cells.Count; index++)
         {
             var cellAddress = row.Cells[index].Address;
-            if (row.Cells[index].Hex.Length > 0 && cellAddress is uint address &&
-                SelectionStart is uint selectionStart && SelectionEnd is uint selectionEnd &&
-                address >= selectionStart && address <= selectionEnd &&
-                TryFindResource("HexFocusBrush") is Brush selectionBrush)
-                drawingContext.DrawRectangle(null, new Pen(selectionBrush, 2), layout.GetHighlightBounds(index, IsAscii));
-
             var brush = row.Cells[index].Highlight switch
             {
                 ByteHighlightState.Different => TryFindResource("HexDifferentBrush") as Brush,
@@ -139,6 +133,14 @@ public sealed class HexByteRowControl : Control
                     drawingContext.DrawRectangle(null, findPen, bounds);
                 }
             }
+
+            // Draw the user's selection after comparison, edit, and Find indicators so
+            // their fills cannot cover the selected-byte outline.
+            if (row.Cells[index].Hex.Length > 0 && cellAddress is uint address &&
+                SelectionStart is uint selectionStart && SelectionEnd is uint selectionEnd &&
+                address >= selectionStart && address <= selectionEnd &&
+                TryFindResource("HexFocusBrush") is Brush selectionBrush)
+                drawingContext.DrawRectangle(null, new Pen(selectionBrush, 2), layout.GetHighlightBounds(index, IsAscii));
         }
 
         drawingContext.DrawDrawing(GetRowDrawing(row, layout));
