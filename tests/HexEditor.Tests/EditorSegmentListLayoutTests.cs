@@ -23,11 +23,13 @@ public sealed class EditorSegmentListLayoutTests
                 var window = new MainWindow { Width = 360 };
                 window.ViewModel.LoadImage(MemoryImage.FromSegments([
                     new MemorySegment(0x08002000, [0x01]),
-                    new MemorySegment(0x08000000, new byte[0x15BC])]), null, null);
+                    new MemorySegment(0x08000000, new byte[0x15BC])]), "editor.hex", null);
                 window.Show();
                 window.UpdateLayout();
 
                 var blocks = (ListBox)window.FindName("SegmentsGrid");
+                var group = (GroupBox)LogicalTreeHelper.GetParent(blocks);
+                Assert.AreEqual("editor.hex", group.Header);
                 Assert.AreEqual(SelectionMode.Extended, blocks.SelectionMode);
                 Assert.AreEqual(ScrollBarVisibility.Auto, ScrollViewer.GetVerticalScrollBarVisibility(blocks));
                 var horizontalScroll = Descendants<ScrollViewer>(blocks).Single();

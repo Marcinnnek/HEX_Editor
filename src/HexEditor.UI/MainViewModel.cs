@@ -171,6 +171,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool ActiveCanUndo => CanEdit && ActiveDocument.CanUndo;
     public bool ActiveCanRedo => CanEdit && ActiveDocument.CanRedo;
     public string? SourcePath => Workspace.Document.SourcePath;
+    public string EditorBlockListHeader => string.IsNullOrWhiteSpace(SourcePath) ? "Untitled" : Path.GetFileName(SourcePath);
     public MemoryImageExportFormat? SourceFormat => Workspace.Document.SourceFormat;
     public MemoryImageFormatMetadata? SourceFormatMetadata => Workspace.Document.SourceFormatMetadata;
 
@@ -216,7 +217,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(preview.InputFormat);
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata),
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(EditorBlockListHeader), nameof(SourceFormat), nameof(SourceFormatMetadata),
             nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
         if (!ReferenceEquals(previousImage, CurrentImage)) NotifyImageChanged(previousImage, CurrentImage);
     }
@@ -240,7 +241,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RefreshEditorStatus();
         RefreshTitle();
         StatusMessage = DescribeImage(format?.ToString());
-        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata),
+        Raise(nameof(CurrentImage), nameof(IsModified), nameof(CanUndo), nameof(CanRedo), nameof(SourcePath), nameof(EditorBlockListHeader), nameof(SourceFormat), nameof(SourceFormatMetadata),
             nameof(ActiveImage), nameof(ActiveHasImage), nameof(ActiveCanSave), nameof(ActiveCanSaveAs), nameof(ActiveCanCloseImage), nameof(ActiveCanRelocate));
         if (!ReferenceEquals(previousImage, image)) NotifyImageChanged(previousImage, image);
     }
@@ -334,7 +335,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (ReferenceEquals(document, Workspace.Document)) RefreshTitle();
         StatusMessage = $"Saved {document.CurrentImage.OccupiedByteCount:N0} bytes as {document.SourceFormat}.";
         if (ReferenceEquals(document, Workspace.Document)) RefreshEditorStatus();
-        Raise(nameof(SourcePath), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified),
+        Raise(nameof(SourcePath), nameof(EditorBlockListHeader), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified),
             nameof(ActiveCanSave), nameof(ActiveHasImage), nameof(ActiveCanCloseImage));
     }
 
