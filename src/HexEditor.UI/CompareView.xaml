@@ -70,7 +70,8 @@
                                   BytesPerRow="{Binding ViewModel.BytesPerRow}"
                                   ShowAscii="{Binding ViewModel.ShowAscii}"
                                   AddressRangeSelected="ByteAddressSelected" />
-            <GridSplitter Grid.Row="1" Grid.Column="1" Width="8" HorizontalAlignment="Stretch" />
+            <GridSplitter Grid.Row="1" Grid.Column="1" Width="8" HorizontalAlignment="Stretch"
+                          Background="{DynamicResource HexWindowBrush}" />
             <local:HexViewControl x:Name="FileBView" Grid.Row="1" Grid.Column="2"
                                   ItemsSource="{Binding ViewModel.FileBRows}"
                                   BytesPerRow="{Binding ViewModel.BytesPerRow}"
