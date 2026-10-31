@@ -167,8 +167,12 @@ public sealed class LiveCompareScrollingAcceptanceTests
             Window? window = null;
             try
             {
-                var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x12, 0x13])]);
-                var referenceImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x34, 0x35])]);
+                var baseImage = MemoryImage.FromSegments([
+                    new MemorySegment(0x1000, [0x12, 0x13]),
+                    new MemorySegment(0x1010, [0x36, 0x37])]);
+                var referenceImage = MemoryImage.FromSegments([
+                    new MemorySegment(0x1000, [0x34, 0x35]),
+                    new MemorySegment(0x1010, [0x38, 0x39])]);
                 var compare = new CompareView(new CompareWorkspaceTabViewModel(baseImage, referenceImage, "base.hex", "reference.hex"));
                 window = new Window { Content = compare, Width = 1280, Height = 800, ShowInTaskbar = false };
                 window.Show();
@@ -183,6 +187,16 @@ public sealed class LiveCompareScrollingAcceptanceTests
                 Assert.IsTrue(left.SelectByteAt(leftHex, new Point(3, 3), extendSelection: false));
                 Assert.AreEqual(0x1000u, leftHex.SelectionStart);
                 Assert.IsNull(rightHex.SelectionStart, "Selecting panel A clears panel B's previous byte outline.");
+
+                var leftLastRow = Descendants<HexByteRowControl>(left)
+                    .Single(item => item.IsVisible && !item.IsAscii && item.Row?.Address == "00001010");
+                Assert.IsTrue(left.SelectByteAt(leftHex, new Point(3, 3), extendSelection: false));
+                Assert.IsTrue(left.SelectByteAt(leftLastRow, new Point(3, 3), extendSelection: true));
+                Assert.AreEqual(0x1000u, leftHex.SelectionStart);
+                Assert.AreEqual(0x1010u, leftLastRow.SelectionEnd);
+                Assert.IsNull(right.SelectionStart, "A Shift range remains local to the clicked Compare panel.");
+                Assert.IsTrue(leftHex.Row!.Cells.Where(cell => cell.Address is >= 0x1002 and < 0x1010)
+                    .All(cell => cell.Hex.Length == 0), "Unoccupied addresses do not acquire selected byte cells.");
             }
             catch (Exception exception) { failure = exception; }
             finally { window?.Close(); }

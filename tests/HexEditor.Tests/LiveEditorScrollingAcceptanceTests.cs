@@ -75,6 +75,52 @@ public sealed class LiveEditorScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void ShiftSelectionAcrossRowsOutlinesOnlyOccupiedBytesInSparseImage()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var model = new HexImageViewModel(MemoryImage.FromSegments([
+                    new MemorySegment(0x1000, [0x11, 0x22]),
+                    new MemorySegment(0x1010, [0x33, 0x44])]), bytesPerRow: 8);
+                var view = new HexViewControl { ItemsSource = model.Rows, BytesPerRow = 8, Width = 1100, Height = 500 };
+                window = new Window { Content = view, Width = 1120, Height = 520, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var startRow = Descendants<HexByteRowControl>(view)
+                    .Single(item => item.IsVisible && !item.IsAscii && item.Row?.Address == "00001000");
+                var endRow = Descendants<HexByteRowControl>(view)
+                    .Single(item => item.IsVisible && !item.IsAscii && item.Row?.Address == "00001010");
+                Assert.IsTrue(view.SelectByteAt(startRow, new Point(18, 3), extendSelection: false));
+                Assert.IsTrue(view.SelectByteAt(endRow, new Point(3, 3), extendSelection: true));
+
+                Assert.AreEqual(0x1001u, view.SelectionStart);
+                Assert.AreEqual(0x1010u, view.SelectionEnd);
+                Assert.AreEqual(0x1001u, startRow.SelectionStart);
+                Assert.AreEqual(0x1010u, endRow.SelectionEnd);
+                Assert.IsTrue(model.Rows.SelectMany(row => row.Cells)
+                    .Where(cell => cell.Address is >= 0x1002 and < 0x1010)
+                    .All(cell => cell.Hex.Length == 0), "Address gaps stay blank inside the selected range.");
+
+                Assert.IsTrue(view.SelectByteAt(endRow, new Point(3, 3), extendSelection: false));
+                Assert.AreEqual(0x1010u, view.SelectionStart, "A plain byte click replaces the Shift range.");
+                Assert.AreEqual(0x1010u, view.SelectionEnd);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void AsciiColumnUsesRowCapacityAndCollapsesWhenHiddenInBothLayouts()
     {
         Exception? failure = null;
