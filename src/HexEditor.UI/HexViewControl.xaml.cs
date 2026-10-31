@@ -52,6 +52,11 @@ public partial class HexViewControl : UserControl
     public static readonly DependencyProperty BytesPerRowProperty = DependencyProperty.Register(
         nameof(BytesPerRow), typeof(int), typeof(HexViewControl), new PropertyMetadata(16, OnGridGeometryChanged));
 
+    public static readonly DependencyProperty SelectionStartProperty = DependencyProperty.Register(
+        nameof(SelectionStart), typeof(uint?), typeof(HexViewControl), new PropertyMetadata(null));
+    public static readonly DependencyProperty SelectionEndProperty = DependencyProperty.Register(
+        nameof(SelectionEnd), typeof(uint?), typeof(HexViewControl), new PropertyMetadata(null));
+
     public System.Collections.IEnumerable? ItemsSource
     {
         get => (System.Collections.IEnumerable?)GetValue(ItemsSourceProperty);
@@ -71,6 +76,8 @@ public partial class HexViewControl : UserControl
     }
 
     public int BytesPerRow { get => (int)GetValue(BytesPerRowProperty); set => SetValue(BytesPerRowProperty, value); }
+    public uint? SelectionStart { get => (uint?)GetValue(SelectionStartProperty); private set => SetValue(SelectionStartProperty, value); }
+    public uint? SelectionEnd { get => (uint?)GetValue(SelectionEndProperty); private set => SetValue(SelectionEndProperty, value); }
     public double HexDataColumnWidth => (double)GetValue(HexDataColumnWidthProperty);
     public double HexDataContentWidth => (double)GetValue(HexDataContentWidthProperty);
 
@@ -98,6 +105,8 @@ public partial class HexViewControl : UserControl
 
     public void SetSelectedRow(int rowIndex)
     {
+        _anchorAddress = null;
+        SelectionStart = SelectionEnd = null;
         _selectedRowIndex = rowIndex;
         foreach (var item in WindowRows) item.IsSelected = item.RowIndex == rowIndex;
         if (!UseWindowedScrolling)
@@ -475,9 +484,12 @@ public partial class HexViewControl : UserControl
             if (!row.TryGetAddressAt(point, out var hitAddress)) return false;
             address = hitAddress;
             var anchor = extendSelection && _anchorAddress is uint existing ? existing : hitAddress;
-            _anchorAddress = hitAddress;
-            AddressRangeSelected?.Invoke(this, new AddressRangeSelectedEventArgs(
-                Math.Min(anchor, hitAddress), Math.Max(anchor, hitAddress)));
+            var start = Math.Min(anchor, hitAddress);
+            var end = Math.Max(anchor, hitAddress);
+            AddressRangeSelected?.Invoke(this, new AddressRangeSelectedEventArgs(start, end));
+            _anchorAddress = anchor;
+            SelectionStart = start;
+            SelectionEnd = end;
             return true;
         }
         catch (Exception exception)

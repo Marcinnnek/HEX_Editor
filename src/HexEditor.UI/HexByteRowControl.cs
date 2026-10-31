@@ -36,6 +36,14 @@ public sealed class HexByteRowControl : Control
         nameof(RowCapacity), typeof(int), typeof(HexByteRowControl),
         new FrameworkPropertyMetadata(0, FrameworkPropertyMetadataOptions.AffectsMeasure | FrameworkPropertyMetadataOptions.AffectsRender));
 
+    public static readonly DependencyProperty SelectionStartProperty = DependencyProperty.Register(
+        nameof(SelectionStart), typeof(uint?), typeof(HexByteRowControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty SelectionEndProperty = DependencyProperty.Register(
+        nameof(SelectionEnd), typeof(uint?), typeof(HexByteRowControl),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public HexViewRow? Row
     {
         get => (HexViewRow?)GetValue(RowProperty);
@@ -54,6 +62,9 @@ public sealed class HexByteRowControl : Control
         set => SetValue(RowCapacityProperty, value);
     }
 
+    public uint? SelectionStart { get => (uint?)GetValue(SelectionStartProperty); set => SetValue(SelectionStartProperty, value); }
+    public uint? SelectionEnd { get => (uint?)GetValue(SelectionEndProperty); set => SetValue(SelectionEndProperty, value); }
+
     public bool TryGetAddressAt(Point point, out uint address)
     {
         address = default;
@@ -61,7 +72,8 @@ public sealed class HexByteRowControl : Control
         if (row is null || row.IsGapMarker || point.X < 0 || point.Y < 0) return false;
         EnsureMetrics();
         var layout = CreateLayout();
-        if (!layout.TryGetByteIndexAt(point, row.Cells.Count, IsAscii, out var index) || row.Cells[index].Address is not uint selected) return false;
+        if (!layout.TryGetByteIndexAt(point, row.Cells.Count, IsAscii, out var index) ||
+            row.Cells[index].Hex.Length == 0 || row.Cells[index].Address is not uint selected) return false;
         address = selected;
         return true;
     }
@@ -97,6 +109,13 @@ public sealed class HexByteRowControl : Control
         if (row is null || row.IsGapMarker) return;
         for (var index = 0; index < row.Cells.Count; index++)
         {
+            var cellAddress = row.Cells[index].Address;
+            if (row.Cells[index].Hex.Length > 0 && cellAddress is uint address &&
+                SelectionStart is uint selectionStart && SelectionEnd is uint selectionEnd &&
+                address >= selectionStart && address <= selectionEnd &&
+                TryFindResource("HexFocusBrush") is Brush selectionBrush)
+                drawingContext.DrawRectangle(null, new Pen(selectionBrush, 2), layout.GetHighlightBounds(index, IsAscii));
+
             var brush = row.Cells[index].Highlight switch
             {
                 ByteHighlightState.Different => TryFindResource("HexDifferentBrush") as Brush,
