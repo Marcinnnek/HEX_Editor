@@ -14,6 +14,8 @@ namespace HexEditor.Tests;
 [DoNotParallelize]
 public sealed class LiveCompareScrollingAcceptanceTests
 {
+    public TestContext TestContext { get; set; } = null!;
+
     [TestMethod]
     public void ComparePanelsScrollLiveAndStayAlignedForHundredMillionByteImages()
     {
@@ -100,6 +102,71 @@ public sealed class LiveCompareScrollingAcceptanceTests
         thread.Join();
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         Assert.IsLessThan(TimeSpan.FromMilliseconds(100), elapsed);
+    }
+
+    [TestMethod]
+    public void DraggingSixtyFiveKilobyteCompareToEndKeepsUpWithTheThumb()
+    {
+        Exception? failure = null;
+        var elapsed = TimeSpan.Zero;
+        var eventMilliseconds = 0d;
+        var layoutMilliseconds = 0d;
+        var steps = 0;
+        var refreshes = 0;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var a = MemoryImage.FromPatternRange(0, 65_535, [0x12, 0xA7]);
+                var b = MemoryImage.FromPatternRange(0, 65_535, [0x93, 0x06]);
+                var compare = new CompareView(new CompareWorkspaceTabViewModel(a, b, "base.hex", "reference.hex"));
+                window = new Window { Content = compare, Width = 1280, Height = 800, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+
+                var left = (HexViewControl)compare.FindName("FileAView");
+                var right = (HexViewControl)compare.FindName("FileBView");
+                left.FirstVisibleRowChanged += (_, _) => refreshes++;
+                var bar = Descendants<ScrollBar>(left).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                var thumb = Descendants<Thumb>(bar).Single();
+                thumb.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent, Source = thumb });
+
+                var started = Stopwatch.StartNew();
+                for (var step = 0; step < 80 && bar.Value < bar.Maximum; step++)
+                {
+                    var eventStarted = Stopwatch.GetTimestamp();
+                    thumb.RaiseEvent(new DragDeltaEventArgs(0, 10) { RoutedEvent = Thumb.DragDeltaEvent, Source = thumb });
+                    eventMilliseconds += Stopwatch.GetElapsedTime(eventStarted).TotalMilliseconds;
+                    var layoutStarted = Stopwatch.GetTimestamp();
+                    window.UpdateLayout();
+                    Pump(window.Dispatcher);
+                    layoutMilliseconds += Stopwatch.GetElapsedTime(layoutStarted).TotalMilliseconds;
+                    steps++;
+                }
+                thumb.RaiseEvent(new DragCompletedEventArgs(0, 0, false)
+                    { RoutedEvent = Thumb.DragCompletedEvent, Source = thumb });
+                window.UpdateLayout();
+                Pump(window.Dispatcher);
+                elapsed = started.Elapsed;
+                Assert.AreEqual((int)bar.Maximum, left.FirstVisibleRowIndex, "The drag should reach the final row window.");
+                Assert.AreEqual(left.FirstVisibleRowIndex, right.FirstVisibleRowIndex);
+                Assert.AreEqual(left.WindowRows[0].Row.Address, right.WindowRows[0].Row.Address);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+        TestContext.WriteLine($"65 KB drag: {elapsed.TotalMilliseconds:F1} ms, {steps} events, {refreshes} viewport updates; " +
+            $"event handling {eventMilliseconds:F1} ms, layout {layoutMilliseconds:F1} ms.");
+        Assert.IsLessThan(TimeSpan.FromMilliseconds(500), elapsed,
+            $"Dragging both 65 KB panels to the end took {elapsed.TotalMilliseconds:F1} ms " +
+            $"in {steps} steps and {refreshes} refreshes " +
+            $"(events {eventMilliseconds:F1} ms, layout {layoutMilliseconds:F1} ms).");
     }
 
     [TestMethod]

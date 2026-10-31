@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Globalization;
 using System.Windows.Media;
+using System.Windows.Threading;
 using System.ComponentModel;
 using HexEditor.Compare;
 
@@ -17,6 +18,10 @@ public partial class HexViewControl : UserControl
 {
     private uint? _anchorAddress;
     private bool _refreshingWindow;
+    private bool _draggingRowThumb;
+    private bool _hasRefreshedDuringDrag;
+    private int? _pendingDragRow;
+    private readonly DispatcherTimer _dragRefreshTimer;
     private int _windowStart;
     private int _visibleRowCount = 24;
     private int _selectedRowIndex = -1;
@@ -31,6 +36,15 @@ public partial class HexViewControl : UserControl
     public HexViewControl()
     {
         InitializeComponent();
+        _dragRefreshTimer = new DispatcherTimer(DispatcherPriority.Render, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(200)
+        };
+        _dragRefreshTimer.Tick += (_, _) => ApplyPendingDragRow();
+        RowThumb.AddHandler(Thumb.DragStartedEvent,
+            new DragStartedEventHandler(RowThumb_DragStarted), handledEventsToo: true);
+        RowThumb.AddHandler(Thumb.DragCompletedEvent,
+            new DragCompletedEventHandler(RowThumb_DragCompleted), handledEventsToo: true);
         HexGrid.LoadingRow += (_, e) => ApplyRowBackground(e.Row);
         DependencyPropertyDescriptor.FromProperty(Control.FontFamilyProperty, typeof(DataGrid))!
             .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); UpdateAsciiColumnWidth(); });
@@ -274,6 +288,7 @@ public partial class HexViewControl : UserControl
     private static void OnItemsSourceChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
     {
         if (owner is not HexViewControl control) return;
+        control.CancelPendingDrag();
         if (e.OldValue is INotifyCollectionChanged previous)
             previous.CollectionChanged -= control.ItemsSource_CollectionChanged;
 
@@ -313,6 +328,7 @@ public partial class HexViewControl : UserControl
     private static void OnWindowModeChanged(DependencyObject owner, DependencyPropertyChangedEventArgs e)
     {
         if (owner is not HexViewControl control) return;
+        control.CancelPendingDrag();
         var enabled = (bool)e.NewValue;
         control.HexGrid.ItemsSource = enabled ? null : control.ItemsSource as IEnumerable;
         control.HexGrid.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
@@ -325,6 +341,7 @@ public partial class HexViewControl : UserControl
     private void SetWindowStart(int index)
     {
         if (ItemsSource is not IList<HexViewRow> rows || rows.Count == 0) return;
+        CancelPendingDrag();
         var max = Math.Max(0, rows.Count - _visibleRowCount);
         var previousStart = _windowStart;
         _windowStart = Math.Clamp(index, 0, max);
@@ -396,8 +413,48 @@ public partial class HexViewControl : UserControl
     private void RowThumb_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_refreshingWindow || !UseWindowedScrolling) return;
+        _pendingDragRow = (int)Math.Round(e.NewValue);
+        if (_draggingRowThumb && _hasRefreshedDuringDrag &&
+            _pendingDragRow is > 0 && _pendingDragRow < RowThumb.Maximum)
+        {
+            // Redraw when the pointer pauses; continuous drag events only move the thumb.
+            _dragRefreshTimer.Stop();
+            _dragRefreshTimer.Start();
+            return;
+        }
+        ApplyPendingDragRow();
+    }
+
+    private void RowThumb_DragStarted(object sender, DragStartedEventArgs e)
+    {
+        _draggingRowThumb = true;
+        _hasRefreshedDuringDrag = false;
+        _pendingDragRow = null;
+        _dragRefreshTimer.Stop();
+    }
+
+    private void RowThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        _draggingRowThumb = false;
+        ApplyPendingDragRow();
+    }
+
+    private void CancelPendingDrag()
+    {
+        _dragRefreshTimer.Stop();
+        _draggingRowThumb = false;
+        _pendingDragRow = null;
+    }
+
+    private void ApplyPendingDragRow()
+    {
+        _dragRefreshTimer.Stop();
+        if (_pendingDragRow is not int rowIndex) return;
+        _pendingDragRow = null;
+        _hasRefreshedDuringDrag = true;
+        if (_windowStart == rowIndex) return;
         var previousStart = _windowStart;
-        _windowStart = (int)Math.Round(e.NewValue);
+        _windowStart = rowIndex;
         RefreshWindow();
         if (_windowStart != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -419,7 +476,11 @@ public partial class HexViewControl : UserControl
         UpdateAsciiColumnWidth();
     }
 
-    private void Control_Unloaded(object sender, RoutedEventArgs e) => GridSpacingSettings.SpacingChanged -= SpacingChanged;
+    private void Control_Unloaded(object sender, RoutedEventArgs e)
+    {
+        GridSpacingSettings.SpacingChanged -= SpacingChanged;
+        CancelPendingDrag();
+    }
 
     private void SpacingChanged() => Dispatcher.BeginInvoke(() => UpdateHexDataWidth(resetHorizontalScroll: true));
 
