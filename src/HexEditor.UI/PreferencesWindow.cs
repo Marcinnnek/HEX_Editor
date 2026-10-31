@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
+using System.Windows.Data;
 
 namespace HexEditor.UI;
 
@@ -9,10 +11,12 @@ public sealed class PreferencesWindow : Window
     private readonly PreferencesSession _choices;
     private readonly Dictionary<ComparisonColorKind, Border> _swatches = [];
     private AppearanceMode _palette = AppearanceMode.Light;
+    private int _lastValidRowWidth;
 
     public PreferencesWindow(PreferencesSession choices)
     {
         _choices = choices;
+        _lastValidRowWidth = choices.DefaultBytesPerRow;
         Title = "Preferences";
         Width = 470;
         SizeToContent = SizeToContent.Height;
@@ -29,6 +33,36 @@ public sealed class PreferencesWindow : Window
         var light = AddMode(modes, "Light", choices.Appearance == AppearanceMode.Light);
         AddMode(modes, "Dark", choices.Appearance == AppearanceMode.Dark);
         panel.Children.Add(modes);
+
+        panel.Children.Add(new TextBlock { Text = "Default bytes per row", Margin = new Thickness(0, 0, 0, 4) });
+        var rowWidth = new ComboBox { Name = "DefaultRowWidthSelector", Width = 120, IsEditable = true,
+            IsTextSearchEnabled = false, HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 16), ItemsSource = new[] { 8, 16, 32 } };
+        rowWidth.Text = choices.DefaultBytesPerRow.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        rowWidth.PreviewTextInput += (_, e) => e.Handled = !e.Text.All(char.IsAsciiDigit);
+        DataObject.AddPastingHandler(rowWidth, (_, e) =>
+        {
+            if (!e.SourceDataObject.GetDataPresent(DataFormats.Text, true) ||
+                e.SourceDataObject.GetData(DataFormats.Text) is not string text || !text.All(char.IsAsciiDigit))
+                e.CancelCommand();
+        });
+        rowWidth.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            CommitRowWidth(rowWidth);
+            e.Handled = true;
+        };
+        rowWidth.LostKeyboardFocus += (_, _) => CommitRowWidth(rowWidth);
+        rowWidth.SelectionChanged += (_, _) =>
+        {
+            if (rowWidth.SelectedItem is int selected)
+            {
+                rowWidth.Text = selected.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                _lastValidRowWidth = selected;
+                _choices.DefaultBytesPerRow = selected;
+            }
+        };
+        panel.Children.Add(rowWidth);
 
         panel.Children.Add(new TextBlock { Text = "HEX grid spacing", FontSize = 18,
             FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) });
@@ -70,6 +104,7 @@ public sealed class PreferencesWindow : Window
         var save = new Wpf.Ui.Controls.Button { Content = "Save", IsDefault = true, MinWidth = 80 };
         save.Click += (_, _) =>
         {
+            CommitRowWidth(rowWidth);
             choices.Appearance = followWindows.IsChecked == true ? AppearanceMode.Automatic
                 : light.IsChecked == true ? AppearanceMode.Light : AppearanceMode.Dark;
             choices.HorizontalByteSpacing = (int)horizontal.Value;
@@ -81,6 +116,20 @@ public sealed class PreferencesWindow : Window
         panel.Children.Add(actions);
         Content = panel;
         RefreshSwatches();
+    }
+
+    private void CommitRowWidth(ComboBox rowWidth)
+    {
+        if (int.TryParse(rowWidth.Text, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var value) && value is >= 1 and <= 128)
+        {
+            _lastValidRowWidth = value;
+            _choices.DefaultBytesPerRow = value;
+            return;
+        }
+
+        rowWidth.Text = _lastValidRowWidth.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _choices.DefaultBytesPerRow = _lastValidRowWidth;
     }
 
     private void AddColorRow(Panel panel, string label, ComparisonColorKind kind)

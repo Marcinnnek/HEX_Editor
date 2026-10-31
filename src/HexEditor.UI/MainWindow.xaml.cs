@@ -47,7 +47,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        ViewModel = new MainViewModel();
+        ViewModel = new MainViewModel { DefaultBytesPerRow = RowWidthSettings.Current.DefaultBytesPerRow };
         ViewModel.ImageChanged += (_, _) => InvalidateFind("Image changed. Search again.");
         ViewModel.PropertyChanged += (_, e) =>
         {
@@ -92,9 +92,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            var choices = new PreferencesSession(_appearanceSession, GridSpacingSettings.Current);
+            var choices = new PreferencesSession(_appearanceSession, GridSpacingSettings.Current,
+                defaultRowWidth: RowWidthSettings.Current);
             if (new PreferencesWindow(choices) { Owner = this }.ShowDialog() != true) return;
             choices.Save();
+            ViewModel.DefaultBytesPerRow = RowWidthSettings.Current.DefaultBytesPerRow;
             ApplyAppearance();
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or AggregateException)

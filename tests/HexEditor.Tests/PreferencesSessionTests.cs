@@ -1,4 +1,7 @@
 using HexEditor.UI;
+using HexEditor.Core;
+using HexEditor.Formats;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -166,6 +169,45 @@ public sealed class PreferencesSessionTests
     }
 
     [TestMethod]
+    public void Default_row_width_is_staged_validated_and_persisted_until_new_views_use_it()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "hex-editor-row-width-preferences-" + Guid.NewGuid());
+        try
+        {
+            var path = Path.Combine(folder, "row-width.json");
+            using var appearance = new AppearanceSession(
+                new AppearanceSettings(Path.Combine(folder, "appearance.json")), new FixedWindowsAppearance());
+            var settings = new RowWidthSettings(path);
+            var spacing = new GridSpacingSettings(Path.Combine(folder, "spacing.json"));
+            Assert.AreEqual(16, settings.DefaultBytesPerRow);
+
+            var cancelled = new PreferencesSession(appearance, spacing, defaultRowWidth: settings)
+                { DefaultBytesPerRow = 24 };
+            Assert.AreEqual(16, new RowWidthSettings(path).DefaultBytesPerRow);
+
+            var invalid = new PreferencesSession(appearance, spacing, defaultRowWidth: settings)
+                { DefaultBytesPerRow = 129 };
+            Assert.ThrowsExactly<ArgumentOutOfRangeException>(invalid.Save);
+            Assert.AreEqual(16, new RowWidthSettings(path).DefaultBytesPerRow);
+
+            var saved = new PreferencesSession(appearance, spacing, defaultRowWidth: settings)
+                { DefaultBytesPerRow = 24 };
+            saved.Save();
+            Assert.AreEqual(24, settings.DefaultBytesPerRow);
+            Assert.AreEqual(24, new RowWidthSettings(path).DefaultBytesPerRow);
+
+            var editor = new MainViewModel { DefaultBytesPerRow = settings.DefaultBytesPerRow };
+            using var input = new MemoryStream(Encoding.ASCII.GetBytes(":01002000BB24\n:00000001FF\n"));
+            editor.ApplyImport(new MemoryImageFileService().PrepareImport(input), OverlapDecision.OverwriteIncoming);
+            Assert.AreEqual(24, editor.ImageView.BytesPerRow);
+            editor.ImageView.BytesPerRow = 8; // A live Editor choice is not retroactively reset.
+            editor.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x2000, [0xBB])]), null, null);
+            Assert.AreEqual(24, editor.ImageView.BytesPerRow);
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [TestMethod]
     public void Comparison_colors_are_staged_by_palette_and_reset_only_the_selected_palette()
     {
         var folder = Path.Combine(Path.GetTempPath(), "hex-editor-colors-" + Guid.NewGuid());
@@ -257,6 +299,8 @@ public sealed class PreferencesSessionTests
                     new FixedWindowsAppearance());
                 var choices = new PreferencesSession(appearance,
                     new GridSpacingSettings(Path.Combine(folder, "grid-spacing.json")));
+                Assert.AreEqual("16", Children<ComboBox>(new PreferencesWindow(choices))
+                    .Single(combo => combo.Name == "DefaultRowWidthSelector").Text);
                 var window = new PreferencesWindow(choices);
                 Assert.AreEqual(WindowStyle.SingleBorderWindow, window.WindowStyle);
                 Assert.AreEqual(ResizeMode.NoResize, window.ResizeMode);
@@ -324,6 +368,65 @@ public sealed class PreferencesSessionTests
                     Assert.AreEqual(AppearanceMode.Dark, new AppearanceSettings(appearancePath).Mode);
                     Assert.AreEqual(6, new GridSpacingSettings(spacingPath).HorizontalByteSpacing);
                     Assert.AreEqual(3, new GridSpacingSettings(spacingPath).VerticalRowSpacing);
+                }
+                finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+            }
+            catch (Exception exception) { failure = exception; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
+    [TestMethod]
+    public void Preferences_window_saves_a_custom_default_width_and_rejects_out_of_range_entry()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var folder = Path.Combine(Path.GetTempPath(), "hex-editor-width-window-" + Guid.NewGuid());
+                try
+                {
+                    using var appearance = new AppearanceSession(
+                        new AppearanceSettings(Path.Combine(folder, "appearance.json")), new FixedWindowsAppearance());
+                    var settings = new RowWidthSettings(Path.Combine(folder, "row-width.json"));
+                    var choices = new PreferencesSession(appearance,
+                        new GridSpacingSettings(Path.Combine(folder, "spacing.json")), defaultRowWidth: settings);
+                    var window = new PreferencesWindow(choices)
+                    {
+                        Left = -3000, Top = -3000, WindowStartupLocation = WindowStartupLocation.Manual,
+                        ShowActivated = false, ShowInTaskbar = false
+                    };
+                    window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+                    {
+                        var rowWidth = Children<ComboBox>(window).Single(combo => combo.Name == "DefaultRowWidthSelector");
+                        rowWidth.Text = "129";
+                        Children<Wpf.Ui.Controls.Button>(window).Single(button => Equals(button.Content, "Save"))
+                            .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                    });
+                    Assert.IsTrue(window.ShowDialog().GetValueOrDefault());
+                    Assert.AreEqual(16, choices.DefaultBytesPerRow);
+                    Assert.AreEqual(16, settings.DefaultBytesPerRow);
+
+                    var valid = new PreferencesSession(appearance,
+                        new GridSpacingSettings(Path.Combine(folder, "spacing.json")), defaultRowWidth: settings);
+                    var saveWindow = new PreferencesWindow(valid)
+                    {
+                        Left = -3000, Top = -3000, WindowStartupLocation = WindowStartupLocation.Manual,
+                        ShowActivated = false, ShowInTaskbar = false
+                    };
+                    saveWindow.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+                    {
+                        Children<ComboBox>(saveWindow).Single(combo => combo.Name == "DefaultRowWidthSelector").Text = "24";
+                        Children<Wpf.Ui.Controls.Button>(saveWindow).Single(button => Equals(button.Content, "Save"))
+                            .RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                    });
+                    Assert.IsTrue(saveWindow.ShowDialog().GetValueOrDefault());
+                    valid.Save();
+                    Assert.AreEqual(24, new RowWidthSettings(settings.FilePath).DefaultBytesPerRow);
                 }
                 finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
             }

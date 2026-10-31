@@ -122,7 +122,7 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
             progress.Report(new MemoryImageFileProgress(update.Stage, update.Completed, update.Total)));
         return await Task.Run(() => new CompareWorkspaceTabViewModel(document.CurrentImage, reference.Image,
             baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path, document,
-            cancellationToken, comparisonProgress), cancellationToken);
+            cancellationToken, comparisonProgress, viewModel.DefaultBytesPerRow), cancellationToken);
     }
 }
 

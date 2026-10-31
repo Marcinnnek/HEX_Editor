@@ -37,6 +37,27 @@ public sealed class CompareCurrentImageWorkflowTests
     }
 
     [TestMethod]
+    public async Task New_comparison_uses_the_saved_default_row_width()
+    {
+        var basePath = CreateImageFile(0x10);
+        var referencePath = CreateImageFile(0x20);
+        try
+        {
+            var viewModel = new MainViewModel { DefaultBytesPerRow = 24 };
+            viewModel.Workspace.Open(basePath, OverlapDecision.OverwriteIncoming);
+            var comparison = await new CompareCurrentImageWorkflow(viewModel).StartAsync(
+                (_, _) => referencePath, () => Assert.Fail("Existing base should stay open."), CancellationToken.None, null);
+
+            Assert.IsNotNull(comparison);
+            Assert.AreEqual(24, comparison.Comparison.BytesPerRow);
+            viewModel.DefaultBytesPerRow = 32;
+            Assert.AreEqual(24, comparison.Comparison.BytesPerRow,
+                "Saving a new default must not change a comparison that is already open.");
+        }
+        finally { File.Delete(basePath); File.Delete(referencePath); }
+    }
+
+    [TestMethod]
     public async Task CompareWithoutImageOpensBaseBeforeSecondPickerAndKeepsItWhenCancelled()
     {
         var basePath = CreateImageFile(0x10);
