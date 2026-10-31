@@ -6,9 +6,9 @@
 
 **Status:** resolved
 
-- [ ] A Fill from zero through `0xFFFFFFFF` produces exactly 4,294,967,296 occupied bytes, with correct pattern values at the beginning, interior, and final address.
-- [ ] Keep and Overwrite follow the chosen policy throughout that range, including existing occupied bytes and gaps.
-- [ ] The operation warns above 50,000,000 addresses, shows progress, remains responsive, and can be cancelled without committing a partial image.
-- [ ] The completed Fill is one Undo operation; Undo restores the prior image and Redo restores the filled image.
-- [ ] Intel HEX and S-Record Save/Export can stream the resulting image with progress and cancellation, preserving existing output on failure.
-- [ ] Disk-backed working storage is acceptable; insufficient space fails clearly without changing the current image.
+- [x] A Fill from zero through `0xFFFFFFFF` produces exactly 4,294,967,296 occupied bytes, with correct pattern values at the beginning, interior, and final address.
+- [x] Keep and Overwrite follow the chosen policy throughout that range, including existing occupied bytes and gaps.
+- [x] The operation warns above 50,000,000 addresses, shows progress, remains responsive, and can be cancelled without committing a partial image.
+- [x] The completed Fill is one Undo operation; Undo restores the prior image and Redo restores the filled image.
+- [x] Intel HEX and S-Record Save/Export can stream the resulting image with progress and cancellation, preserving existing output on failure.
+- [x] Disk-backed working storage is acceptable; insufficient space fails clearly without changing the current image.

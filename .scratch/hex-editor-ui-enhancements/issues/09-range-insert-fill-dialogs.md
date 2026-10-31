@@ -6,13 +6,13 @@
 
 **Status:** ready-for-human
 
-- [ ] Select Range accepts validated hexadecimal Start and End addresses and updates the active Editor selection without changing data.
-- [ ] Edit/Insert collects a target address and bytes, preserves explicit overlap decisions, and never silently replaces occupied bytes.
-- [ ] Fill collects a valid range and pattern, applies one reversible transaction, and preserves absolute-address semantics.
-- [ ] Cancel or validation failure leaves the document unchanged; dialogs prefill sensible values from the current selection where available.
-- [ ] Menu and useful context-menu entry points work without reading hidden toolbar controls.
+- [x] Select Range accepts validated hexadecimal Start and End addresses and updates the active Editor selection without changing data.
+- [x] Edit/Insert collects a target address and bytes, preserves explicit overlap decisions, and never silently replaces occupied bytes.
+- [x] Fill collects a valid range and pattern, applies one reversible transaction, and preserves absolute-address semantics.
+- [x] Cancel or validation failure leaves the document unchanged; dialogs prefill sensible values from the current selection where available.
+- [x] Menu and useful context-menu entry points work without reading hidden toolbar controls.
 - [x] Exercise each end-to-end operation through public workspace behavior.
-- [ ] Inspect dialog focus and errors in WPF.
+- [x] Inspect dialog focus and errors in WPF.
 
 ## Comments
 

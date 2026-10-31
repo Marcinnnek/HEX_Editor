@@ -9,12 +9,12 @@
 - [x] Editor uses the agreed vertical memory-segment list and full-width Address, HEX Data, ASCII layout.
 - [x] Compare retains two side-by-side panels with block lists above aligned HEX grids and a visible difference-result area.
 - [x] Compare has two columns: the first column stacks File 1's segment list above File 1's data, and the second stacks File 2's segment list above File 2's data.
-- [ ] In Editor, size the segment list just wider than its address content instead of stretching it across the workspace.
+- [x] In Editor, size the segment list just wider than its address content instead of stretching it across the workspace.
 - [x] Segment selection and absolute-address navigation remain usable in both workspaces.
 - [x] Missing bytes stay visibly absent and distinct from stored 00/FF; row and byte alignment survive resizing and ASCII visibility changes.
 - [x] Virtualization remains active and sparse address gaps do not create dense rows or excessive visual elements.
 - [x] Exercise existing view-model behavior for alignment and navigation.
-- [ ] Inspect layout at normal and narrow sizes.
+- [x] Inspect layout at normal and narrow sizes.
 
 ## Comments
 

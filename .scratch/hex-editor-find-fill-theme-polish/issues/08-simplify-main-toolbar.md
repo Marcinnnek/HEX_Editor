@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [ ] The toolbar no longer contains the address field, Go button, or More button.
-- [ ] View > Go to address and Ctrl+G open the existing address dialog.
-- [ ] Every command previously exposed through More remains reachable through the application menus at the minimum supported window width.
-- [ ] Editor and Compare workspace navigation remains usable after the toolbar change.
+- [x] The toolbar no longer contains the address field, Go button, or More button.
+- [x] View > Go to address and Ctrl+G open the existing address dialog.
+- [x] Every command previously exposed through More remains reachable through the application menus at the minimum supported window width.
+- [x] Editor and Compare workspace navigation remains usable after the toolbar change.

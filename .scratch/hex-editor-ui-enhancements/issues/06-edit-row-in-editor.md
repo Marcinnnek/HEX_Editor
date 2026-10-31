@@ -6,14 +6,14 @@
 
 **Status:** ready-for-agent
 
-- [ ] The dialog identifies the row start and selected byte offset from that start; byte columns use zero-based offsets instead of repeating full absolute addresses above every cell.
-- [ ] HEX accepts one or two hexadecimal digits (`0–9`, `A–F`, case-insensitive) per byte; one digit represents its value in the low nibble. ASCII accepts exactly one printable ASCII character (`0x20–0x7E`) per byte, and nonprintable values display as dots.
-- [ ] Original and proposed occupied-byte values remain synchronized between HEX and ASCII; invalid input cannot be committed.
-- [ ] Partial rows and address gaps are displayed without creating bytes at absent addresses; Insert or Fill remains the explicit way to add occupancy.
-- [ ] Invalid input cannot commit; Cancel changes neither bytes nor dirty state.
-- [ ] OK commits all changed bytes as one Undo/Redo action, updates the Editor view, and invalidates affected calculated results through the document change notification.
+- [x] The dialog identifies the row start and selected byte offset from that start; byte columns use zero-based offsets instead of repeating full absolute addresses above every cell.
+- [x] HEX accepts one or two hexadecimal digits (`0–9`, `A–F`, case-insensitive) per byte; one digit represents its value in the low nibble. ASCII accepts exactly one printable ASCII character (`0x20–0x7E`) per byte, and nonprintable values display as dots.
+- [x] Original and proposed occupied-byte values remain synchronized between HEX and ASCII; invalid input cannot be committed.
+- [x] Partial rows and address gaps are displayed without creating bytes at absent addresses; Insert or Fill remains the explicit way to add occupancy.
+- [x] Invalid input cannot commit; Cancel changes neither bytes nor dirty state.
+- [x] OK commits all changed bytes as one Undo/Redo action, updates the Editor view, and invalidates affected calculated results through the document change notification.
 - [x] Test staged validation, sparse rows, cancellation, atomic history, and document state through public operations.
-- [ ] Inspect the dialog interaction in WPF.
+- [x] Inspect the dialog interaction in WPF.
 
 ## Comments
 

@@ -6,12 +6,12 @@
 
 **Status:** ready-for-agent
 
-- [ ] Reproduce and fix the reported exception when using Previous Difference or Next Difference while comparing two different files.
-- [ ] With a selected byte, Next selects the closest difference at a higher address and Previous selects the closest difference at a lower address.
-- [ ] Without a selected row, use the address field as the starting address and search in the requested direction.
-- [ ] If no difference exists in the requested direction, leave the current view and address unchanged and keep the application open.
-- [ ] Log recoverable failures and show a concise status-bar message; never let a navigation exception close the application or comparison tab.
-- [ ] Cover different files, selected and unselected rows, sparse address gaps, and no further differences in regression checks.
+- [x] Reproduce and fix the reported exception when using Previous Difference or Next Difference while comparing two different files.
+- [x] With a selected byte, Next selects the closest difference at a higher address and Previous selects the closest difference at a lower address.
+- [x] Without a selected row, use the address field as the starting address and search in the requested direction.
+- [x] If no difference exists in the requested direction, leave the current view and address unchanged and keep the application open.
+- [x] Log recoverable failures and show a concise status-bar message; never let a navigation exception close the application or comparison tab.
+- [x] Cover different files, selected and unselected rows, sparse address gaps, and no further differences in regression checks.
 
 ## Comments
 

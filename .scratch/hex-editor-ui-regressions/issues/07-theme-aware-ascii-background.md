@@ -6,11 +6,11 @@
 
 **Status:** resolved
 
-- [ ] The ASCII data column is subtly distinct from Address and HEX Data in Editor and both Compare panels.
-- [ ] The tint follows Light and Dark appearance without reducing text, focus, or selection contrast.
-- [ ] Comparison-difference highlights remain visible on ASCII bytes; separator spaces remain neutral.
-- [ ] The tint does not change memory-image values, byte alignment, row sizing, or hit testing.
-- [ ] Inspect both themes and representative changed/unchanged ASCII bytes in WPF; retain existing comparison highlight tests.
+- [x] The ASCII data column is subtly distinct from Address and HEX Data in Editor and both Compare panels.
+- [x] The tint follows Light and Dark appearance without reducing text, focus, or selection contrast.
+- [x] Comparison-difference highlights remain visible on ASCII bytes; separator spaces remain neutral.
+- [x] The tint does not change memory-image values, byte alignment, row sizing, or hit testing.
+- [x] Inspect both themes and representative changed/unchanged ASCII bytes in WPF; retain existing comparison highlight tests.
 
 ## Answer
 

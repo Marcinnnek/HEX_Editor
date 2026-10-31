@@ -6,11 +6,11 @@
 
 **Status:** ready-for-agent
 
-- [ ] Reproduce and fix the reported crash when double-clicking the left panel while comparing two files.
-- [ ] A valid occupied base byte opens Edit Row; headers, gaps, separators, empty areas, and unrealized rows do not open it and do not throw an unhandled exception.
-- [ ] The reference panel remains read-only and reports its behavior in the status bar.
-- [ ] Recoverable failures are recorded in diagnostics with operation and address context where available, without logging byte values or closing the workspace.
-- [ ] Verify behavior in the live WPF interaction path as well as the existing row-activation seam.
+- [x] Reproduce and fix the reported crash when double-clicking the left panel while comparing two files.
+- [x] A valid occupied base byte opens Edit Row; headers, gaps, separators, empty areas, and unrealized rows do not open it and do not throw an unhandled exception.
+- [x] The reference panel remains read-only and reports its behavior in the status bar.
+- [x] Recoverable failures are recorded in diagnostics with operation and address context where available, without logging byte values or closing the workspace.
+- [x] Verify behavior in the live WPF interaction path as well as the existing row-activation seam.
 
 ## Comments
 

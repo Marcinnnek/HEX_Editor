@@ -8,8 +8,8 @@
 
 - [x] Release publishing embeds the required managed application files and supported native components into one distributable executable; trimming is not enabled without compatibility proof.
 - [x] The executable starts when copied alone into an isolated directory, and it does not require application DLLs, resources, or configuration beside it.
-- [ ] Theme and export preferences and diagnostics use user-data locations, with defaults available on first launch.
-- [ ] On the development system, launch the executable and exercise open, compare, edit, save, export, and close workflows. Record its actual OS and installed .NET Desktop Runtime environment. A Windows 10 host is accepted for this validation, but does not establish behavior on the supported Windows 11 24H2+ target or prove launch on a machine without those runtimes.
+- [x] Theme and export preferences and diagnostics use user-data locations, with defaults available on first launch.
+- [x] On the development system, launch the executable and exercise open, compare, edit, save, export, and close workflows. Record its actual OS and installed .NET Desktop Runtime environment. A Windows 10 host is accepted for this validation, but does not establish behavior on the supported Windows 11 24H2+ target or prove launch on a machine without those runtimes.
 - [x] Record the publish command, output location, executable size, environment used for validation, and any clean-machine limitation in the ticket comments.
 
 ## Comments

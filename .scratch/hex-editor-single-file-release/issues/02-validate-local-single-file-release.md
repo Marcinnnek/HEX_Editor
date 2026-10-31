@@ -8,8 +8,8 @@
 
 - [x] Release publishing targets Windows 11 24H2 or newer on x64, is self-contained and single-file, embeds supported native components as needed, and does not enable trimming without compatibility proof.
 - [x] The publish output contains only the executable, and a copy of that executable launches from an isolated directory without adjacent application DLLs, resources, or configuration.
-- [ ] First-launch defaults work without adjacent files; appearance and export preferences persist in user data, and diagnostics use the bounded user-data log.
-- [ ] Exercise open, compare, edit, save, export, and close workflows in the published application on the current development system. Record its actual OS and runtime environment; Windows 10 validation is accepted but does not establish behavior on the supported Windows 11 24H2+ target.
+- [x] First-launch defaults work without adjacent files; appearance and export preferences persist in user data, and diagnostics use the bounded user-data log.
+- [x] Exercise open, compare, edit, save, export, and close workflows in the published application on the current development system. Record its actual OS and runtime environment; Windows 10 validation is accepted but does not establish behavior on the supported Windows 11 24H2+ target.
 - [x] Record the publish command, output location, executable size, operating-system build, architecture, and installed .NET Desktop Runtime environment.
 - [x] State explicitly that validation on a host with .NET Desktop Runtimes installed does not prove launch on a machine without those runtimes.
 

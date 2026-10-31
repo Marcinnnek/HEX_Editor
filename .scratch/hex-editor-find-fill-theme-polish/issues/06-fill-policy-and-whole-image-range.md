@@ -6,9 +6,9 @@
 
 **Status:** resolved
 
-- [ ] Fill Range offers Keep existing data and Overwrite existing data, with Keep selected by default.
-- [ ] Keep writes only to address gaps; Overwrite writes to every address in the selected interval.
-- [ ] A repeating pattern remains anchored to the interval's first address even when Keep skips occupied bytes.
-- [ ] Get fill all region sets the inclusive lowest and highest occupied addresses, including intervening gaps; it is unavailable for an empty image while manual entry remains possible.
-- [ ] The dialog shows the inclusive address count and warns when it exceeds 50,000,000 addresses; cancelling the warning leaves the image unchanged.
-- [ ] A completed Fill is one Undo operation and does not partially change the image after validation or cancellation fails.
+- [x] Fill Range offers Keep existing data and Overwrite existing data, with Keep selected by default.
+- [x] Keep writes only to address gaps; Overwrite writes to every address in the selected interval.
+- [x] A repeating pattern remains anchored to the interval's first address even when Keep skips occupied bytes.
+- [x] Get fill all region sets the inclusive lowest and highest occupied addresses, including intervening gaps; it is unavailable for an empty image while manual entry remains possible.
+- [x] The dialog shows the inclusive address count and warns when it exceeds 50,000,000 addresses; cancelling the warning leaves the image unchanged.
+- [x] A completed Fill is one Undo operation and does not partially change the image after validation or cancellation fails.

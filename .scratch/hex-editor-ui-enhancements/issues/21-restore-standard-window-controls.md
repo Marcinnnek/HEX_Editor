@@ -6,9 +6,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] The main window visibly exposes minimize, maximize/restore, and close controls.
-- [ ] Each control performs its standard Windows window action and supports normal resizing/maximizing behavior.
-- [ ] Verify the controls in the running WPF application at normal and maximized sizes.
+- [x] The main window visibly exposes minimize, maximize/restore, and close controls.
+- [x] Each control performs its standard Windows window action and supports normal resizing/maximizing behavior.
+- [x] Verify the controls in the running WPF application at normal and maximized sizes.
 
 ## Comments
 

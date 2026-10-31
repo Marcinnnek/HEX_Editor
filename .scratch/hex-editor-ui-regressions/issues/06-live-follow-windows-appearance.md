@@ -6,12 +6,12 @@
 
 **Status:** resolved
 
-- [ ] Choosing Follow Windows applies the current Windows light or dark setting across the main window, Editor, Compare, menus, status, and dialogs.
-- [ ] Changing the Windows appearance while the app is open updates already visible content without restarting.
-- [ ] A manual Light or Dark override prevents subsequent Windows changes from replacing the selected mode.
-- [ ] Returning to Follow Windows resumes live operating-system tracking, and the chosen mode persists across restart.
-- [ ] Repeated mode changes do not duplicate event subscriptions or leave stale colors in custom HEX/ASCII rendering.
-- [ ] Verify observable appearance-setting behavior and inspect live operating-system theme changes in WPF.
+- [x] Choosing Follow Windows applies the current Windows light or dark setting across the main window, Editor, Compare, menus, status, and dialogs.
+- [x] Changing the Windows appearance while the app is open updates already visible content without restarting.
+- [x] A manual Light or Dark override prevents subsequent Windows changes from replacing the selected mode.
+- [x] Returning to Follow Windows resumes live operating-system tracking, and the chosen mode persists across restart.
+- [x] Repeated mode changes do not duplicate event subscriptions or leave stale colors in custom HEX/ASCII rendering.
+- [x] Verify observable appearance-setting behavior and inspect live operating-system theme changes in WPF.
 
 ## Answer
 

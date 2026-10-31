@@ -6,13 +6,13 @@
 
 **Status:** resolved
 
-- [ ] The main menu offers Preferences and no longer shows a separate Appearance menu or duplicate appearance commands.
-- [ ] Preferences shows the current appearance mode and independent horizontal byte and vertical row spacing controls.
-- [ ] The dialog has a visible standard Windows title-bar close control, a Cancel action, and styling consistent with the current appearance.
-- [ ] Adjusting controls stages choices; Cancel or X leaves active and persisted appearance and spacing unchanged.
-- [ ] Save applies and persists the staged choices together to open views; reopening Preferences shows the saved values.
-- [ ] A new profile keeps the established default spacing and Follow Windows behavior, and a saved manual appearance override survives restart.
-- [ ] Exercise settings persistence through public operations and inspect Save, Cancel, X, Light, Dark, and Follow Windows in WPF.
+- [x] The main menu offers Preferences and no longer shows a separate Appearance menu or duplicate appearance commands.
+- [x] Preferences shows the current appearance mode and independent horizontal byte and vertical row spacing controls.
+- [x] The dialog has a visible standard Windows title-bar close control, a Cancel action, and styling consistent with the current appearance.
+- [x] Adjusting controls stages choices; Cancel or X leaves active and persisted appearance and spacing unchanged.
+- [x] Save applies and persists the staged choices together to open views; reopening Preferences shows the saved values.
+- [x] A new profile keeps the established default spacing and Follow Windows behavior, and a saved manual appearance override survives restart.
+- [x] Exercise settings persistence through public operations and inspect Save, Cancel, X, Light, Dark, and Follow Windows in WPF.
 
 ## Answer
 

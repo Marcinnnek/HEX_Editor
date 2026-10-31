@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [ ] A public memory-image operation can represent and read a logical occupied range from `0x00000000` through `0xFFFFFFFF` without allocating one 4 GiB byte array.
-- [ ] Occupancy and byte counts use values wide enough for `2^32` bytes, including inclusive end-address arithmetic.
-- [ ] Existing small-image creation, byte reads, segment ordering, and address-gap semantics remain correct while the old form still exists.
-- [ ] The application and existing public small-image workflows remain usable after the expansion.
+- [x] A public memory-image operation can represent and read a logical occupied range from `0x00000000` through `0xFFFFFFFF` without allocating one 4 GiB byte array.
+- [x] Occupancy and byte counts use values wide enough for `2^32` bytes, including inclusive end-address arithmetic.
+- [x] Existing small-image creation, byte reads, segment ordering, and address-gap semantics remain correct while the old form still exists.
+- [x] The application and existing public small-image workflows remain usable after the expansion.

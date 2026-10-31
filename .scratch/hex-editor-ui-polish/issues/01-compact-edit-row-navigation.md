@@ -6,14 +6,14 @@
 
 **Status:** resolved
 
-- [ ] Offset, original HEX/ASCII, and proposed HEX/ASCII values are centered horizontally and vertically in each byte column; row labels remain left-aligned.
-- [ ] Tab visits enabled Proposed HEX inputs by increasing byte offset, then enabled Proposed ASCII inputs in the same order; Shift+Tab reverses this sequence.
-- [ ] Unoccupied addresses remain noneditable and are skipped by Tab. After the last ASCII input, normal focus navigation reaches OK.
-- [ ] Entering an input with Tab, Shift+Tab, or a first mouse click selects its whole value; a later click in the focused input can position the caret.
-- [ ] The chosen byte receives initial focus and visual emphasis, while the visible Selected byte heading is removed.
-- [ ] The dialog fits its controls vertically and has a fixed normal-use height at 8, 16, and 32 bytes per row. On a constrained display, scrolling keeps all inputs and actions reachable without unreadably shrinking text.
-- [ ] Existing one- or two-digit HEX input, one-character printable ASCII input, validation, Cancel behavior, sparse-address protection, synchronized representations, and one reversible commit still work.
-- [ ] Verify editing outcomes through public editing operations and the focus, alignment, and sizing behavior in rendered WPF scenarios.
+- [x] Offset, original HEX/ASCII, and proposed HEX/ASCII values are centered horizontally and vertically in each byte column; row labels remain left-aligned.
+- [x] Tab visits enabled Proposed HEX inputs by increasing byte offset, then enabled Proposed ASCII inputs in the same order; Shift+Tab reverses this sequence.
+- [x] Unoccupied addresses remain noneditable and are skipped by Tab. After the last ASCII input, normal focus navigation reaches OK.
+- [x] Entering an input with Tab, Shift+Tab, or a first mouse click selects its whole value; a later click in the focused input can position the caret.
+- [x] The chosen byte receives initial focus and visual emphasis, while the visible Selected byte heading is removed.
+- [x] The dialog fits its controls vertically and has a fixed normal-use height at 8, 16, and 32 bytes per row. On a constrained display, scrolling keeps all inputs and actions reachable without unreadably shrinking text.
+- [x] Existing one- or two-digit HEX input, one-character printable ASCII input, validation, Cancel behavior, sparse-address protection, synchronized representations, and one reversible commit still work.
+- [x] Verify editing outcomes through public editing operations and the focus, alignment, and sizing behavior in rendered WPF scenarios.
 
 ## Answer
 

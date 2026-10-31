@@ -10,9 +10,9 @@
 - [x] File, Edit, View, Compare, Merge, Tools, and Export commands remain discoverable in appropriate menus or context menus and invoke their working dialogs.
 - [x] Commands are enabled only when the active document, tab, segment, selection, or result makes them valid; Save/Undo/Redo target the active base.
 - [x] At narrow widths, primary toolbar groups collapse into More at defined window-width thresholds, keeping their commands available from the overflow menu.
-- [ ] Verify narrow-window More menu keyboard access and confirm that overflow does not force horizontal scrolling of the Editor or Compare workspace.
-- [ ] Preserve useful existing shortcuts and add conventional shortcuts where absent; visible focus and status feedback remain consistent.
-- [ ] Manually walk every migrated command in Editor and Compare, including narrow-window overflow, and test active-tab command routing through the workspace seam.
+- [x] Verify narrow-window More menu keyboard access and confirm that overflow does not force horizontal scrolling of the Editor or Compare workspace.
+- [x] Preserve useful existing shortcuts and add conventional shortcuts where absent; visible focus and status feedback remain consistent.
+- [x] Manually walk every migrated command in Editor and Compare, including narrow-window overflow, and test active-tab command routing through the workspace seam.
 
 ## Comments
 

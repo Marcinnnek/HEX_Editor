@@ -11,7 +11,7 @@
 - [x] Confirmed left edits refresh difference highlighting, counts, segment lists, Editor, and other Compare tabs using that base.
 - [x] Cancel or invalid input leaves both images and dirty state unchanged; Undo/Redo works from any view of the base.
 - [x] Workspace-seam tests cover valid rows, absent bytes, unloaded rows, and both panels.
-- [ ] WPF interaction checks cover valid rows, absent bytes, unloaded rows, and both panels.
+- [x] WPF interaction checks cover valid rows, absent bytes, unloaded rows, and both panels.
 
 ## Comments
 

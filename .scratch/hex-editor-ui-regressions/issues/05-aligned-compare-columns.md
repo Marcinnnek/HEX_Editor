@@ -6,12 +6,12 @@
 
 **Status:** resolved
 
-- [ ] The base image's memory-segment list is immediately above the base data panel, and the reference image's list is immediately above the reference data panel.
-- [ ] Each list uses its corresponding column's available width at normal and narrow window sizes.
-- [ ] Resizing the window or moving the divider keeps each list aligned with its own data panel.
-- [ ] Segment selection and absolute-address navigation remain usable on both sides.
-- [ ] Compare's settings, aligned rows, and difference-result area remain visible and usable.
-- [ ] Inspect the layout and interactions in WPF at normal and narrow sizes, retaining existing public comparison/navigation tests as regression coverage.
+- [x] The base image's memory-segment list is immediately above the base data panel, and the reference image's list is immediately above the reference data panel.
+- [x] Each list uses its corresponding column's available width at normal and narrow window sizes.
+- [x] Resizing the window or moving the divider keeps each list aligned with its own data panel.
+- [x] Segment selection and absolute-address navigation remain usable on both sides.
+- [x] Compare's settings, aligned rows, and difference-result area remain visible and usable.
+- [x] Inspect the layout and interactions in WPF at normal and narrow sizes, retaining existing public comparison/navigation tests as regression coverage.
 
 ## Answer
 

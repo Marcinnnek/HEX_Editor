@@ -6,13 +6,13 @@
 
 **Status:** resolved
 
-- [ ] A single click on an occupied data row or byte in the base panel responds without a hang or application exit.
-- [ ] The same single-click interaction is safe in the read-only reference panel.
-- [ ] Selection and scrolling stay aligned by absolute address without repeated full-image work or a feedback loop between panels.
-- [ ] The reported `CMSIS-DAP-STLINK21.hex` and `STM32-DEMO.hex` comparison stays open and responsive after clicks in both panels; source files are not edited or saved during verification.
-- [ ] Left-panel double-click editing, right-panel read-only feedback, and Previous/Next Difference remain usable after a single click.
-- [ ] A recoverable interaction error reports the operation, panel, and address or selection when available in status and error diagnostics; open documents and unsaved edits survive.
-- [ ] Cover observable selection and navigation through existing public workspace/model operations and reproduce the click in a WPF acceptance scenario.
+- [x] A single click on an occupied data row or byte in the base panel responds without a hang or application exit.
+- [x] The same single-click interaction is safe in the read-only reference panel.
+- [x] Selection and scrolling stay aligned by absolute address without repeated full-image work or a feedback loop between panels.
+- [x] The reported `CMSIS-DAP-STLINK21.hex` and `STM32-DEMO.hex` comparison stays open and responsive after clicks in both panels; source files are not edited or saved during verification.
+- [x] Left-panel double-click editing, right-panel read-only feedback, and Previous/Next Difference remain usable after a single click.
+- [x] A recoverable interaction error reports the operation, panel, and address or selection when available in status and error diagnostics; open documents and unsaved edits survive.
+- [x] Cover observable selection and navigation through existing public workspace/model operations and reproduce the click in a WPF acceptance scenario.
 
 ## Answer
 

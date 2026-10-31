@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [ ] Editor rows and the Block list can display occupied ranges and address gaps through the expanded image representation, including bytes near both ends of the 32-bit space.
-- [ ] Existing byte edits, Edit Row, insertion, deletion, relocation, Merge, Undo, and Redo still produce the same observable results for small images.
-- [ ] Editing and navigation do not require one contiguous byte array for every memory segment.
-- [ ] The Editor remains usable and the existing public editor acceptance behavior stays green before full-range Fill is enabled.
+- [x] Editor rows and the Block list can display occupied ranges and address gaps through the expanded image representation, including bytes near both ends of the 32-bit space.
+- [x] Existing byte edits, Edit Row, insertion, deletion, relocation, Merge, Undo, and Redo still produce the same observable results for small images.
+- [x] Editing and navigation do not require one contiguous byte array for every memory segment.
+- [x] The Editor remains usable and the existing public editor acceptance behavior stays green before full-range Fill is enabled.

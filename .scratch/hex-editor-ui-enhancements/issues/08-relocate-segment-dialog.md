@@ -6,15 +6,15 @@
 
 **Status:** ready-for-agent
 
-- [ ] A single click selects the memory segment and navigates to its start without changing data.
-- [ ] Double-clicking a memory segment opens Relocate Selected Segment with the current start address prefilled and ready to edit.
-- [ ] The dialog shows the selected segment's current start, end, and byte count, accepts a hexadecimal new start, and previews the new end.
-- [ ] Malformed, overflowing, or format-incompatible destinations are rejected before any data changes.
-- [ ] Occupied destination bytes block by default; overwriting requires a separate affirmative confirmation even when values are identical.
-- [ ] Canceling either dialog or declining overwrite leaves image, selection, and dirty state unchanged.
-- [ ] A successful move preserves segment bytes and length, refreshes affected views, marks the base modified, and is one Undo/Redo action.
+- [x] A single click selects the memory segment and navigates to its start without changing data.
+- [x] Double-clicking a memory segment opens Relocate Selected Segment with the current start address prefilled and ready to edit.
+- [x] The dialog shows the selected segment's current start, end, and byte count, accepts a hexadecimal new start, and previews the new end.
+- [x] Malformed, overflowing, or format-incompatible destinations are rejected before any data changes.
+- [x] Occupied destination bytes block by default; overwriting requires a separate affirmative confirmation even when values are identical.
+- [x] Canceling either dialog or declining overwrite leaves image, selection, and dirty state unchanged.
+- [x] A successful move preserves segment bytes and length, refreshes affected views, marks the base modified, and is one Undo/Redo action.
 - [x] Test relocation through the document/workspace seam.
-- [ ] Inspect the modal flow in WPF.
+- [x] Inspect the modal flow in WPF.
 
 ## Comments
 

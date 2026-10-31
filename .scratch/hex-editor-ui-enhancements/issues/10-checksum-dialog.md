@@ -12,7 +12,7 @@
 - [x] Editing any input byte marks the displayed result stale or recomputes it through the base document's change notification.
 - [x] Cancel, invalid parameters, or declined overlap leave bytes unchanged; errors identify the invalid field or address.
 - [x] Preserve existing known-vector and sparse-gap calculation behavior through public calculation/workspace tests.
-- [ ] Inspect the WPF dialog.
+- [x] Inspect the WPF dialog.
 
 ## Comments
 

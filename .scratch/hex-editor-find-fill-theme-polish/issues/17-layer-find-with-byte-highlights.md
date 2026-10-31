@@ -6,7 +6,7 @@
 
 **Status:** resolved
 
-- [ ] The complete current match has a separate visible indicator in HEX and visible ASCII, including across displayed rows.
-- [ ] In Compare, a byte can simultaneously show its difference background, edited outline, and Find indicator without losing any state.
-- [ ] Only the current match receives the Find indicator; closing Find removes it while leaving the underlying difference/edit colors and navigation intact.
-- [ ] The same layering remains readable in Light and Dark, including with user-selected highlight colors.
+- [x] The complete current match has a separate visible indicator in HEX and visible ASCII, including across displayed rows.
+- [x] In Compare, a byte can simultaneously show its difference background, edited outline, and Find indicator without losing any state.
+- [x] Only the current match receives the Find indicator; closing Find removes it while leaving the underlying difference/edit colors and navigation intact.
+- [x] The same layering remains readable in Light and Dark, including with user-selected highlight colors.

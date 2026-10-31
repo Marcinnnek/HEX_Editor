@@ -6,12 +6,12 @@
 
 **Status:** resolved
 
-- [ ] Dark applies to the main window, menus, toolbar, Editor, Compare, status, and existing dialogs rather than leaving mismatched light surfaces.
-- [ ] Text, inputs, disabled controls, focus, selection, and comparison highlights have readable contrast in Dark.
-- [ ] Custom HEX/ASCII rendering and window content use theme-appropriate colors without changing memory-image data or absolute-address alignment.
-- [ ] Switching between Light and Dark updates already open views and newly opened dialogs consistently.
-- [ ] Existing manual appearance choice remains stored and restored after restart.
-- [ ] Inspect representative Editor, Compare, Edit Row, and Preferences flows in WPF; test observable appearance state through the existing settings seam.
+- [x] Dark applies to the main window, menus, toolbar, Editor, Compare, status, and existing dialogs rather than leaving mismatched light surfaces.
+- [x] Text, inputs, disabled controls, focus, selection, and comparison highlights have readable contrast in Dark.
+- [x] Custom HEX/ASCII rendering and window content use theme-appropriate colors without changing memory-image data or absolute-address alignment.
+- [x] Switching between Light and Dark updates already open views and newly opened dialogs consistently.
+- [x] Existing manual appearance choice remains stored and restored after restart.
+- [x] Inspect representative Editor, Compare, Edit Row, and Preferences flows in WPF; test observable appearance state through the existing settings seam.
 
 ## Answer
 

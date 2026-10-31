@@ -6,12 +6,12 @@
 
 **Status:** ready-for-agent
 
-- [ ] Add a Preferences command to the main menu and open a focused settings window.
-- [ ] Provide independent controls for horizontal spacing between bytes and vertical spacing between rows.
-- [ ] Apply changes to Editor and Compare views and persist them under `%LOCALAPPDATA%\HexEditor`, with sensible defaults on first launch.
-- [ ] Use slightly tighter spacing than the current grid by default.
-- [ ] Keep spacing and separator backgrounds neutral when neighboring comparison bytes are highlighted.
-- [ ] Verify independent adjustment, application across views, first-launch defaults, and persistence after restart.
+- [x] Add a Preferences command to the main menu and open a focused settings window.
+- [x] Provide independent controls for horizontal spacing between bytes and vertical spacing between rows.
+- [x] Apply changes to Editor and Compare views and persist them under `%LOCALAPPDATA%\HexEditor`, with sensible defaults on first launch.
+- [x] Use slightly tighter spacing than the current grid by default.
+- [x] Keep spacing and separator backgrounds neutral when neighboring comparison bytes are highlighted.
+- [x] Verify independent adjustment, application across views, first-launch defaults, and persistence after restart.
 
 ## Comments
 
