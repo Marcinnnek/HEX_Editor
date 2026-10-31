@@ -50,11 +50,20 @@ public partial class CompareView : UserControl
         grid.SelectionMode = DataGridSelectionMode.Single;
         grid.SelectionChanged += Panel_SelectionChanged;
         panel.ByteClickFailed += Panel_ByteClickFailed;
+        panel.AddressRowSelected += Panel_AddressRowSelected;
         panel.WindowedByteDoubleClicked += Panel_WindowedByteDoubleClicked;
         panel.FirstVisibleRowChanged += Panel_FirstVisibleRowChanged;
         grid.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler(Grid_ScrollChanged));
         grid.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
             new MouseButtonEventHandler(Panel_PreviewMouseLeftButtonDown), handledEventsToo: true);
+    }
+
+    private void Panel_AddressRowSelected(object? sender, AddressRowSelectedEventArgs e)
+    {
+        if (sender is not HexViewControl panel) return;
+        _lastSelectedSide = SideOf(panel);
+        var rowAddress = HexAddressParser.TryParse(e.Row.Address, out var address) ? address : (uint?)null;
+        SelectAddressRow(e.RowIndex, e.Row, rowAddress);
     }
 
     private ComparePanelSide SideOf(object panel) => ReferenceEquals(panel, FileAView) ||
@@ -106,12 +115,14 @@ public partial class CompareView : UserControl
             var source = e.OriginalSource as DependencyObject;
             var row = FindAncestor<DataGridRow>(source);
             var cell = FindAncestor<DataGridCell>(source);
-            if (row?.Item is not HexViewRow viewRow || cell is null || viewRow.IsGapMarker ||
-                !HexAddressParser.TryParse(viewRow.Address, out var rowStartAddress)) return;
-            rowStart = rowStartAddress;
+            if (row?.Item is not HexViewRow viewRow || cell is null) return;
             rowIndex = row.GetIndex();
-            if (!ReferenceEquals(cell.Column, grid.Columns[0]))
+            var isAddressCell = ReferenceEquals(cell.Column, grid.Columns[0]);
+            var hasAddress = HexAddressParser.TryParse(viewRow.Address, out var rowStartAddress);
+            if (hasAddress) rowStart = rowStartAddress;
+            if (!isAddressCell)
             {
+                if (viewRow.IsGapMarker) return;
                 var byteRow = FindAncestor<HexByteRowControl>(source);
                 if (byteRow is null || !ReferenceEquals(byteRow.Row, row.Item) ||
                     !byteRow.TryGetAddressAt(e.GetPosition(byteRow), out var hitAddress)) return;
@@ -124,9 +135,9 @@ public partial class CompareView : UserControl
                 // Byte clicks are handled by HexViewControl, which retains shift-range selection.
                 if (address is not null) return;
                 e.Handled = true;
-                Navigate(rowStartAddress);
                 return;
             }
+            if (viewRow.IsGapMarker || !hasAddress) return;
             e.Handled = true;
 
             ActivateSelectedRow(side, rowIndex, rowStartAddress, address);
@@ -136,6 +147,25 @@ public partial class CompareView : UserControl
             ReportInteractionFailure(e.ClickCount == 2 ? "double-click" : "single-click", side, rowIndex,
                 address ?? rowStart, exception);
         }
+    }
+
+    private void SelectAddressRow(int rowIndex, HexViewRow row, uint? rowStart)
+    {
+        _syncingScroll = true;
+        try
+        {
+            _selectedByteAddress = null;
+            FileAView.SetSelectedRow(rowIndex);
+            FileBView.SetSelectedRow(rowIndex);
+            if (!FileAView.UseWindowedScrolling)
+            {
+                FileAView.ItemsGrid.SelectedIndex = -1;
+                FileBView.ItemsGrid.SelectedIndex = -1;
+            }
+            if (!row.IsGapMarker && rowStart is uint address)
+                AddressBox.Text = address.ToString("X8");
+        }
+        finally { _syncingScroll = false; }
     }
 
     private void Panel_WindowedByteDoubleClicked(object? sender, WindowedByteDoubleClickEventArgs e)
@@ -272,6 +302,8 @@ public partial class CompareView : UserControl
 
     private void Navigate(uint address)
     {
+        FileAView.SetSelectedRow(-1);
+        FileBView.SetSelectedRow(-1);
         _selectedByteAddress = address;
         AddressBox.Text = address.ToString("X8");
         if (ViewModel.TryNavigateToAddress(address, out var rowIndex)) SelectRow(rowIndex);
@@ -348,6 +380,8 @@ public partial class CompareView : UserControl
 
     private void ByteAddressSelected(object? sender, AddressRangeSelectedEventArgs e)
     {
+        FileAView.SetSelectedRow(-1);
+        FileBView.SetSelectedRow(-1);
         var side = SideOf(sender!);
         _lastSelectedSide = side;
         try

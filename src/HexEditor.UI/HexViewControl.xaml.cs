@@ -17,11 +17,13 @@ public partial class HexViewControl : UserControl
     private bool _refreshingWindow;
     private int _windowStart;
     private int _visibleRowCount = 24;
+    private int _selectedRowIndex = -1;
     public WindowedRowCollection WindowRows { get; } = [];
 
     public HexViewControl()
     {
         InitializeComponent();
+        HexGrid.LoadingRow += (_, e) => ApplyRowBackground(e.Row);
         DependencyPropertyDescriptor.FromProperty(Control.FontFamilyProperty, typeof(DataGrid))!
             .AddValueChanged(HexGrid, (_, _) => UpdateAddressColumnWidth());
         DependencyPropertyDescriptor.FromProperty(Control.FontSizeProperty, typeof(DataGrid))!
@@ -76,6 +78,75 @@ public partial class HexViewControl : UserControl
     public event EventHandler<ByteClickFailedEventArgs>? ByteClickFailed;
     public event EventHandler<WindowedByteDoubleClickEventArgs>? WindowedByteDoubleClicked;
     public event EventHandler? FirstVisibleRowChanged;
+    public event EventHandler<AddressRowSelectedEventArgs>? AddressRowSelected;
+
+    public int SelectedRowIndex => _selectedRowIndex;
+
+    public void SetSelectedRow(int rowIndex)
+    {
+        _selectedRowIndex = rowIndex;
+        foreach (var item in WindowRows) item.IsSelected = item.RowIndex == rowIndex;
+        if (!UseWindowedScrolling)
+        {
+            for (var i = 0; i < HexGrid.Items.Count; i++)
+                if (HexGrid.ItemContainerGenerator.ContainerFromIndex(i) is DataGridRow row) ApplyRowBackground(row);
+        }
+    }
+
+    private void ApplyRowBackground(DataGridRow row) =>
+        row.Background = row.GetIndex() == _selectedRowIndex
+            ? TryFindResource("HexSelectionBrush") as Brush
+            : TryFindResource("HexSurfaceBrush") as Brush;
+
+    private void AddressRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not DependencyObject source) return;
+        HexViewRow? row = null;
+        var index = -1;
+        if (FindAncestor<DataGridRow>(source) is { Item: HexViewRow dataGridRow } dataRow &&
+            FindAncestor<DataGridCell>(source) is { Column.DisplayIndex: 0 })
+        {
+            row = dataGridRow;
+            index = dataRow.GetIndex();
+        }
+        else if (FindAncestor<HexRowAddressControl>(source)?.Row is { } addressRow &&
+                 FindAncestor<ContentPresenter>(source)?.DataContext is WindowedRowItem item)
+        {
+            row = addressRow;
+            index = item.RowIndex;
+        }
+        if (row is null || index < 0) return;
+        SetSelectedRow(index);
+        AddressRowSelected?.Invoke(this, new AddressRowSelectedEventArgs(index, row));
+        e.Handled = true;
+    }
+
+    private void AddressCell_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not HexRowAddressControl { Row: { } row } || ItemsSource is not IList<HexViewRow> rows) return;
+        var index = -1;
+        for (var candidate = 0; candidate < rows.Count; candidate++)
+        {
+            var candidateRow = rows[candidate];
+            if (candidateRow.IsGapMarker == row.IsGapMarker && candidateRow.Address == row.Address &&
+                candidateRow.GapDescription == row.GapDescription)
+            {
+                index = candidate;
+                break;
+            }
+        }
+        if (index < 0) return;
+        SetSelectedRow(index);
+        AddressRowSelected?.Invoke(this, new AddressRowSelectedEventArgs(index, row));
+        e.Handled = true;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject source) where T : DependencyObject
+    {
+        for (var current = source; current is not null; current = current is Visual ? VisualTreeHelper.GetParent(current) : LogicalTreeHelper.GetParent(current))
+            if (current is T match) return match;
+        return null;
+    }
 
     public void ScrollToRow(int rowIndex)
     {
@@ -180,6 +251,7 @@ public partial class HexViewControl : UserControl
         RowThumb.Value = _windowStart;
         _refreshingWindow = false;
         WindowRows.ReplaceAll(rows, _windowStart, Math.Min(rows.Count, _windowStart + _visibleRowCount));
+        foreach (var item in WindowRows) item.IsSelected = item.RowIndex == _selectedRowIndex;
     }
 
     private double GetVisibleThumbViewport(int maxStart)
@@ -280,7 +352,11 @@ public sealed class WindowedRowCollection : ObservableCollection<WindowedRowItem
         var count = end - start;
         while (Count > count) RemoveAt(Count - 1);
         while (Count < count) Add(new WindowedRowItem(rows[start + Count]));
-        for (var index = 0; index < count; index++) this[index].Row = rows[start + index];
+        for (var index = 0; index < count; index++)
+        {
+            this[index].Row = rows[start + index];
+            this[index].RowIndex = start + index;
+        }
     }
 }
 
@@ -288,6 +364,9 @@ public sealed class WindowedRowItem(HexViewRow row) : System.ComponentModel.INot
 {
     private HexViewRow _row = row;
     public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    public int RowIndex { get; internal set; }
+    private bool _isSelected;
+    public bool IsSelected { get => _isSelected; set { if (_isSelected == value) return; _isSelected = value; PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsSelected))); } }
     public HexViewRow Row
     {
         get => _row;
@@ -298,6 +377,12 @@ public sealed class WindowedRowItem(HexViewRow row) : System.ComponentModel.INot
             PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Row)));
         }
     }
+}
+
+public sealed class AddressRowSelectedEventArgs(int rowIndex, HexViewRow row) : EventArgs
+{
+    public int RowIndex { get; } = rowIndex;
+    public HexViewRow Row { get; } = row;
 }
 
 public sealed class ByteClickFailedEventArgs(uint? address, Exception exception) : EventArgs
