@@ -131,6 +131,17 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
 {
     private readonly MemoryImageFileService _fileService = new();
 
+    public bool ConfirmMergeFormats(LoadedMemoryImage destination, LoadedMemoryImage source,
+        Func<MemoryImageFormatMismatch, bool> confirmMismatch)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(confirmMismatch);
+        foreach (var mismatch in new[] { destination.FormatMismatch, source.FormatMismatch })
+            if (mismatch is not null && !confirmMismatch(mismatch)) return false;
+        return true;
+    }
+
     public void Open(string path, Func<MemoryImageImportPreview, OverlapDecision> chooseOverlap)
     {
         var preview = viewModel.PrepareOpen(path);

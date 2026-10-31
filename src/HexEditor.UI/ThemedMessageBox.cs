@@ -74,6 +74,14 @@ internal sealed class ThemedMessageBox : Window
         return dialog._result == MessageBoxResult.Yes;
     }
 
+    public static bool ShowMergeAnyway(Window? owner, string message, string title)
+    {
+        var dialog = new ThemedMessageBox(owner, message, title, MessageBoxButton.YesNo,
+            yesLabel: "Merge anyway", noLabel: "Cancel");
+        dialog.ShowDialog();
+        return dialog._result == MessageBoxResult.Yes;
+    }
+
     private void AddButton(StackPanel actions, string label, MessageBoxResult result,
         bool isDefault = false, bool isCancel = false)
     {
