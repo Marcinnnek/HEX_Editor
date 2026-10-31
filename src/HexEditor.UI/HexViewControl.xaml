@@ -55,7 +55,7 @@
                       FontStretch="{Binding FontStretch, ElementName=HexGrid}"
                       PreviewMouseWheel="WindowedScroll_PreviewMouseWheel">
           <StackPanel>
-            <Grid Margin="0,4,0,4">
+            <Grid Margin="0,4,0,4" TextElement.FontWeight="Bold">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="Auto"/>
                 <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto">
@@ -168,6 +168,7 @@
                 BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
               <Setter Property="Padding" Value="0,4,0,4"/>
               <Setter Property="VerticalContentAlignment" Value="Center"/>
+              <Setter Property="FontWeight" Value="Bold"/>
           </Style>
         </ui:DataGrid.ColumnHeaderStyle>
         <ui:DataGrid.RowStyle>
