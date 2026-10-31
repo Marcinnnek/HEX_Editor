@@ -44,23 +44,24 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
 
     public bool TryGetRowIndex(uint address, out int rowIndex)
     {
-        var rowAddress = (ulong)(address / _rowWidth) * _rowWidth;
         var low = 0;
         var high = _spans.Count - 1;
         while (low <= high)
         {
             var middle = low + ((high - low) / 2);
             var span = _spans[middle];
-            if (rowAddress < span.StartAddress)
+            var spanEnd = Math.Min((ulong)uint.MaxValue, span.EndAddress + _rowWidth - 1);
+            if (address < span.StartAddress)
             {
                 high = middle - 1;
             }
-            else if (rowAddress > span.EndAddress)
+            else if (address > spanEnd)
             {
                 low = middle + 1;
             }
             else
             {
+                var rowAddress = span.StartAddress + ((address - span.StartAddress) / _rowWidth) * _rowWidth;
                 if (span.IsGap)
                 {
                     ExpandNavigationRow(span, rowAddress);

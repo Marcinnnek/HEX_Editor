@@ -126,29 +126,21 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         var width = (uint)bytesPerRow;
         var rowRanges = image.Ranges.Select(range =>
         {
-            var first = (ulong)(range.StartAddress / width) * width;
-            var last = (ulong)(range.EndAddress / width) * width;
+            var first = (ulong)range.StartAddress;
+            var last = first + (((ulong)range.EndAddress - first) / width) * width;
             return (First: first, Last: last);
         }).ToArray();
 
         var ranges = new List<SparseRowSpan>();
-        var runStart = rowRanges[0].First;
-        var runEnd = rowRanges[0].Last;
+        ranges.Add(new SparseRowSpan(rowRanges[0].First, rowRanges[0].Last));
         for (var index = 1; index < rowRanges.Length; index++)
         {
             var next = rowRanges[index];
-            var emptyRows = ((long)next.First - (long)runEnd) / bytesPerRow - 1;
-            if (emptyRows <= 1)
-            {
-                runEnd = next.Last;
-                continue;
-            }
-            ranges.Add(new SparseRowSpan(runStart, runEnd));
-            ranges.Add(new SparseRowSpan(runEnd + width, next.First - width, IsGap: true));
-            runStart = next.First;
-            runEnd = next.Last;
+            var previousEnd = image.Ranges[index - 1].EndAddress;
+            if ((ulong)next.First > (ulong)previousEnd + (2UL * width))
+                ranges.Add(new SparseRowSpan((ulong)previousEnd + 1, next.First - 1, IsGap: true));
+            ranges.Add(new SparseRowSpan(next.First, next.Last));
         }
-        ranges.Add(new SparseRowSpan(runStart, runEnd));
         return ranges;
     }
 
