@@ -90,7 +90,17 @@ public readonly record struct ByteGridLayout(double CharacterWidth, double LineH
         var stride = byteWidth + (isAscii ? 0 : HorizontalSpacing);
         if (byteWidth <= 0 || stride <= 0 || point.Y >= LineHeight || point.X >= GetRowSize(count, isAscii).Width) return false;
         var candidate = (int)(point.X / stride);
-        if ((uint)candidate >= (uint)count || !GetByteBounds(candidate, isAscii).Contains(point)) return false;
+        if ((uint)candidate >= (uint)count) return false;
+        var bounds = GetByteBounds(candidate, isAscii);
+        if (!bounds.Contains(point))
+        {
+            // HEX spacing is a shared hit target: each byte owns the half of
+            // the following separator nearest its glyph. ASCII has no gaps.
+            if (isAscii || candidate >= count - 1 || point.X <= bounds.Right || point.X >= bounds.Right + HorizontalSpacing)
+                return false;
+            var midpoint = bounds.Right + HorizontalSpacing / 2d;
+            candidate = point.X < midpoint ? candidate : candidate + 1;
+        }
         index = candidate;
         return true;
     }

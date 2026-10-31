@@ -136,7 +136,7 @@ public sealed class CompareRowActivationTests
     }
 
     [STATestMethod]
-    public void HexByteHitTesting_RejectsSeparatorsAndOutsideRow()
+    public void HexByteHitTesting_SelectsTheNearestByteAcrossSeparatorsAndRejectsOutsideRow()
     {
         var row = new HexViewRow("00001000", "10 20", "..", false, null)
         {
@@ -149,7 +149,10 @@ public sealed class CompareRowActivationTests
 
         Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth * 0.1, 1), out var first));
         Assert.AreEqual(0x1000u, first);
-        Assert.IsFalse(control.TryGetAddressAt(new Point(separator, 1), out _));
+        Assert.IsTrue(control.TryGetAddressAt(new Point(separator - 0.1, 1), out var separatorLeft));
+        Assert.AreEqual(0x1000u, separatorLeft);
+        Assert.IsTrue(control.TryGetAddressAt(new Point(separator, 1), out var separatorRight));
+        Assert.AreEqual(0x1001u, separatorRight);
         Assert.IsTrue(control.TryGetAddressAt(new Point(byteWidth + GridSpacingSettings.Current.HorizontalByteSpacing + byteWidth * 0.1, 1), out var second));
         Assert.AreEqual(0x1001u, second);
         Assert.IsFalse(control.TryGetAddressAt(new Point(control.DesiredSize.Width, 1), out _));

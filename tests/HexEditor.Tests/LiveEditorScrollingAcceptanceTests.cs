@@ -110,6 +110,49 @@ public sealed class LiveEditorScrollingAcceptanceTests
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
+    [TestMethod]
+    public void RoutedHexInterbyteClickSelectsExpectedNeighborInBothViewModes()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var model = new HexImageViewModel(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20])]), 8, showAscii: false);
+                var view = new HexViewControl { ItemsSource = model.Rows, BytesPerRow = 8, ShowAscii = false, Width = 600, Height = 240 };
+                uint? selectedAddress = null;
+                view.AddressRangeSelected += (_, range) => selectedAddress = range.EndAddress;
+                window = new Window { Content = view, Width = 620, Height = 260, Left = 100, Top = 100, ShowInTaskbar = false };
+                window.Show();
+                Pump(window.Dispatcher);
+                foreach (var windowed in new[] { false, true })
+                {
+                    view.UseWindowedScrolling = windowed;
+                    Pump(window.Dispatcher);
+                    var row = Descendants<HexByteRowControl>(view).Single(item => !item.IsAscii && item.Row?.Address == "00001000");
+                    var spacing = GridSpacingSettings.Current.HorizontalByteSpacing;
+                    var line = new FormattedText("0", System.Globalization.CultureInfo.InvariantCulture,
+                        FlowDirection.LeftToRight, new Typeface(row.FontFamily, row.FontStyle, row.FontWeight, row.FontStretch),
+                        row.FontSize, row.Foreground, VisualTreeHelper.GetDpi(row).PixelsPerDip);
+                    var byteWidth = line.WidthIncludingTrailingWhitespace * 2;
+                    var clickPoint = new Point(byteWidth + spacing / 2d, line.Height / 2d);
+                    var handled = view.SelectByteAt(row, clickPoint, extendSelection: false);
+                    Assert.IsTrue(handled, "The HEX row handles clicks in the separator.");
+                    Assert.AreEqual(0x1001u, selectedAddress,
+                        $"A click at {clickPoint} (row size {row.DesiredSize}, spacing {spacing}) selects byte two in {(windowed ? "windowed" : "DataGrid")} mode.");
+                    selectedAddress = null;
+                }
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     [STATestMethod]
     [DoNotParallelize]
     public void HexDataColumnTracksRowCapacityAndSpacingInBothLayouts()
