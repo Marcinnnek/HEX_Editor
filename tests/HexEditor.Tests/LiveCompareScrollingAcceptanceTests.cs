@@ -159,6 +159,41 @@ public sealed class LiveCompareScrollingAcceptanceTests
     }
 
     [TestMethod]
+    public void ByteSelectionBelongsOnlyToTheClickedComparePanel()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var baseImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x12, 0x13])]);
+                var referenceImage = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x34, 0x35])]);
+                var compare = new CompareView(new CompareWorkspaceTabViewModel(baseImage, referenceImage, "base.hex", "reference.hex"));
+                window = new Window { Content = compare, Width = 1280, Height = 800, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+                var left = (HexViewControl)compare.FindName("FileAView");
+                var right = (HexViewControl)compare.FindName("FileBView");
+                var leftHex = Descendants<HexByteRowControl>(left).Single(item => item.IsVisible && !item.IsAscii && item.Row?.Address == "00001000");
+                var rightHex = Descendants<HexByteRowControl>(right).Single(item => item.IsVisible && !item.IsAscii && item.Row?.Address == "00001000");
+
+                Assert.IsTrue(right.SelectByteAt(rightHex, new Point(3, 3), extendSelection: false));
+                Assert.AreEqual(0x1000u, rightHex.SelectionStart);
+                Assert.IsTrue(left.SelectByteAt(leftHex, new Point(3, 3), extendSelection: false));
+                Assert.AreEqual(0x1000u, leftHex.SelectionStart);
+                Assert.IsNull(rightHex.SelectionStart, "Selecting panel A clears panel B's previous byte outline.");
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void DoubleClickingWindowedCompareByteActivatesBaseRowOnly()
     {
         Exception? failure = null;
