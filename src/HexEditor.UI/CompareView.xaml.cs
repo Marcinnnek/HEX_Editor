@@ -32,9 +32,8 @@ public partial class CompareView : UserControl
         _rowWidthChangeSide = _lastSelectedSide;
         ViewModel.BytesPerRowChanging += ViewModel_BytesPerRowChanging;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
-        var useWindowedScrolling = ViewModel.Rows.Count > 50_000;
-        FileAView.UseWindowedScrolling = useWindowedScrolling;
-        FileBView.UseWindowedScrolling = useWindowedScrolling;
+        FileAView.UseWindowedScrolling = true;
+        FileBView.UseWindowedScrolling = true;
         ConfigurePanel(FileAView);
         ConfigurePanel(FileBView);
     }
@@ -338,9 +337,8 @@ public partial class CompareView : UserControl
         _rowWidthChangeAddress = null;
         _rowWidthChangeHadByteSelection = false;
 
-        var useWindowedScrolling = ViewModel.Rows.Count > 50_000;
-        FileAView.UseWindowedScrolling = useWindowedScrolling;
-        FileBView.UseWindowedScrolling = useWindowedScrolling;
+        FileAView.UseWindowedScrolling = true;
+        FileBView.UseWindowedScrolling = true;
         if (address is not uint selectedAddress || !ViewModel.TryNavigateToAddress(selectedAddress, out var rowIndex)) return;
         if (hadByteSelection) _selectedByteAddress = selectedAddress;
         SelectRow(rowIndex);

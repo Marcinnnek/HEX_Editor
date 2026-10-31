@@ -4,6 +4,15 @@
              xmlns:local="clr-namespace:HexEditor.UI"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
     <UserControl.Resources>
+      <Style x:Key="HexGridColumnHeaderStyle" TargetType="DataGridColumnHeader"
+             BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+        <Setter Property="Padding" Value="0,4,0,4"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Background" Value="{DynamicResource HexWindowBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource HexBorderBrush}"/>
+      </Style>
       <Style x:Key="WindowedRowSelectionStyle" TargetType="Grid">
         <Style.Triggers>
           <DataTrigger Binding="{Binding IsSelected}" Value="True">
@@ -170,14 +179,10 @@
               SelectionUnit="Cell" SelectionMode="Extended"
               EnableRowVirtualization="True" EnableColumnVirtualization="True"
               VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-              ScrollViewer.CanContentScroll="True" FontFamily="Consolas">
+              ScrollViewer.CanContentScroll="True" FontFamily="Consolas"
+              Background="{DynamicResource HexWindowBrush}">
         <ui:DataGrid.ColumnHeaderStyle>
-          <Style TargetType="DataGridColumnHeader"
-                BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-              <Setter Property="Padding" Value="0,4,0,4"/>
-              <Setter Property="VerticalContentAlignment" Value="Center"/>
-              <Setter Property="FontWeight" Value="Bold"/>
-          </Style>
+          <StaticResource ResourceKey="HexGridColumnHeaderStyle" />
         </ui:DataGrid.ColumnHeaderStyle>
         <ui:DataGrid.RowStyle>
             <Style TargetType="DataGridRow">
@@ -197,7 +202,7 @@
 
     <DataGridTemplateColumn.HeaderStyle>
         <Style TargetType="DataGridColumnHeader"
-               BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+               BasedOn="{StaticResource HexGridColumnHeaderStyle}">
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="0,4,0,4"/>
         </Style>
@@ -242,7 +247,7 @@
             <DataGridTemplateColumn x:Name="AsciiColumn" Header="ASCII" Width="192">
                 <DataGridTemplateColumn.HeaderStyle>
                     <Style TargetType="DataGridColumnHeader"
-                               BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                               BasedOn="{StaticResource HexGridColumnHeaderStyle}">
                         <Setter Property="HorizontalContentAlignment" Value="Left" />
                         <Setter Property="Padding" Value="6,4,0,4" />
                     </Style>
