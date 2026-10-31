@@ -317,7 +317,7 @@ public sealed class MemoryComparisonModel
 
     private static void ValidateRowWidth(int width)
     {
-        if (width is not (8 or 16 or 32)) throw new ArgumentOutOfRangeException(nameof(width), "Row width must be 8, 16, or 32 bytes.");
+        if (width is < 1 or > 128) throw new ArgumentOutOfRangeException(nameof(width), "Row width must be between 1 and 128 bytes.");
     }
 
     internal IEnumerable<uint> GetDifferenceRows()
@@ -326,7 +326,7 @@ public sealed class MemoryComparisonModel
         foreach (var address in GetOccupiedAddresses())
         {
             if (GetState(address) == CompareByteState.Equal) continue;
-            var row = address & ~((uint)_bytesPerRow - 1);
+            var row = address / (uint)_bytesPerRow * (uint)_bytesPerRow;
             if (lastRow == row) continue;
             lastRow = row;
             yield return row;

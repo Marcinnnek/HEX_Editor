@@ -20,7 +20,7 @@ public sealed class EditRowWindow : Window
         Title = $"Edit Row — {_session.ImageName}";
         // A 37-DIP byte column keeps two HEX digits and one ASCII character readable.
         // The work-area cap leaves scrolling for narrow screens and high display scaling.
-        Width = Math.Min(120 + session.Cells.Count * 37 + 36, Math.Max(1, SystemParameters.WorkArea.Width - 24));
+        Width = Math.Min(120 + Math.Min(session.Cells.Count, 32) * 37 + 36, Math.Max(1, SystemParameters.WorkArea.Width - 24));
         MaxWidth = SystemParameters.WorkArea.Width;
         MaxHeight = SystemParameters.WorkArea.Height;
         SizeToContent = SizeToContent.Height;
@@ -36,35 +36,71 @@ public sealed class EditRowWindow : Window
         };
         DockPanel.SetDock(heading, Dock.Top); root.Children.Add(heading);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 20, 10, 0) };
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Margin = new Thickness(10, 0, 0, 0), TabIndex = session.Cells.Count * 2 };
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(10, 0, 0, 0), TabIndex = session.Cells.Count * 2 + 1 };
+        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 80, Margin = new Thickness(10, 0, 0, 0) };
+        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(10, 0, 0, 0) };
         ok.Click += (_, _) => { if (_session.Commit()) { DialogResult = true; Close(); } else if (_session.IsValid) { DialogResult = true; Close(); } };
         cancel.Click += (_, _) => { _session.Cancel(); DialogResult = false; Close(); };
         buttons.Children.Add(ok); buttons.Children.Add(cancel); DockPanel.SetDock(buttons, Dock.Bottom); root.Children.Add(buttons);
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
-        var grid = new Grid(); grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
-        for (var i = 0; i < session.Cells.Count; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(37) });
-        AddLabelRow(grid, 0, "Offset", cell => cell.OffsetText);
-        AddLabelRow(grid, 1, "Original HEX", cell => cell.Hex);
-        AddLabelRow(grid, 2, "Original ASCII", cell => cell.Ascii);
-        AddRowHeader(grid, 3, "Proposed HEX");
-        AddRowHeader(grid, 4, "Proposed ASCII");
-        for (var i = 0; i < session.Cells.Count; i++)
+        var groups = new StackPanel();
+        var editableTabIndex = 0;
+        for (var groupStart = 0; groupStart < session.Cells.Count; groupStart += 32)
         {
-            var cell = session.Cells[i];
-            _hex[i] = CreateInput(cell.Hex.Trim(), cell.IsOccupied, 2, i);
-            _ascii[i] = CreateInput(cell.Ascii, cell.IsOccupied, 1, session.Cells.Count + i);
-            var index = i;
-            _hex[i].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetHex(cell.Address!.Value, _hex[index].Text)) SyncAscii(index); };
-            _ascii[i].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetAscii(cell.Address!.Value, _ascii[index].Text)) SyncHex(index); };
-            AddCell(grid, 3, i + 1, _hex[i]); AddCell(grid, 4, i + 1, _ascii[i]);
-            if (cell.Address == session.SelectedAddress)
+            var count = Math.Min(32, session.Cells.Count - groupStart);
+            var grid = new Grid { Margin = new Thickness(0, groupStart == 0 ? 0 : 8, 0, 0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(112) });
+            for (var column = 0; column < count; column++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(37) });
+            AddLabelRow(grid, 0, "Offset", cell => cell.OffsetText, groupStart, count);
+            AddLabelRow(grid, 1, "Original HEX", cell => cell.Hex, groupStart, count);
+            AddLabelRow(grid, 2, "Original ASCII", cell => cell.Ascii, groupStart, count);
+            AddRowHeader(grid, 3, "Proposed HEX");
+            AddRowHeader(grid, 4, "Proposed ASCII");
+            for (var column = 0; column < count; column++)
             {
-                _hex[i].SetResourceReference(TextBox.BorderBrushProperty, "HexFocusBrush");
-                _ascii[i].SetResourceReference(TextBox.BorderBrushProperty, "HexFocusBrush");
+                var index = groupStart + column;
+                var cell = session.Cells[index];
+                _hex[index] = CreateInput(cell.Hex.Trim(), cell.IsOccupied, 2, 0);
+                _ascii[index] = CreateInput(cell.Ascii, cell.IsOccupied, 1, 0);
+                var capturedIndex = index;
+                _hex[index].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetHex(cell.Address!.Value, _hex[capturedIndex].Text)) SyncAscii(capturedIndex); };
+                _ascii[index].TextChanged += (_, _) => { if (_syncing) return; if (_session.SetAscii(cell.Address!.Value, _ascii[capturedIndex].Text)) SyncHex(capturedIndex); };
+                AddCell(grid, 3, column + 1, _hex[index]); AddCell(grid, 4, column + 1, _ascii[index]);
+                if (cell.Address == session.SelectedAddress)
+                {
+                    _hex[index].SetResourceReference(TextBox.BorderBrushProperty, "HexFocusBrush");
+                    _ascii[index].SetResourceReference(TextBox.BorderBrushProperty, "HexFocusBrush");
+                }
             }
+
+            for (var column = 0; column < count; column++)
+            {
+                var index = groupStart + column;
+                if (!_session.Cells[index].IsOccupied) continue;
+                _hex[index].TabIndex = editableTabIndex++;
+            }
+            for (var column = 0; column < count; column++)
+            {
+                var index = groupStart + column;
+                if (!_session.Cells[index].IsOccupied) continue;
+                _ascii[index].TabIndex = editableTabIndex++;
+            }
+
+            var horizontalScroll = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = grid
+            };
+            groups.Children.Add(horizontalScroll);
         }
-        scroll.Content = grid; root.Children.Add(scroll); Content = root;
+        ok.TabIndex = editableTabIndex;
+        cancel.TabIndex = editableTabIndex + 1;
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Content = groups
+        };
+        root.Children.Add(scroll); Content = root;
         Loaded += (_, _) =>
         {
             var selectedIndex = session.Cells.ToList().FindIndex(cell => cell.Address == session.SelectedAddress);
@@ -106,12 +142,12 @@ public sealed class EditRowWindow : Window
         if (_enteredInputs.Add(input)) input.SelectAll();
     }
     private static void AddCell(Grid grid, int row, int col, UIElement element) { while (grid.RowDefinitions.Count <= row) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(element, row); Grid.SetColumn(element, col); grid.Children.Add(element); }
-    private void AddLabelRow(Grid grid, int row, string header, Func<EditRowCell, string> value)
+    private void AddLabelRow(Grid grid, int row, string header, Func<EditRowCell, string> value, int groupStart, int count)
     {
         AddRowHeader(grid, row, header);
-        for (var i = 0; i < _session.Cells.Count; i++) AddCell(grid, row, i + 1, new TextBlock
+        for (var i = 0; i < count; i++) AddCell(grid, row, i + 1, new TextBlock
         {
-            Text = value(_session.Cells[i]), Margin = new Thickness(2, 3, 2, 3),
+            Text = value(_session.Cells[groupStart + i]), Margin = new Thickness(2, 3, 2, 3),
             FontFamily = new FontFamily("Consolas"),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,

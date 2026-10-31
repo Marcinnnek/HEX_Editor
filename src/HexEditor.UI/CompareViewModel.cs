@@ -27,12 +27,23 @@ public sealed class CompareViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public event Action? BytesPerRowChanging;
+    public int BytesPerRow
+    {
+        get => _comparison.BytesPerRow;
+        set
+        {
+            if (value is < 1 or > 128) throw new ArgumentOutOfRangeException(nameof(value), "Row width must be between 1 and 128 bytes.");
+            if (_comparison.BytesPerRow == value) return;
+            BytesPerRowChanging?.Invoke();
+            SetComparisonProperty(() => _comparison.BytesPerRow = value, nameof(BytesPerRow));
+        }
+    }
     public IList<CompareViewRow> Rows => _comparison.Rows;
     public IList<HexViewRow> FileARows => _fileARows;
     public IList<HexViewRow> FileBRows => _fileBRows;
     public MemoryImage FileA => _comparison.FileA;
     public MemoryImage FileB => _comparison.FileB;
-    public int BytesPerRow { get => _comparison.BytesPerRow; set => SetComparisonProperty(() => _comparison.BytesPerRow = value, nameof(BytesPerRow)); }
     public bool ShowAscii { get => _comparison.ShowAscii; set => SetComparisonProperty(() => _comparison.ShowAscii = value, nameof(ShowAscii)); }
     public CompareViewMode ViewMode { get => _comparison.ViewMode; set => SetComparisonProperty(() => _comparison.ViewMode = value, nameof(ViewMode)); }
     public string ComparisonStatus => _comparison.ComparisonStatus;

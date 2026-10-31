@@ -18,7 +18,14 @@
         </Border>
         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" VerticalAlignment="Center">
             <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
-            <ComboBox x:Name="RowWidthBox" Width="70" ItemsSource="{Binding RowWidths}" SelectedItem="{Binding ViewModel.BytesPerRow}" />
+            <ComboBox x:Name="RowWidthBox" Width="70" IsEditable="True" IsTextSearchEnabled="False"
+                      Style="{StaticResource {x:Type ComboBox}}" ItemsSource="{Binding RowWidths}"
+                      Text="{Binding ViewModel.BytesPerRow, Mode=OneWay}"
+                      SelectionChanged="RowWidthBox_SelectionChanged"
+                      PreviewTextInput="RowWidthBox_PreviewTextInput"
+                      PreviewKeyDown="RowWidthBox_PreviewKeyDown"
+                      LostKeyboardFocus="RowWidthBox_LostKeyboardFocus"
+                      DataObject.Pasting="RowWidthBox_Pasting" />
             <CheckBox Content="Show ASCII" IsChecked="{Binding ViewModel.ShowAscii}" VerticalAlignment="Center" Margin="14,0" />
             <ComboBox x:Name="ViewModeBox" Width="150" ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewModel.ViewMode}" />
             <TextBlock Text="Start" VerticalAlignment="Center" Margin="10,0,4,0" />
