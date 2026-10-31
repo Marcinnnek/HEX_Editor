@@ -8,6 +8,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Globalization;
 using System.Windows.Media;
+using System.ComponentModel;
 
 namespace HexEditor.UI;
 
@@ -28,6 +29,10 @@ public partial class HexViewControl : UserControl
     public HexViewControl()
     {
         InitializeComponent();
+        DependencyPropertyDescriptor.FromProperty(Control.FontFamilyProperty, typeof(DataGrid))!
+            .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); });
+        DependencyPropertyDescriptor.FromProperty(Control.FontSizeProperty, typeof(DataGrid))!
+            .AddValueChanged(HexGrid, (_, _) => { UpdateAddressColumnWidth(); UpdateHexDataWidth(resetHorizontalScroll: true); });
     }
 
     public static readonly DependencyProperty ItemsSourceProperty = DependencyProperty.Register(
@@ -76,6 +81,10 @@ public partial class HexViewControl : UserControl
         get => (Thickness)GetValue(RowGapProperty);
         private set => SetValue(RowGapProperty, value);
     }
+
+    public static readonly DependencyProperty AddressColumnWidthProperty = DependencyProperty.Register(
+        nameof(AddressColumnWidth), typeof(double), typeof(HexViewControl), new PropertyMetadata(100d));
+    public double AddressColumnWidth => (double)GetValue(AddressColumnWidthProperty);
 
     public event EventHandler<AddressRangeSelectedEventArgs>? AddressRangeSelected;
     public event EventHandler<ByteClickFailedEventArgs>? ByteClickFailed;
@@ -223,6 +232,7 @@ public partial class HexViewControl : UserControl
     private void Control_Loaded(object sender, RoutedEventArgs e)
     {
         GridSpacingSettings.SpacingChanged += SpacingChanged;
+        UpdateAddressColumnWidth();
         UpdateHexDataWidth(resetHorizontalScroll: false);
         RefreshWindow();
     }
@@ -259,6 +269,17 @@ public partial class HexViewControl : UserControl
         var vertical = viewer.VerticalOffset;
         viewer.ScrollToHorizontalOffset(0);
         viewer.ScrollToVerticalOffset(vertical);
+    }
+
+    private void UpdateAddressColumnWidth()
+    {
+        var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var text = new FormattedText("FFFFFFFF", System.Globalization.CultureInfo.InvariantCulture,
+            FlowDirection.LeftToRight, new Typeface(HexGrid.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal),
+            HexGrid.FontSize, Foreground, dpi);
+        SetValue(AddressColumnWidthProperty, text.Width + 12);
+        if (HexGrid.Columns.Count > 0) HexGrid.Columns[0].Width = new DataGridLength(AddressColumnWidth);
+        InvalidateMeasure();
     }
 
     private void ByteCell_Click(object sender, MouseButtonEventArgs e)
