@@ -1103,6 +1103,8 @@ public partial class MainWindow : Window
         var dialog = new ExportOptionsDialog(exportSegments, selectedSegments,
             _exportSettings.MaxDataBytesPerRecord, initialScope) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Options is not { } options) return;
+        if (!_files.ConfirmExportFormat(options.Path, options.Format, mismatch =>
+                ThemedMessageBox.ShowSaveAnyway(this, mismatch.Message, "Export format mismatch"))) return;
 
         try
         {
