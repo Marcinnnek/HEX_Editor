@@ -305,6 +305,45 @@ public sealed class CompareCurrentImageWorkflowTests
     }
 
     [TestMethod]
+    [DataRow("firmware.hex", MemoryImageExportFormat.SRecord, MemoryImageExportFormat.IntelHex)]
+    [DataRow("firmware.srec", MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord)]
+    public void ExportFormatMismatchRequiresConfirmationForEveryExportScope(string fileName,
+        MemoryImageExportFormat outputFormat, MemoryImageExportFormat expectedFormat)
+    {
+        var workflow = new MemoryImageFileWorkflow(new MainViewModel());
+        foreach (var scope in Enum.GetValues<ExportScope>())
+        {
+            MemoryImageFormatMismatch? shown = null;
+            var allowed = workflow.ConfirmExportFormat(fileName, outputFormat, mismatch =>
+            {
+                shown = mismatch;
+                return false;
+            });
+
+            Assert.IsFalse(allowed, $"{scope} export should be canceled when the user rejects the warning.");
+            Assert.IsNotNull(shown);
+            Assert.AreEqual(fileName, shown.FileName);
+            Assert.AreEqual(expectedFormat, shown.ExpectedFormat);
+            Assert.AreEqual(outputFormat, shown.DetectedFormat);
+        }
+    }
+
+    [TestMethod]
+    public void ExportFormatConfirmationAllowsAcceptedMismatchAndSkipsMatchingOrUnknownExtensions()
+    {
+        var workflow = new MemoryImageFileWorkflow(new MainViewModel());
+        var promptCount = 0;
+
+        Assert.IsTrue(workflow.ConfirmExportFormat("firmware.hex", MemoryImageExportFormat.SRecord,
+            mismatch => { promptCount++; return mismatch.ExpectedFormat == MemoryImageExportFormat.IntelHex; }));
+        Assert.IsTrue(workflow.ConfirmExportFormat("firmware.srec", MemoryImageExportFormat.SRecord,
+            _ => { promptCount++; return false; }));
+        Assert.IsTrue(workflow.ConfirmExportFormat("firmware.custom", MemoryImageExportFormat.IntelHex,
+            _ => { promptCount++; return false; }));
+        Assert.AreEqual(1, promptCount);
+    }
+
+    [TestMethod]
     public void MergeFormatMismatchAllowsContinuingWhenUserAcceptsDetectedFormat()
     {
         var viewModel = new MainViewModel();

@@ -131,6 +131,15 @@ internal sealed class MemoryImageFileWorkflow(MainViewModel viewModel)
 {
     private readonly MemoryImageFileService _fileService = new();
 
+    public bool ConfirmExportFormat(string path, MemoryImageExportFormat format,
+        Func<MemoryImageFormatMismatch, bool> confirmMismatch)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(confirmMismatch);
+        var mismatch = MemoryImageFormatClassifier.GetExtensionMismatch(path, format);
+        return mismatch is null || confirmMismatch(mismatch);
+    }
+
     public bool ConfirmSaveFormat(EditorDocument document,
         Func<MemoryImageFormatMismatch, bool> confirmMismatch)
     {
