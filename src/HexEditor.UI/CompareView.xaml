@@ -36,12 +36,12 @@
                 <ui:TextBox x:Name="RangeStartBox" Text="00000000" local:HexAddressInput.Apply="True" />
                 <TextBlock Text="End" VerticalAlignment="Center" Margin="8,0,4,0" />
                 <ui:TextBox x:Name="RangeEndBox" Text="FFFFFFFF" local:HexAddressInput.Apply="True" />
-                <ui:Button x:Name="ApplyRangeButton" Content="Apply range" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
+                <ui:Button x:Name="ApplyRangeButton" Content="Apply range" Height="{Binding ElementName=RangeEndBox, Path=ActualHeight}" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
             </StackPanel>
             <ui:TextBox x:Name="AddressBox" local:HexAddressInput.Apply="True" />
-            <ui:Button Content="Go" Margin="4,0" Padding="8,3" Click="Go_Click" />
-            <ui:Button Content="Previous difference" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
-            <ui:Button Content="Next difference" Padding="8,3" Click="NextDifference_Click" />
+            <ui:Button x:Name="GoButton" Content="Go" Height="{Binding ElementName=AddressBox, Path=ActualHeight}" Margin="4,0" Padding="8,3" Click="Go_Click" />
+            <ui:Button x:Name="PreviousDifferenceButton" Content="Previous difference" Height="{Binding ElementName=AddressBox, Path=ActualHeight}" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
+            <ui:Button x:Name="NextDifferenceButton" Content="Next difference" Height="{Binding ElementName=AddressBox, Path=ActualHeight}" Padding="8,3" Click="NextDifference_Click" />
         </WrapPanel>
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>

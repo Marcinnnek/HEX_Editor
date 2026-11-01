@@ -57,6 +57,14 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
                 Assert.AreEqual(8, start.MaxLength);
                 Assert.AreEqual(8, end.MaxLength);
                 Assert.AreEqual(8, go.MaxLength);
+                window.UpdateLayout();
+                Assert.IsGreaterThan(0d, go.ActualHeight);
+                Assert.AreEqual(start.ActualHeight, end.ActualHeight, 1d);
+                foreach (var buttonName in new[] { "ApplyRangeButton", "GoButton", "PreviousDifferenceButton", "NextDifferenceButton" })
+                {
+                    var button = (Button)view.FindName(buttonName);
+                    Assert.AreEqual(go.ActualHeight, button.ActualHeight, 1d, $"{buttonName} should match the address fields.");
+                }
 
                 foreach (var box in new[] { start, end, go })
                 {
