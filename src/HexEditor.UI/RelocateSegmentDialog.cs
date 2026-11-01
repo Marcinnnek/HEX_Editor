@@ -22,8 +22,6 @@ public sealed class RelocateSegmentDialog : Window
         _confirmDelete = confirmDelete ?? ConfirmDelete;
         _destination = new TextBox
         {
-            Padding = new Thickness(8, 5, 8, 5),
-            VerticalContentAlignment = VerticalAlignment.Center,
             Text = startAddress.ToString("X8")
         };
         HexAddressInput.Configure(_destination);

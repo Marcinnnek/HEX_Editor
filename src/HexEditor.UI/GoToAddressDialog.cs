@@ -6,11 +6,7 @@ namespace HexEditor.UI;
 /// <summary>Collects an absolute hexadecimal address for navigation.</summary>
 public sealed class GoToAddressDialog : Window
 {
-    private readonly TextBox _address = new()
-    {
-        Padding = new Thickness(8, 5, 8, 5),
-        VerticalContentAlignment = VerticalAlignment.Center
-    };
+    private readonly TextBox _address = new();
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
 
     public GoToAddressDialog()

@@ -49,10 +49,10 @@
                         <TextBlock Text="Override the default overlap choice for an inclusive hexadecimal address range." TextWrapping="Wrap" Margin="0,0,0,6" />
                         <WrapPanel Margin="0,0,0,6">
                             <TextBlock Text="Start" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <ui:TextBox x:Name="OverrideStartBox" Text="00000000" Margin="0,0,8,0" local:HexAddressInput.Apply="True" />
-                            <TextBlock Text="End" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <ui:TextBox x:Name="OverrideEndBox" Text="00000000" Margin="0,0,8,0" local:HexAddressInput.Apply="True" />
-                            <ComboBox x:Name="OverrideChoiceBox" Width="215" Margin="0,0,8,0" />
+                            <ui:TextBox x:Name="OverrideStartBox" Text="00000000" local:HexAddressInput.Apply="True" />
+                            <TextBlock Text="End" VerticalAlignment="Center" Margin="8,0,4,0" />
+                            <ui:TextBox x:Name="OverrideEndBox" Text="00000000" local:HexAddressInput.Apply="True" />
+                            <ComboBox x:Name="OverrideChoiceBox" Width="215" Margin="8,0,8,0" />
                             <ui:Button Content="Add override" Padding="8,3" Click="AddOverride_Click" />
                         </WrapPanel>
                     </StackPanel>

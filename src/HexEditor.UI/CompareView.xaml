@@ -19,7 +19,7 @@
         </Border>
         <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" VerticalAlignment="Center">
             <ComboBox x:Name="ViewModeBox" Width="150" ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewModel.ViewMode}" />
-            <StackPanel x:Name="RangeControls" Orientation="Horizontal" ToolTipService.ShowOnDisabled="True">
+            <StackPanel x:Name="RangeControls" Orientation="Horizontal" Margin="0,0,12,0" ToolTipService.ShowOnDisabled="True">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Setter Property="IsEnabled" Value="False" />
@@ -38,7 +38,7 @@
                 <ui:TextBox x:Name="RangeEndBox" Text="FFFFFFFF" local:HexAddressInput.Apply="True" />
                 <ui:Button x:Name="ApplyRangeButton" Content="Apply range" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
             </StackPanel>
-            <ui:TextBox x:Name="AddressBox" Margin="12,0,0,0" VerticalContentAlignment="Center" local:HexAddressInput.Apply="True" />
+            <ui:TextBox x:Name="AddressBox" local:HexAddressInput.Apply="True" />
             <ui:Button Content="Go" Margin="4,0" Padding="8,3" Click="Go_Click" />
             <ui:Button Content="Previous difference" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
             <ui:Button Content="Next difference" Padding="8,3" Click="NextDifference_Click" />

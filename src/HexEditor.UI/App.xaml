@@ -35,6 +35,7 @@
                 </Style.Triggers>
             </Style>
             <Style TargetType="{x:Type TextBox}">
+                <Setter Property="Margin" Value="0" />
                 <Setter Property="Background" Value="{DynamicResource HexSurfaceBrush}" />
                 <Setter Property="Foreground" Value="{DynamicResource HexTextBrush}" />
                 <Setter Property="BorderBrush" Value="{DynamicResource HexBorderBrush}" />
