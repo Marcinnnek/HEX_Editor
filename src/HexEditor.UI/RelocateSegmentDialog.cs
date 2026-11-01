@@ -1,7 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
 
 namespace HexEditor.UI;
 
@@ -22,15 +20,13 @@ public sealed class RelocateSegmentDialog : Window
         _startAddress = startAddress;
         _endAddress = endAddress;
         _confirmDelete = confirmDelete ?? ConfirmDelete;
-        _destination = new TextBox {  
-            MinWidth = 190,
-            MaxLength = 10,
-            FontSize = 15,
+        _destination = new TextBox
+        {
             Padding = new Thickness(8, 5, 8, 5),
-            VerticalContentAlignment = VerticalAlignment.Center, 
-            Text = startAddress.ToString("X8") };
-        _destination.PreviewTextInput += Destination_PreviewTextInput;
-        DataObject.AddPastingHandler(_destination, Destination_Pasting);
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Text = startAddress.ToString("X8")
+        };
+        HexAddressInput.Configure(_destination);
         Title = "Relocate memory segment";
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -38,8 +34,8 @@ public sealed class RelocateSegmentDialog : Window
         var panel = new StackPanel { Margin = new Thickness(18), MinWidth = 360 };
         panel.Children.Add(new TextBlock { Text = $"Current range: 0x{startAddress:X8}–0x{endAddress:X8}" });
         panel.Children.Add(new TextBlock { Text = $"Byte count: {byteCount:N0}", Margin = new Thickness(0, 4, 0, 12) });
-        panel.Children.Add(new TextBlock { Text = "New start address (hexadecimal):", Margin = new Thickness(0, 8, 0, 12) });
-        panel.Children.Add(_destination);
+        panel.Children.Add(AddressFieldRow.Create("New start address (hex)", _destination,
+            new Thickness(0, 8, 0, 12)));
         panel.Children.Add(_preview);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 80, Margin = new Thickness(0, 0, 8, 0) };
@@ -82,34 +78,6 @@ public sealed class RelocateSegmentDialog : Window
     private bool ConfirmDelete(string message) =>
         ThemedMessageBox.Show(this, message, "Confirm Block deletion", MessageBoxButton.YesNo,
             MessageBoxImage.Warning) == MessageBoxResult.Yes;
-
-    private void Destination_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        var proposed = _destination.Text.Remove(_destination.SelectionStart, _destination.SelectionLength)
-            .Insert(_destination.SelectionStart, e.Text);
-        e.Handled = !IsHexAddressInput(proposed);
-    }
-
-    private void Destination_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
-            e.SourceDataObject.GetData(DataFormats.UnicodeText, true) is not string pasted)
-        {
-            e.CancelCommand();
-            return;
-        }
-
-        var proposed = _destination.Text.Remove(_destination.SelectionStart, _destination.SelectionLength)
-            .Insert(_destination.SelectionStart, pasted);
-        if (!IsHexAddressInput(proposed)) e.CancelCommand();
-    }
-
-    private static bool IsHexAddressInput(string text)
-    {
-        if (text.Length == 0) return true;
-        var digits = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
-        return digits.Length <= 8 && digits.All(Uri.IsHexDigit);
-    }
 
     private bool TryGetDestination(out uint destination)
     {

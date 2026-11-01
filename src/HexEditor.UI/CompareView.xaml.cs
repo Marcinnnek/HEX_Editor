@@ -27,9 +27,6 @@ public partial class CompareView : UserControl
         ViewModel = workspace.Comparison;
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
-        DataObject.AddPastingHandler(RangeStartBox, AddressInput_Pasting);
-        DataObject.AddPastingHandler(RangeEndBox, AddressInput_Pasting);
-        DataObject.AddPastingHandler(AddressBox, AddressInput_Pasting);
         _rowWidthChangeSide = _lastSelectedSide;
         ViewModel.BytesPerRowChanging += ViewModel_BytesPerRowChanging;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
@@ -246,41 +243,6 @@ public partial class CompareView : UserControl
         }
         ViewModel.SetAddressRange(start, end);
         ViewModel.ViewMode = CompareViewMode.AddressRange;
-    }
-
-    private void AddressInput_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        if (sender is not TextBox box) return;
-        var proposed = box.Text.Remove(box.SelectionStart, box.SelectionLength)
-            .Insert(box.SelectionStart, e.Text);
-        e.Handled = !HexAddressParser.IsValidPartialInput(proposed);
-    }
-
-    private void AddressInput_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (sender is not TextBox box) return;
-        var uppercase = box.Text.ToUpperInvariant();
-        if (box.Text == uppercase) return;
-
-        var selectionStart = box.SelectionStart;
-        var selectionLength = box.SelectionLength;
-        box.Text = uppercase;
-        box.Select(selectionStart, selectionLength);
-    }
-
-    private static void AddressInput_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (sender is not TextBox box ||
-            !e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
-            e.SourceDataObject.GetData(DataFormats.UnicodeText, true) is not string pasted)
-        {
-            e.CancelCommand();
-            return;
-        }
-
-        var proposed = box.Text.Remove(box.SelectionStart, box.SelectionLength)
-            .Insert(box.SelectionStart, pasted);
-        if (!HexAddressParser.IsValidPartialInput(proposed)) e.CancelCommand();
     }
 
     private void Go_Click(object sender, RoutedEventArgs e)

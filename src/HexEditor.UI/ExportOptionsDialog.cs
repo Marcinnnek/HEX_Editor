@@ -38,6 +38,8 @@ public sealed class ExportOptionsDialog : Window
         MinWidth = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
+        HexAddressInput.Configure(_start);
+        HexAddressInput.Configure(_end);
         _scope.SelectedIndex = (int)initialScope;
         _recordSize.SelectedItem = previousRecordSize;
         foreach (var row in segments) _segments.Items.Add($"{row.StartAddress} – {row.EndAddress} ({row.ByteCount:N0} bytes)");
@@ -97,12 +99,9 @@ public sealed class ExportOptionsDialog : Window
 
     private FrameworkElement BuildRange()
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        _start.Width = 130;
-        _end.Width = 130;
-        panel.Children.Add(_start);
-        panel.Children.Add(new TextBlock { Text = " to ", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(5, 0, 5, 0) });
-        panel.Children.Add(_end);
+        var panel = new StackPanel();
+        panel.Children.Add(AddressFieldRow.Create("Start", _start));
+        panel.Children.Add(AddressFieldRow.Create("End", _end, new Thickness(0, 6, 0, 0)));
         return panel;
     }
 

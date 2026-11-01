@@ -23,12 +23,12 @@ public sealed class HexAddressParserTests
     }
 
     [TestMethod]
-    public void InputAllowsEightHexDigitsOrTenCharactersWithPrefix()
+    public void InputAllowsOnlyEightHexDigits()
     {
-        foreach (var input in new[] { "", "0", "0x", "FFFFFFFF", "0xFFFFFFFF" })
+        foreach (var input in new[] { "", "0", "abcdef12", "FFFFFFFF" })
             Assert.IsTrue(HexAddressParser.IsValidPartialInput(input), input);
 
-        foreach (var input in new[] { "100000000", "0x100000000", "0x12G4", "12 34", "0x0x12" })
+        foreach (var input in new[] { "100000000", "0x1234", "12G4", "12 34" })
             Assert.IsFalse(HexAddressParser.IsValidPartialInput(input), input);
     }
 }

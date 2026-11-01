@@ -7,8 +7,7 @@ public static class HexAddressParser
     public static bool IsValidPartialInput(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
-        var digits = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
-        return digits.Length <= 8 && digits.All(Uri.IsHexDigit);
+        return text.Length <= 8 && text.All(Uri.IsHexDigit);
     }
 
     public static bool TryParse(string text, out uint address)

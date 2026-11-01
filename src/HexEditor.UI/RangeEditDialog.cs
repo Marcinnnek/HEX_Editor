@@ -11,8 +11,8 @@ internal sealed record RangeEditDialogResult(uint Start, uint End, byte[]? Patte
 internal sealed class RangeEditDialog : Window
 {
     private readonly RangeEditDialogKind _kind;
-    private readonly TextBox _start = new() { MinWidth = 150 };
-    private readonly TextBox _end = new() { MinWidth = 150 };
+    private readonly TextBox _start = new();
+    private readonly TextBox _end = new();
     private readonly TextBox _pattern = new() { MinWidth = 220 };
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _count = new() { Name = "InclusiveAddressCount" };
@@ -26,6 +26,8 @@ internal sealed class RangeEditDialog : Window
         _kind = kind;
         _fillAllRegion = fillAllRegion;
         _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
+        HexAddressInput.Configure(_start);
+        HexAddressInput.Configure(_end);
         Title = kind switch { RangeEditDialogKind.SelectRange => "Select Range", RangeEditDialogKind.Insert => "Edit / Insert", _ => "Fill Range" };
         Width = 390;
         SizeToContent = SizeToContent.Height;
@@ -36,8 +38,10 @@ internal sealed class RangeEditDialog : Window
         _end.Text = end.ToString("X8", CultureInfo.InvariantCulture);
 
         var panel = new StackPanel { Margin = new Thickness(18) };
-        AddField(panel, kind == RangeEditDialogKind.Insert ? "Target address" : "Start address", _start);
-        if (kind != RangeEditDialogKind.Insert) AddField(panel, "End address (inclusive)", _end);
+        panel.Children.Add(AddressFieldRow.Create(kind == RangeEditDialogKind.Insert ? "Target address" : "Start address",
+            _start, new Thickness(0, 8, 0, 3)));
+        if (kind != RangeEditDialogKind.Insert)
+            panel.Children.Add(AddressFieldRow.Create("End address (inclusive)", _end, new Thickness(0, 8, 0, 3)));
         if (kind != RangeEditDialogKind.SelectRange)
             AddField(panel, kind == RangeEditDialogKind.Insert ? "Bytes (hex)" : "Repeating byte pattern (hex)", _pattern);
         if (kind == RangeEditDialogKind.Fill)

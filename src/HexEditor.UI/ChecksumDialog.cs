@@ -14,8 +14,8 @@ public sealed class ChecksumDialog : Window
     private readonly MainViewModel _viewModel;
     private readonly Func<int, string, OverlapDecision> _chooseOverlap;
     private readonly ComboBox _algorithm = new() { ItemsSource = new[] { "Additive", "CRC-16/CCITT-FALSE", "CRC-32/ISO-HDLC", "Custom CRC" }, SelectedIndex = 0 };
-    private readonly TextBox _start = new() { Text = "00000000", Width = 105 };
-    private readonly TextBox _end = new() { Text = "00000000", Width = 105 };
+    private readonly TextBox _start = new() { Text = "00000000" };
+    private readonly TextBox _end = new() { Text = "00000000" };
     private readonly ComboBox _width = new() { ItemsSource = new[] { 8, 16, 32 }, SelectedItem = 8, Width = 74 };
     private readonly ComboBox _missing = new() { ItemsSource = new[] { "Reject missing addresses", "Fill missing addresses" }, SelectedIndex = 0 };
     private readonly TextBox _fill = new() { Text = "FF", Width = 75 };
@@ -25,7 +25,7 @@ public sealed class ChecksumDialog : Window
     private readonly CheckBox _reflectInput = new() { Content = "Reflect input" };
     private readonly CheckBox _reflectOutput = new() { Content = "Reflect output" };
     private readonly TextBox _finalXor = new() { Text = "0", Width = 100 };
-    private readonly TextBox _writeAddress = new() { Text = "00000000", Width = 130 };
+    private readonly TextBox _writeAddress = new() { Text = "00000000" };
     private readonly TextBlock _result = new() { Text = "Calculate to inspect the result.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 4) };
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
 
@@ -34,6 +34,9 @@ public sealed class ChecksumDialog : Window
         _viewModel = viewModel;
         _chooseOverlap = chooseOverlap;
         _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
+        HexAddressInput.Configure(_start);
+        HexAddressInput.Configure(_end);
+        HexAddressInput.Configure(_writeAddress);
         Title = "Calculate checksum / CRC";
         Width = 510;
         SizeToContent = SizeToContent.Height;
@@ -172,10 +175,9 @@ public sealed class ChecksumDialog : Window
 
     private FrameworkElement RangeInputs()
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
-        row.Children.Add(_start);
-        row.Children.Add(new TextBlock { Text = " to ", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 6, 0) });
-        row.Children.Add(_end);
+        var row = new StackPanel { Orientation = Orientation.Vertical };
+        row.Children.Add(AddressFieldRow.Create("Start", _start));
+        row.Children.Add(AddressFieldRow.Create("End", _end, new Thickness(0, 6, 0, 0)));
         return row;
     }
 

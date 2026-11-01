@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:HexEditor.UI"
         Title="Preview and merge images" Height="700" Width="900" MinHeight="540" MinWidth="760"
         WindowStartupLocation="CenterOwner">
     <Grid>
@@ -48,9 +49,9 @@
                         <TextBlock Text="Override the default overlap choice for an inclusive hexadecimal address range." TextWrapping="Wrap" Margin="0,0,0,6" />
                         <WrapPanel Margin="0,0,0,6">
                             <TextBlock Text="Start" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <ui:TextBox x:Name="OverrideStartBox" Width="95" Text="00000000" Margin="0,0,8,0" />
+                            <ui:TextBox x:Name="OverrideStartBox" Text="00000000" Margin="0,0,8,0" local:HexAddressInput.Apply="True" />
                             <TextBlock Text="End" VerticalAlignment="Center" Margin="0,0,4,0" />
-                            <ui:TextBox x:Name="OverrideEndBox" Width="95" Text="00000000" Margin="0,0,8,0" />
+                            <ui:TextBox x:Name="OverrideEndBox" Text="00000000" Margin="0,0,8,0" local:HexAddressInput.Apply="True" />
                             <ComboBox x:Name="OverrideChoiceBox" Width="215" Margin="0,0,8,0" />
                             <ui:Button Content="Add override" Padding="8,3" Click="AddOverride_Click" />
                         </WrapPanel>

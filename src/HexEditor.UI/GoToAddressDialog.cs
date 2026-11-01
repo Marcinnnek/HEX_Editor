@@ -1,7 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
 
 namespace HexEditor.UI;
 
@@ -10,9 +8,6 @@ public sealed class GoToAddressDialog : Window
 {
     private readonly TextBox _address = new()
     {
-        MinWidth = 190,
-        MaxLength = 10,
-        FontSize = 15,
         Padding = new Thickness(8, 5, 8, 5),
         VerticalContentAlignment = VerticalAlignment.Center
     };
@@ -29,12 +24,10 @@ public sealed class GoToAddressDialog : Window
         ShowInTaskbar = false;
 
         _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
-        _address.PreviewTextInput += Address_PreviewTextInput;
-        DataObject.AddPastingHandler(_address, Address_Pasting);
+        HexAddressInput.Configure(_address);
 
         var panel = new StackPanel { Margin = new Thickness(18) };
-        panel.Children.Add(new TextBlock { Text = "Address (hex)", Margin = new Thickness(0, 0, 0, 5) });
-        panel.Children.Add(_address);
+        panel.Children.Add(AddressFieldRow.Create("Address (hex)", _address));
         panel.Children.Add(_error);
 
         var buttons = new StackPanel
@@ -55,27 +48,6 @@ public sealed class GoToAddressDialog : Window
     }
 
     public uint? Address { get; private set; }
-
-    private void Address_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        var proposed = _address.Text.Remove(_address.SelectionStart, _address.SelectionLength)
-            .Insert(_address.SelectionStart, e.Text);
-        e.Handled = !HexAddressParser.IsValidPartialInput(proposed);
-    }
-
-    private void Address_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
-            e.SourceDataObject.GetData(DataFormats.UnicodeText, true) is not string pasted)
-        {
-            e.CancelCommand();
-            return;
-        }
-
-        var proposed = _address.Text.Remove(_address.SelectionStart, _address.SelectionLength)
-            .Insert(_address.SelectionStart, pasted);
-        if (!HexAddressParser.IsValidPartialInput(proposed)) e.CancelCommand();
-    }
 
     private void Accept()
     {
