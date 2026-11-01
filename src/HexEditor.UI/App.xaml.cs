@@ -14,6 +14,7 @@ public partial class App : Application
         ApplicationAppearance.Apply(AppearanceMode.Light);
         base.OnStartup(e);
         var window = new MainWindow();
+        window.SizeForDefaultRowWidth();
         MainWindow = window;
         window.Show();
         if (e.Args.Length > 0)

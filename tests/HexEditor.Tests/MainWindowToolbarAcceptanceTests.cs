@@ -11,12 +11,67 @@ namespace HexEditor.Tests;
 public sealed class MainWindowToolbarAcceptanceTests
 {
     [TestMethod]
+    public void StartupWidthFitsOnlyThe16And32BytePresets()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            foreach (var bytesPerRow in new[] { 16, 32, 8, 24 })
+            {
+                var window = new MainWindow();
+                try
+                {
+                    var minimumWidth = window.MinWidth;
+                    var originalWidth = window.Width;
+                    window.ViewModel.DefaultBytesPerRow = bytesPerRow;
+                    window.SizeForDefaultRowWidth();
+                    window.Show();
+                    window.UpdateLayout();
+
+                    Assert.AreEqual(minimumWidth, window.MinWidth);
+                    var panel = (HexViewControl)window.FindName("HexRowsView");
+                    var scroll = (ScrollViewer)panel.FindName("WindowedScroll");
+                    if (bytesPerRow == 16)
+                        Assert.AreEqual(window.MinWidth, window.Width, 1d);
+                    else if (bytesPerRow == 32)
+                    {
+                        Assert.IsGreaterThan(window.MinWidth, window.Width);
+                        if (window.Width < SystemParameters.WorkArea.Width)
+                            Assert.IsLessThanOrEqualTo(1d, scroll.ScrollableWidth,
+                                "The 32-byte row should fit without horizontal scrolling at startup.");
+                    }
+                    else
+                        Assert.AreEqual(originalWidth, window.Width);
+
+                    Assert.AreEqual(bytesPerRow is 16 or 32 ? bytesPerRow : 16,
+                        window.ViewModel.ImageView.BytesPerRow);
+                    Assert.AreEqual(window.ViewModel.ActiveBytesPerRow.ToString(),
+                        ((ComboBox)window.FindName("RowWidthBox")).Text);
+                    var startupWidth = window.Width;
+                    window.ViewModel.ImageView.BytesPerRow = bytesPerRow == 32 ? 16 : 32;
+                    window.UpdateLayout();
+                    Assert.AreEqual(startupWidth, window.Width, 1d,
+                        "Changing bytes per row after opening should not resize the main window.");
+                }
+                catch (Exception exception) { failure = exception; }
+                finally { window.Close(); }
+                if (failure is not null) break;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void SingleCommandBarKeepsMenusAndViewControlsAtMinimumWidth()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
         {
-            var window = new MainWindow { Width = 640 };
+            var window = new MainWindow();
+            window.Width = window.MinWidth;
             try
             {
                 window.Show();

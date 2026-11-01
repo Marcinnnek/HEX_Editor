@@ -93,6 +93,30 @@ public partial class MainWindow : Window
         ApplyAppearance();
     }
 
+    internal void SizeForDefaultRowWidth()
+    {
+        var bytesPerRow = ViewModel.DefaultBytesPerRow;
+        if (bytesPerRow is not (16 or 32)) return;
+
+        ViewModel.ActiveBytesPerRow = bytesPerRow;
+        Width = MinWidth;
+        var hexRoot = (FrameworkElement)HexRowsView.FindName("Root");
+        hexRoot.Loaded += FitInitialRowWidth;
+    }
+
+    private void FitInitialRowWidth(object sender, RoutedEventArgs e)
+    {
+        var hexRoot = (FrameworkElement)sender;
+        hexRoot.Loaded -= FitInitialRowWidth;
+        UpdateLayout();
+
+        var scroll = (ScrollViewer)HexRowsView.FindName("WindowedScroll");
+        if (scroll.ScrollableWidth <= 0) return;
+
+        var desiredWidth = Math.Ceiling(ActualWidth + scroll.ScrollableWidth + 12);
+        Width = Math.Max(MinWidth, Math.Min(desiredWidth, SystemParameters.WorkArea.Width));
+    }
+
     private void Preferences_Click(object sender, RoutedEventArgs e)
     {
         try
