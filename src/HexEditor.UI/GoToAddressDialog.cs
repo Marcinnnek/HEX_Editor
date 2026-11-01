@@ -23,7 +23,7 @@ public sealed class GoToAddressDialog : Window
         HexAddressInput.Configure(_address);
 
         var panel = new StackPanel { Margin = new Thickness(18) };
-        panel.Children.Add(AddressFieldRow.Create("Address (hex)", _address));
+        panel.Children.Add(AddressFieldRow.Create("Address (hex):", _address));
         panel.Children.Add(_error);
 
         var buttons = new StackPanel

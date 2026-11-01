@@ -38,12 +38,12 @@ internal sealed class RangeEditDialog : Window
         _end.Text = end.ToString("X8", CultureInfo.InvariantCulture);
 
         var panel = new StackPanel { Margin = new Thickness(18) };
-        panel.Children.Add(AddressFieldRow.Create(kind == RangeEditDialogKind.Insert ? "Target address" : "Start address",
+        panel.Children.Add(AddressFieldRow.Create(kind == RangeEditDialogKind.Insert ? "Target address (hex):" : "Start address (hex):",
             _start, new Thickness(0, 8, 0, 3)));
         if (kind != RangeEditDialogKind.Insert)
-            panel.Children.Add(AddressFieldRow.Create("End address (inclusive)", _end, new Thickness(0, 8, 0, 3)));
+            panel.Children.Add(AddressFieldRow.Create("End address (inclusive) (hex):", _end, new Thickness(0, 8, 0, 3)));
         if (kind != RangeEditDialogKind.SelectRange)
-            AddField(panel, kind == RangeEditDialogKind.Insert ? "Bytes (hex)" : "Repeating byte pattern (hex)", _pattern);
+            AddField(panel, kind == RangeEditDialogKind.Insert ? "Bytes (hex):" : "Repeating byte pattern (hex):", _pattern);
         if (kind == RangeEditDialogKind.Fill)
         {
             _allRegion.IsEnabled = fillAllRegion is not null;
