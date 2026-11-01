@@ -53,8 +53,6 @@
                 <ui:MenuItem Header="Find bytes..." Click="FindBytes_Click" InputGestureText="Ctrl+F" />
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
-            </Menu>
-            <Menu VerticalAlignment="Center">
             <ui:MenuItem Header="_Tools" IsEnabled="{Binding ViewModel.CanEdit}">
                 <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
                 <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
