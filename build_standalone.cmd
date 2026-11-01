@@ -1,0 +1,1 @@
+dotnet publish src/HexEditor.UI/HexEditor.UI.csproj -c Release -p:PublishProfile=SingleFileWinX64 -o artifacts/publish/win-x64-standalone
