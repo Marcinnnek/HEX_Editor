@@ -542,14 +542,6 @@ public partial class MainWindow : Window
 
     private EditorDocument ActiveDocument => ViewModel.ActiveDocument;
 
-    private void PrimaryToolBarTray_SizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        var width = e.NewSize.Width;
-        ViewToolBar.Visibility = width < 900 ? Visibility.Collapsed : Visibility.Visible;
-        HistoryToolBar.Visibility = width < 760 ? Visibility.Collapsed : Visibility.Visible;
-        CompareToolBar.Visibility = width < 650 ? Visibility.Collapsed : Visibility.Visible;
-    }
-
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = e.Key == Key.System ? e.SystemKey : e.Key;

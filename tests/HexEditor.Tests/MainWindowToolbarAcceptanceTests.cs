@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Input;
-using HexEditor.Core;
 using HexEditor.UI;
 
 namespace HexEditor.Tests;
@@ -12,7 +11,7 @@ namespace HexEditor.Tests;
 public sealed class MainWindowToolbarAcceptanceTests
 {
     [TestMethod]
-    public void SimplifiedToolbarKeepsNavigationAndCommandsInMenusAtMinimumWidth()
+    public void SingleCommandBarKeepsMenusAndViewControlsAtMinimumWidth()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -23,19 +22,26 @@ public sealed class MainWindowToolbarAcceptanceTests
                 window.Show();
                 window.UpdateLayout();
 
-                var toolbar = (ToolBarTray)window.FindName("PrimaryToolBarTray");
-                var toolbarLabels = Descendants<FrameworkElement>(toolbar)
-                    .Select(element => element switch
-                    {
-                        Button button => button.Content?.ToString(),
-                        TextBox textBox => textBox.ToolTip?.ToString(),
-                        _ => null
-                    })
-                    .Where(label => label is not null)
-                    .ToArray();
-                Assert.DoesNotContain("Go", toolbarLabels);
-                Assert.DoesNotContain("More ▾", toolbarLabels);
-                Assert.IsNull(window.FindName("AddressInput"));
+                var commandBar = (StackPanel)window.FindName("MainCommandBar");
+                var menus = commandBar.Children.OfType<Menu>().ToArray();
+                CollectionAssert.AreEqual(new[] { "_File", "_Edit", "_View", "_Tools", "_Preferences..." },
+                    menus.SelectMany(menu => menu.Items.Cast<MenuItem>()).Select(item => item.Header.ToString()).ToArray());
+                Assert.IsNull(window.FindName("PrimaryToolBarTray"));
+                var widthBox = (ComboBox)window.FindName("RowWidthBox");
+                var ascii = (CheckBox)window.FindName("AsciiCheckBox");
+                Assert.IsTrue(widthBox.IsVisible);
+                Assert.IsTrue(ascii.IsVisible);
+                var rightEdge = menus[^1].TranslatePoint(new Point(menus[^1].ActualWidth, 0), commandBar).X;
+                Assert.IsLessThanOrEqualTo(commandBar.ActualWidth, rightEdge,
+                    "The last menu must remain reachable at the minimum supported window width.");
+
+                var fileItems = menus[0].Items.Cast<MenuItem>().First().Items.OfType<MenuItem>().ToArray();
+                CollectionAssert.AreEqual(new[]
+                {
+                    "Open HEX / S-Record...", "Save", "Save As...", "Close Image",
+                    "Compare images...", "Merge images...", "Export Image...",
+                    "Export Selected Segments...", "Export Address Range..."
+                }, fileItems.Select(item => item.Header.ToString()).ToArray());
 
                 var menuItems = LogicalDescendants<MenuItem>(window).ToArray();
                 Assert.IsTrue(menuItems.Any(item => item.Header?.ToString() == "Go to address" && item.InputGestureText == "Ctrl+G"),
@@ -48,6 +54,8 @@ public sealed class MainWindowToolbarAcceptanceTests
                     "Export Image...", "Export Selected Segments...", "Export Address Range..."
                 })
                     Assert.IsTrue(menuItems.Any(item => item.Header?.ToString() == command), $"'{command}' remains available in a menu.");
+
+                Assert.AreEqual(1, menuItems.Count(item => item.Header?.ToString() == "Export Image..."));
 
                 var tabs = (TabControl)window.FindName("WorkspaceTabs");
                 tabs.SelectedIndex = 0;
@@ -163,16 +171,6 @@ public sealed class MainWindowToolbarAcceptanceTests
             RoutedEvent = Keyboard.PreviewKeyDownEvent
         };
         combo.RaiseEvent(args);
-    }
-
-    private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, index);
-            if (child is T match) yield return match;
-            foreach (var descendant in Descendants<T>(child)) yield return descendant;
-        }
     }
 
     private static IEnumerable<T> LogicalDescendants<T>(DependencyObject parent) where T : DependencyObject

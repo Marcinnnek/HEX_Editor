@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.ComponentModel;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -26,7 +25,6 @@ public partial class CompareView : UserControl
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopySelection_Executed, CopySelection_CanExecute));
         Workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         ViewModel = workspace.Comparison;
-        RowWidths = [8, 16, 32];
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
         _rowWidthChangeSide = _lastSelectedSide;
@@ -45,7 +43,6 @@ public partial class CompareView : UserControl
         : null;
     public IReadOnlyList<int> SelectedBaseSegmentIndexes => FileABlocks.SelectedItems
         .Cast<CompareMemoryBlockRow>().Select(row => Workspace.BlocksA.IndexOf(row)).Where(index => index >= 0).ToArray();
-    public int[] RowWidths { get; }
     public CompareViewMode[] ViewModes { get; }
     public event Action<uint, uint>? BaseRowActivated;
     public event Action<string>? StatusRequested;
@@ -274,50 +271,6 @@ public partial class CompareView : UserControl
     private void PreviousDifference_Click(object sender, RoutedEventArgs e)
     {
         NavigateDifference(forward: false);
-    }
-
-    private static bool IsDecimalWidthText(string text) => text.All(char.IsAsciiDigit);
-
-    private void RowWidthBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (RowWidthBox.SelectedItem is int width && width != ViewModel.BytesPerRow)
-            ApplyRowWidth(width);
-    }
-
-    private void RowWidthBox_PreviewTextInput(object sender, TextCompositionEventArgs e) =>
-        e.Handled = !IsDecimalWidthText(e.Text);
-
-    private void RowWidthBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter) return;
-        CommitRowWidth();
-        e.Handled = true;
-    }
-
-    private void RowWidthBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitRowWidth();
-
-    private void RowWidthBox_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (!e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, true) ||
-            e.SourceDataObject.GetData(DataFormats.UnicodeText) is not string pasted || !IsDecimalWidthText(pasted))
-            e.CancelCommand();
-    }
-
-    private void CommitRowWidth()
-    {
-        if (int.TryParse(RowWidthBox.Text, NumberStyles.None, CultureInfo.InvariantCulture, out var width) && width is >= 1 and <= 128)
-        {
-            ApplyRowWidth(width);
-            RowWidthBox.Text = width.ToString(CultureInfo.InvariantCulture);
-            return;
-        }
-        RowWidthBox.Text = ViewModel.BytesPerRow.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private void ApplyRowWidth(int width)
-    {
-        ViewModel.BytesPerRow = width;
-        RowWidthBox.Text = width.ToString(CultureInfo.InvariantCulture);
     }
 
     private void ViewModel_BytesPerRowChanging()

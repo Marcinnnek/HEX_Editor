@@ -11,7 +11,7 @@ namespace HexEditor.Tests;
 public sealed class CompareRowWidthAcceptanceTests
 {
     [TestMethod]
-    public void CompareWidthControlAcceptsCustomWidthsAndKeepsCurrentPanelAddress()
+    public void MainCommandBarControlsCompareWidthAndAsciiWhileKeepingCurrentPanelAddress()
     {
         Exception? failure = null;
         var thread = new Thread(() =>
@@ -19,13 +19,26 @@ public sealed class CompareRowWidthAcceptanceTests
             var left = MemoryImage.FromSegments([new MemorySegment(0x1000, Enumerable.Range(0, 32).Select(value => (byte)value).ToArray())]);
             var right = MemoryImage.FromSegments([new MemorySegment(0x1000, Enumerable.Range(0, 32).Select(value => (byte)(value + 1)).ToArray())]);
             var view = new CompareView(new CompareWorkspaceTabViewModel(left, right, "left.hex", "right.hex"));
-            var window = new Window { Content = view, Width = 900, Height = 500 };
+            view.ViewModel.BytesPerRow = 24;
+            var window = new MainWindow { Width = 900, Height = 500 };
             try
             {
+                var tabs = (TabControl)window.FindName("WorkspaceTabs");
+                tabs.Items.Add(new TabItem { Header = "Compare", Content = view });
                 window.Show();
+                tabs.SelectedIndex = 1;
                 window.UpdateLayout();
-                var widthBox = (ComboBox)view.FindName("RowWidthBox");
+                var widthBox = (ComboBox)window.FindName("RowWidthBox");
+                var ascii = (CheckBox)window.FindName("AsciiCheckBox");
                 Assert.IsTrue(widthBox.IsEditable);
+                Assert.IsTrue(widthBox.IsEnabled);
+                Assert.IsNull(view.FindName("RowWidthBox"));
+                Assert.AreEqual(view.ViewModel.ShowAscii, ascii.IsChecked);
+                Assert.AreEqual("24", widthBox.Text);
+                tabs.SelectedIndex = 0;
+                Assert.AreEqual("16", widthBox.Text);
+                tabs.SelectedIndex = 1;
+                Assert.AreEqual("24", widthBox.Text);
 
                 view.NavigateToFindMatch(ComparePanelSide.Reference, 0x1005, 0x1006);
                 foreach (var width in new[] { 1, 3, 24, 80, 128 })
@@ -35,6 +48,7 @@ public sealed class CompareRowWidthAcceptanceTests
                     window.UpdateLayout();
 
                     Assert.AreEqual(width, view.ViewModel.BytesPerRow);
+                    Assert.AreEqual(width, window.ViewModel.ActiveBytesPerRow);
                     Assert.AreEqual(width, view.FileAView.BytesPerRow);
                     Assert.AreEqual(width, view.FileBView.BytesPerRow);
                     Assert.AreEqual((ComparePanelSide.Reference, 0x1005u), view.CurrentFindCursor);
@@ -45,6 +59,11 @@ public sealed class CompareRowWidthAcceptanceTests
                 Assert.AreEqual(16, view.FileAView.BytesPerRow);
                 Assert.AreEqual(16, view.FileBView.BytesPerRow);
                 Assert.AreEqual((ComparePanelSide.Reference, 0x1005u), view.CurrentFindCursor);
+
+                ascii.IsChecked = false;
+                Assert.IsFalse(view.ViewModel.ShowAscii);
+                ascii.IsChecked = true;
+                Assert.IsTrue(view.ViewModel.ShowAscii);
 
                 widthBox.Text = "129";
                 CommitWithEnter(widthBox);

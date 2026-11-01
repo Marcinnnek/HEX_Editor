@@ -17,13 +17,16 @@
         </ResourceDictionary>
     </Window.Resources>
     <DockPanel Margin="12">
-        <Menu DockPanel.Dock="Top" Margin="0,0,0,8">
+        <StackPanel x:Name="MainCommandBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <Menu VerticalAlignment="Center">
             <ui:MenuItem Header="_File">
                 <ui:MenuItem x:Name="OpenMenuItem" Header="Open HEX / S-Record..." Click="OpenImage_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" InputGestureText="Ctrl+O" />
                 <Separator />
                 <ui:MenuItem x:Name="SaveMenuItem" Header="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" InputGestureText="Ctrl+S" />
                 <ui:MenuItem Header="Save As..." Click="SaveAs_Click" IsEnabled="{Binding ViewModel.ActiveCanSaveAs}" InputGestureText="Ctrl+Shift+S" />
                 <ui:MenuItem Header="Close Image" Click="CloseImage_Click" IsEnabled="{Binding ViewModel.ActiveCanCloseImage}" InputGestureText="Ctrl+W" />
+                <ui:MenuItem x:Name="CompareMenuItem" Header="Compare images..." Click="CompareImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
+                <ui:MenuItem x:Name="MergeMenuItem" Header="Merge images..." Click="MergeImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
                 <Separator />
                 <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
                 <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
@@ -50,25 +53,33 @@
                 <ui:MenuItem Header="Find bytes..." Click="FindBytes_Click" InputGestureText="Ctrl+F" />
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
-            <ui:MenuItem x:Name="CompareMenuItem" Header="_Compare" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}">
-                <ui:MenuItem Header="Compare images..." Click="CompareImages_Click" />
-            </ui:MenuItem>
-            <ui:MenuItem x:Name="MergeMenuItem" Header="_Merge" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}">
-                <ui:MenuItem Header="Merge images..." Click="MergeImages_Click" />
-            </ui:MenuItem>
+            </Menu>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,8,0">
+                <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
+                <ComboBox x:Name="RowWidthBox"
+                          Width="85" MinHeight="30" Margin="0,0,8,0" VerticalAlignment="Center"
+                          IsEditable="True" IsReadOnly="False" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
+                          Style="{StaticResource {x:Type ComboBox}}" ToolTip="Bytes per row"
+                          ItemsSource="{Binding ViewModel.RowWidths}"
+                          Text="{Binding ViewModel.ActiveBytesPerRow, Mode=OneWay}"
+                          SelectionChanged="RowWidthBox_SelectionChanged"
+                          PreviewTextInput="RowWidthBox_PreviewTextInput"
+                          PreviewKeyDown="RowWidthBox_PreviewKeyDown"
+                          LostKeyboardFocus="RowWidthBox_LostKeyboardFocus"
+                          DataObject.Pasting="RowWidthBox_Pasting" />
+                <CheckBox x:Name="AsciiCheckBox" Content="ASCII" ToolTip="Show ASCII"
+                          IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
+                          VerticalAlignment="Center" Padding="4,0" />
+            </StackPanel>
+            <Menu VerticalAlignment="Center">
             <ui:MenuItem Header="_Tools" IsEnabled="{Binding ViewModel.CanEdit}">
                 <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
                 <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Preferences..." Click="Preferences_Click" />
-            <ui:MenuItem Header="E_xport">
-                <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" />
-                <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" />
-                <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" />
-            </ui:MenuItem>
-        </Menu>
-        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-            <Border DockPanel.Dock="Top" x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="{DynamicResource HexBorderBrush}" BorderThickness="1" Padding="6" Margin="0,0,0,6">
+            </Menu>
+        </StackPanel>
+        <Border DockPanel.Dock="Top" x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="{DynamicResource HexBorderBrush}" BorderThickness="1" Padding="6" Margin="0,0,0,6">
                 <DockPanel>
                     <ui:Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
                     <StackPanel>
@@ -76,46 +87,7 @@
                         <ProgressBar x:Name="FileOperationProgress" Height="8" IsIndeterminate="True" />
                     </StackPanel>
                 </DockPanel>
-            </Border>
-            <ToolBarTray DockPanel.Dock="Top" x:Name="PrimaryToolBarTray" SizeChanged="PrimaryToolBarTray_SizeChanged" IsLocked="True" ToolTip="Primary commands">
-                <ToolBar x:Name="FileToolBar" ToolTip="File">
-                    <ui:Button Content="Open" Click="OpenImage_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" ToolTip="Open HEX / S-Record (Ctrl+O)" />
-                    <ui:Button Content="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" ToolTip="Save active base (Ctrl+S)" />
-                </ToolBar>
-                <ToolBar x:Name="CompareToolBar" ToolTip="Compare / Merge">
-                    <ui:Button Content="Compare" Click="CompareImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
-                    <ui:Button Content="Merge" Click="MergeImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
-                </ToolBar>
-                <ToolBar x:Name="HistoryToolBar" ToolTip="History">
-                    <ui:Button Content="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" />
-                    <ui:Button Content="Redo" Click="Redo_Click" IsEnabled="{Binding ViewModel.ActiveCanRedo}" />
-                </ToolBar>
-                <ToolBar x:Name="ViewToolBar" ToolTip="View">
-                    <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <ComboBox x:Name="RowWidthBox"
-                                 Width="85"
-                                 MinHeight="30"
-                                 Margin="0,0,8,0"
-                                 VerticalAlignment="Center"
-                                 IsEditable="True"
-                                 IsReadOnly="False"
-                                 IsTextSearchEnabled="False"
-                                 StaysOpenOnEdit="True"
-                                 Style="{StaticResource {x:Type ComboBox}}"
-                                 ToolTip="Bytes per row"
-                                 ItemsSource="{Binding ViewModel.RowWidths}"
-                                 IsEnabled="{Binding ViewModel.ActiveIsEditor}"
-                                 Text="{Binding ViewModel.ActiveBytesPerRow, Mode=OneWay}"
-                                 SelectionChanged="RowWidthBox_SelectionChanged"
-                                 PreviewTextInput="RowWidthBox_PreviewTextInput"
-                                 PreviewKeyDown="RowWidthBox_PreviewKeyDown"
-                                 LostKeyboardFocus="RowWidthBox_LostKeyboardFocus"
-                                 DataObject.Pasting="RowWidthBox_Pasting" />
-                    <CheckBox Content="ASCII" ToolTip="Show ASCII" IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
-                              VerticalAlignment="Center" Padding="4,0" />
-                </ToolBar>
-            </ToolBarTray>
-        </DockPanel>
+        </Border>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock>
                 <Run Text="Address: " /><Run Text="{Binding ViewModel.EditorStatus.CurrentAddressText, Mode=OneWay}" />
