@@ -21,4 +21,14 @@ public sealed class HexAddressParserTests
         Assert.IsFalse(HexAddressParser.TryParse("xyz", out _));
         Assert.IsFalse(HexAddressParser.TryParse("100000000", out _));
     }
+
+    [TestMethod]
+    public void InputAllowsEightHexDigitsOrTenCharactersWithPrefix()
+    {
+        foreach (var input in new[] { "", "0", "0x", "FFFFFFFF", "0xFFFFFFFF" })
+            Assert.IsTrue(HexAddressParser.IsValidPartialInput(input), input);
+
+        foreach (var input in new[] { "100000000", "0x100000000", "0x12G4", "12 34", "0x0x12" })
+            Assert.IsFalse(HexAddressParser.IsValidPartialInput(input), input);
+    }
 }

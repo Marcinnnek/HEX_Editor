@@ -60,7 +60,7 @@ public sealed class GoToAddressDialog : Window
     {
         var proposed = _address.Text.Remove(_address.SelectionStart, _address.SelectionLength)
             .Insert(_address.SelectionStart, e.Text);
-        e.Handled = !IsHexAddressInput(proposed);
+        e.Handled = !HexAddressParser.IsValidPartialInput(proposed);
     }
 
     private void Address_Pasting(object sender, DataObjectPastingEventArgs e)
@@ -74,14 +74,7 @@ public sealed class GoToAddressDialog : Window
 
         var proposed = _address.Text.Remove(_address.SelectionStart, _address.SelectionLength)
             .Insert(_address.SelectionStart, pasted);
-        if (!IsHexAddressInput(proposed)) e.CancelCommand();
-    }
-
-    private static bool IsHexAddressInput(string text)
-    {
-        if (text.Length == 0) return true;
-        var digits = text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? text[2..] : text;
-        return digits.Length <= 8 && digits.All(Uri.IsHexDigit);
+        if (!HexAddressParser.IsValidPartialInput(proposed)) e.CancelCommand();
     }
 
     private void Accept()
