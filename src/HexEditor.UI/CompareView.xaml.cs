@@ -256,6 +256,18 @@ public partial class CompareView : UserControl
         e.Handled = !HexAddressParser.IsValidPartialInput(proposed);
     }
 
+    private void AddressInput_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (sender is not TextBox box) return;
+        var uppercase = box.Text.ToUpperInvariant();
+        if (box.Text == uppercase) return;
+
+        var selectionStart = box.SelectionStart;
+        var selectionLength = box.SelectionLength;
+        box.Text = uppercase;
+        box.Select(selectionStart, selectionLength);
+    }
+
     private static void AddressInput_Pasting(object sender, DataObjectPastingEventArgs e)
     {
         if (sender is not TextBox box ||

@@ -33,12 +33,12 @@
                     </Style>
                 </StackPanel.Style>
                 <TextBlock Text="Start" VerticalAlignment="Center" Margin="10,0,4,0" />
-                <ui:TextBox x:Name="RangeStartBox" Width="92" Text="00000000" MaxLength="10" PreviewTextInput="AddressInput_PreviewTextInput" />
+                <ui:TextBox x:Name="RangeStartBox" Width="113" Text="00000000" MaxLength="10" CharacterCasing="Upper" PreviewTextInput="AddressInput_PreviewTextInput" TextChanged="AddressInput_TextChanged" />
                 <TextBlock Text="End" VerticalAlignment="Center" Margin="8,0,4,0" />
-                <ui:TextBox x:Name="RangeEndBox" Width="92" Text="FFFFFFFF" MaxLength="10" PreviewTextInput="AddressInput_PreviewTextInput" />
+                <ui:TextBox x:Name="RangeEndBox" Width="113" Text="FFFFFFFF" MaxLength="10" CharacterCasing="Upper" PreviewTextInput="AddressInput_PreviewTextInput" TextChanged="AddressInput_TextChanged" />
                 <ui:Button x:Name="ApplyRangeButton" Content="Apply range" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
             </StackPanel>
-            <ui:TextBox x:Name="AddressBox" Width="110" Margin="12,0,0,0" VerticalContentAlignment="Center" MaxLength="10" PreviewTextInput="AddressInput_PreviewTextInput" />
+            <ui:TextBox x:Name="AddressBox" Width="113" Margin="12,0,0,0" VerticalContentAlignment="Center" MaxLength="10" CharacterCasing="Upper" PreviewTextInput="AddressInput_PreviewTextInput" TextChanged="AddressInput_TextChanged" />
             <ui:Button Content="Go" Margin="4,0" Padding="8,3" Click="Go_Click" />
             <ui:Button Content="Previous difference" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
             <ui:Button Content="Next difference" Padding="8,3" Click="NextDifference_Click" />

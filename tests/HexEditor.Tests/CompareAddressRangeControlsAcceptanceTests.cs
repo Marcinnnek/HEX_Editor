@@ -58,6 +58,9 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
 
                 foreach (var box in new[] { start, end, go })
                 {
+                    Assert.AreEqual(CharacterCasing.Upper, box.CharacterCasing);
+                    box.Text = "0xabcdef12";
+                    Assert.AreEqual("0XABCDEF12", box.Text);
                     box.SelectAll();
                     Assert.IsTrue(IsInputRejected(box, "0x12G4"));
                     Assert.IsTrue(IsInputRejected(box, "100000000"));
