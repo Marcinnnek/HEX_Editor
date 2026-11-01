@@ -26,6 +26,7 @@ public sealed class FindBytesWindow : Window
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
+        FormTextBoxAppearance.Apply(_pattern);
 
         _mode.Items.Add("HEX");
         _mode.Items.Add("ASCII");

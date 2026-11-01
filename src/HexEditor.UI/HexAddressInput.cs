@@ -8,8 +8,8 @@ namespace HexEditor.UI;
 public static class HexAddressInput
 {
     public const double FieldWidth = 116;
-    public const double FieldFontSize = 15;
-    public static readonly Thickness FieldPadding = new(8, 5, 8, 5);
+    public const double FieldFontSize = FormTextBoxAppearance.FontSize;
+    public static readonly Thickness FieldPadding = FormTextBoxAppearance.Padding;
 
     public static readonly DependencyProperty ApplyProperty = DependencyProperty.RegisterAttached(
         "Apply", typeof(bool), typeof(HexAddressInput), new PropertyMetadata(false, OnApplyChanged));
@@ -30,10 +30,7 @@ public static class HexAddressInput
         if (!(bool)e.NewValue) return;
 
         box.Width = FieldWidth;
-        box.FontSize = FieldFontSize;
-        box.Margin = new Thickness(0);
-        box.Padding = FieldPadding;
-        box.VerticalContentAlignment = VerticalAlignment.Center;
+        FormTextBoxAppearance.Apply(box);
         box.MaxLength = 8;
         box.CharacterCasing = CharacterCasing.Upper;
         box.PreviewTextInput += PreviewTextInput;

@@ -130,6 +130,15 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
                 Assert.AreEqual("ABCDEF12", field.Text);
             }
 
+            if (window is ExportOptionsDialog)
+            {
+                var path = Descendants<TextBox>(window).Single(box => box.MinWidth == 300);
+                Assert.AreEqual(HexAddressInput.FieldFontSize, path.FontSize);
+                Assert.AreEqual(HexAddressInput.FieldPadding, path.Padding);
+                Assert.AreEqual(new Thickness(0), path.Margin);
+                Assert.AreEqual(VerticalAlignment.Center, path.VerticalContentAlignment);
+            }
+
             var rows = Descendants<Grid>(window)
                 .Where(grid => grid.ColumnDefinitions.Count == 2 &&
                     grid.ColumnDefinitions[0].Width.Value == AddressFieldRow.LabelWidth &&

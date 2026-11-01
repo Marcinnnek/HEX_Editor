@@ -45,6 +45,13 @@ public sealed class FindBytesWindowAcceptanceTests
                 Assert.AreEqual("Case", window.AsciiDraft);
                 Assert.AreEqual("Case", window.PatternInput.Text);
                 Assert.AreEqual(ResizeMode.NoResize, window.ResizeMode);
+                Assert.IsTrue(double.IsNaN(window.PatternInput.Width));
+                Assert.AreEqual(220d, window.PatternInput.MinWidth);
+                Assert.AreEqual(HexAddressInput.FieldFontSize, window.PatternInput.FontSize);
+                Assert.AreEqual(HexAddressInput.FieldPadding, window.PatternInput.Padding);
+                Assert.AreEqual(new Thickness(0), window.PatternInput.Margin);
+                Assert.AreEqual(VerticalAlignment.Center, window.PatternInput.VerticalContentAlignment);
+                Assert.AreEqual(CharacterCasing.Normal, window.PatternInput.CharacterCasing);
             }
             catch (Exception exception) { failure = exception; }
             finally { window?.Close(); }

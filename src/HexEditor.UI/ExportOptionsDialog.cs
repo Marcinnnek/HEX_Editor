@@ -33,11 +33,12 @@ public sealed class ExportOptionsDialog : Window
         int previousRecordSize, ExportScope initialScope)
     {
         Title = "Export memory data";
-        Width = 520;
+        Width = 600;
         SizeToContent = SizeToContent.Height;
-        MinWidth = 480;
+        MinWidth = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
+        FormTextBoxAppearance.Apply(_path);
         HexAddressInput.Configure(_start);
         HexAddressInput.Configure(_end);
         _scope.SelectedIndex = (int)initialScope;
