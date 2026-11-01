@@ -62,6 +62,7 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
                 {
                     Assert.AreEqual(HexAddressInput.FieldWidth, box.Width);
                     Assert.AreEqual(HexAddressInput.FieldFontSize, box.FontSize);
+                    Assert.AreEqual(VerticalAlignment.Center, box.VerticalContentAlignment);
                     Assert.AreEqual(CharacterCasing.Upper, box.CharacterCasing);
                     box.Text = "abcdef12";
                     Assert.AreEqual("ABCDEF12", box.Text);
@@ -118,6 +119,7 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
             {
                 Assert.AreEqual(HexAddressInput.FieldWidth, field.Width);
                 Assert.AreEqual(HexAddressInput.FieldFontSize, field.FontSize);
+                Assert.AreEqual(VerticalAlignment.Center, field.VerticalContentAlignment);
                 Assert.AreEqual(8, field.MaxLength);
                 Assert.AreEqual(CharacterCasing.Upper, field.CharacterCasing);
                 field.Text = "abcdef12";

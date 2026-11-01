@@ -30,6 +30,7 @@ public static class HexAddressInput
 
         box.Width = FieldWidth;
         box.FontSize = FieldFontSize;
+        box.VerticalContentAlignment = VerticalAlignment.Center;
         box.MaxLength = 8;
         box.CharacterCasing = CharacterCasing.Upper;
         box.PreviewTextInput += PreviewTextInput;
