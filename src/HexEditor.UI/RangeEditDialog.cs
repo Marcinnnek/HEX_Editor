@@ -29,7 +29,7 @@ internal sealed class RangeEditDialog : Window
         HexAddressInput.Configure(_start);
         HexAddressInput.Configure(_end);
         Title = kind switch { RangeEditDialogKind.SelectRange => "Select Range", RangeEditDialogKind.Insert => "Edit / Insert", _ => "Fill Range" };
-        Width = 390;
+        Width = kind == RangeEditDialogKind.Insert ? 390 : 470;
         SizeToContent = SizeToContent.Height;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.NoResize;
@@ -38,10 +38,11 @@ internal sealed class RangeEditDialog : Window
         _end.Text = end.ToString("X8", CultureInfo.InvariantCulture);
 
         var panel = new StackPanel { Margin = new Thickness(18) };
+        var labelWidth = kind == RangeEditDialogKind.Insert ? AddressFieldRow.LabelWidth : AddressFieldRow.LongLabelWidth;
         panel.Children.Add(AddressFieldRow.Create(kind == RangeEditDialogKind.Insert ? "Target address (hex):" : "Start address (hex):",
-            _start, new Thickness(0, 8, 0, 3)));
+            _start, new Thickness(0, 8, 0, 3), labelWidth));
         if (kind != RangeEditDialogKind.Insert)
-            panel.Children.Add(AddressFieldRow.Create("End address (inclusive) (hex):", _end, new Thickness(0, 8, 0, 3)));
+            panel.Children.Add(AddressFieldRow.Create("End address (inclusive) (hex):", _end, new Thickness(0, 8, 0, 3), labelWidth));
         if (kind != RangeEditDialogKind.SelectRange)
             AddField(panel, kind == RangeEditDialogKind.Insert ? "Bytes (hex):" : "Repeating byte pattern (hex):", _pattern);
         if (kind == RangeEditDialogKind.Fill)

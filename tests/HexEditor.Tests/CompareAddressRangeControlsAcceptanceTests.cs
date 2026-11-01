@@ -168,13 +168,15 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
 
             var rows = Descendants<Grid>(window)
                 .Where(grid => grid.ColumnDefinitions.Count == 2 &&
-                    grid.ColumnDefinitions[0].Width.Value == AddressFieldRow.LabelWidth &&
                     grid.Children.OfType<TextBox>().Any(HexAddressInput.GetApply))
                 .ToArray();
             Assert.HasCount(expectedAddressRows, rows, window.GetType().Name);
             var fieldPositions = new List<double>();
             foreach (var row in rows)
             {
+                var expectedLabelWidth = window is RangeEditDialog && expectedAddressRows == 2
+                    ? AddressFieldRow.LongLabelWidth : AddressFieldRow.LabelWidth;
+                Assert.AreEqual(expectedLabelWidth, row.ColumnDefinitions[0].Width.Value);
                 var label = row.Children.OfType<TextBlock>().Single();
                 var field = row.Children.OfType<TextBox>().Single();
                 Assert.AreEqual(0, Grid.GetColumn(label));
@@ -183,6 +185,8 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
                 var fieldY = field.TranslatePoint(new Point(0, field.ActualHeight / 2), window).Y;
                 Assert.IsTrue(Math.Abs(labelY - fieldY) <= 1, $"{window.GetType().Name}: label and field must share one line.");
                 fieldPositions.Add(field.TranslatePoint(new Point(), window).X);
+                Assert.IsLessThan(window.ActualWidth, fieldPositions[^1] + field.ActualWidth,
+                    $"{window.GetType().Name}: address field must fit inside the dialog.");
             }
             Assert.IsTrue(fieldPositions.Count < 2 || fieldPositions.Max() - fieldPositions.Min() <= 1,
                 $"{window.GetType().Name}: address fields must align vertically.");
