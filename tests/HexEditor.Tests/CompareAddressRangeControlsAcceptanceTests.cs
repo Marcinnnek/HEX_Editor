@@ -49,6 +49,7 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
                 }
 
                 view.ViewModel.ViewMode = CompareViewMode.AddressRange;
+                window.UpdateLayout();
                 Assert.IsTrue(rangeControls.IsEnabled);
                 Assert.IsTrue(start.IsEnabled);
                 Assert.IsTrue(end.IsEnabled);
@@ -60,10 +61,28 @@ public sealed class CompareAddressRangeControlsAcceptanceTests
                 window.UpdateLayout();
                 Assert.IsGreaterThan(0d, go.ActualHeight);
                 Assert.AreEqual(start.ActualHeight, end.ActualHeight, 1d);
+                var addressTextRect = start.GetRectFromCharacterIndex(0);
+                var addressTextTop = start.TranslatePoint(new Point(0, addressTextRect.Top), view).Y;
+                var modeBox = (ComboBox)view.FindName("ViewModeBox");
+                Assert.AreEqual(go.ActualHeight, modeBox.ActualHeight, 1d);
+                Assert.AreEqual(HexAddressInput.FieldFontSize, modeBox.FontSize);
+                Assert.AreEqual(VerticalAlignment.Center, modeBox.VerticalContentAlignment);
+                AssertTextAligned(modeBox);
                 foreach (var buttonName in new[] { "ApplyRangeButton", "GoButton", "PreviousDifferenceButton", "NextDifferenceButton" })
                 {
                     var button = (Button)view.FindName(buttonName);
                     Assert.AreEqual(go.ActualHeight, button.ActualHeight, 1d, $"{buttonName} should match the address fields.");
+                    Assert.AreEqual(HexAddressInput.FieldFontSize, button.FontSize);
+                    Assert.AreEqual(VerticalAlignment.Center, button.VerticalContentAlignment);
+                    AssertTextAligned(button);
+                }
+
+                void AssertTextAligned(Control control)
+                {
+                    var text = Descendants<TextBlock>(control).Single(block => block.ActualHeight > 0);
+                    var textTop = text.TranslatePoint(new Point(), view).Y;
+                    Assert.AreEqual(addressTextTop, textTop, 1d, $"{control.Name} text should align with address text.");
+                    Assert.AreEqual(addressTextRect.Height, text.ActualHeight, 1d, $"{control.Name} text height should match address text.");
                 }
 
                 foreach (var box in new[] { start, end, go })
