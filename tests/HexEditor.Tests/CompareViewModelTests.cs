@@ -10,6 +10,29 @@ namespace HexEditor.Tests;
 public sealed class CompareViewModelTests
 {
     [TestMethod]
+    public void DifferencesOnly_DoesNotShowAnUnchangedFirstRow()
+    {
+        var baseBytes = Enumerable.Range(0, 32).Select(index => (byte)index).ToArray();
+        var referenceBytes = (byte[])baseBytes.Clone();
+        referenceBytes[0x15] ^= 0xFF;
+        var comparison = new CompareViewModel(
+            MemoryImage.FromSegments([new MemorySegment(0xA0000000, baseBytes)]),
+            MemoryImage.FromSegments([new MemorySegment(0xA0000000, referenceBytes)]),
+            bytesPerRow: 16);
+
+        Assert.IsTrue(comparison.TryNavigateToAddress(0xA0000000, out _));
+        comparison.ViewMode = CompareViewMode.DifferencesOnly;
+
+        Assert.AreEqual("A0000010", comparison.Rows[0].Address);
+        Assert.HasCount(1, comparison.Rows);
+        Assert.IsFalse(comparison.TryNavigateToAddress(0xA0000000, out _));
+        Assert.HasCount(1, comparison.Rows);
+
+        comparison.Refresh(comparison.FileA, comparison.FileA);
+        Assert.HasCount(0, comparison.Rows);
+    }
+
+    [TestMethod]
     public void CompareRows_UseGlobalCustomWidthForOccupiedAndDifferencesOnlyRows()
     {
         var baseImage = MemoryImage.FromSegments([
@@ -639,7 +662,7 @@ public sealed class CompareViewModelTests
         comparison.ViewMode = CompareViewMode.AddressRange;
         Assert.HasCount(5, comparison.Rows);
         comparison.ViewMode = CompareViewMode.DifferencesOnly;
-        Assert.HasCount(3, comparison.Rows);
+        Assert.HasCount(2, comparison.Rows);
         Assert.IsFalse(comparison.Rows.Any(row => row.IsGapMarker));
     }
 }

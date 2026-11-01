@@ -67,9 +67,9 @@ public sealed class MemoryComparisonModelTests
                 comparison.Rows[rowIndex].States[0x1003 - expectedStart], $"width {width}");
 
             comparison.ViewMode = CompareViewMode.DifferencesOnly;
-            Assert.IsTrue(comparison.TryNavigateToAddress(0x1002, out var differenceRow), $"difference row width {width}");
+            Assert.IsTrue(comparison.TryNavigateToAddress(0x1003, out var differenceRow), $"difference row width {width}");
             var differenceAddress = comparison.Rows[differenceRow].Address;
-            Assert.AreEqual(((0x1002 / width) * width).ToString("X8"), differenceAddress, $"difference row width {width}");
+            Assert.AreEqual(((0x1003 / width) * width).ToString("X8"), differenceAddress, $"difference row width {width}");
             Assert.AreEqual(width, comparison.Rows[differenceRow].FileA.Cells.Count, $"File A difference width {width}");
             Assert.AreEqual(width, comparison.Rows[differenceRow].FileB.Cells.Count, $"File B difference width {width}");
             Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(0x1001, null, out var next), $"next difference width {width}");

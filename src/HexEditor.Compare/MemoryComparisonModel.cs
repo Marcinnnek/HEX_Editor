@@ -65,6 +65,17 @@ public sealed class MemoryComparisonModel
             return false;
         }
 
+        if (_viewMode == CompareViewMode.DifferencesOnly)
+        {
+            if (_rows.TryGetRowIndex(address, out rowIndex) && !_rows[rowIndex].IsGapMarker)
+            {
+                _navigationAddress = address;
+                return true;
+            }
+            rowIndex = -1;
+            return false;
+        }
+
         _navigationAddress = address;
         if (_rows.TryGetRowIndex(address, out rowIndex))
             return !_rows[rowIndex].IsGapMarker;
@@ -363,11 +374,6 @@ public sealed class MemoryComparisonModel
         if (_viewMode == CompareViewMode.DifferencesOnly)
         {
             var intervals = GetDifferenceRows().Select(address => ((ulong)address, (ulong)address));
-            if (_navigationAddress is uint navigationAddress)
-            {
-                var rowAddress = AddressRowGrid.RowStart(navigationAddress, width);
-                intervals = intervals.Append((rowAddress, rowAddress));
-            }
             return BuildSparseRanges(intervals, width, includeOneBlankRow: false, markLargeGaps: false);
         }
 
