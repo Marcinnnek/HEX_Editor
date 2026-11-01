@@ -54,6 +54,13 @@
                 <ui:MenuItem Header="Select range" Click="SelectRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             </Menu>
+            <Menu VerticalAlignment="Center">
+            <ui:MenuItem Header="_Tools" IsEnabled="{Binding ViewModel.CanEdit}">
+                <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
+                <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
+            </ui:MenuItem>
+            <ui:MenuItem Header="_Preferences..." Click="Preferences_Click" />
+            </Menu>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,8,0">
                 <TextBlock Text="Bytes per row" VerticalAlignment="Center" Margin="0,0,6,0" />
                 <ComboBox x:Name="RowWidthBox"
@@ -71,13 +78,6 @@
                           IsChecked="{Binding ViewModel.ActiveShowAscii, UpdateSourceTrigger=PropertyChanged}"
                           VerticalAlignment="Center" Padding="4,0" />
             </StackPanel>
-            <Menu VerticalAlignment="Center">
-            <ui:MenuItem Header="_Tools" IsEnabled="{Binding ViewModel.CanEdit}">
-                <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
-                <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
-            </ui:MenuItem>
-            <ui:MenuItem Header="_Preferences..." Click="Preferences_Click" />
-            </Menu>
         </StackPanel>
         <Border DockPanel.Dock="Top" x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="{DynamicResource HexBorderBrush}" BorderThickness="1" Padding="6" Margin="0,0,0,6">
                 <DockPanel>

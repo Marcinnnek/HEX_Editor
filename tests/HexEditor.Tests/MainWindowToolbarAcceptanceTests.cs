@@ -23,6 +23,10 @@ public sealed class MainWindowToolbarAcceptanceTests
                 window.UpdateLayout();
 
                 var commandBar = (StackPanel)window.FindName("MainCommandBar");
+                Assert.AreEqual(3, commandBar.Children.Count);
+                Assert.IsInstanceOfType<Menu>(commandBar.Children[0]);
+                Assert.IsInstanceOfType<Menu>(commandBar.Children[1]);
+                var viewSettings = (StackPanel)commandBar.Children[2];
                 var menus = commandBar.Children.OfType<Menu>().ToArray();
                 CollectionAssert.AreEqual(new[] { "_File", "_Edit", "_View", "_Tools", "_Preferences..." },
                     menus.SelectMany(menu => menu.Items.Cast<MenuItem>()).Select(item => item.Header.ToString()).ToArray());
@@ -31,9 +35,9 @@ public sealed class MainWindowToolbarAcceptanceTests
                 var ascii = (CheckBox)window.FindName("AsciiCheckBox");
                 Assert.IsTrue(widthBox.IsVisible);
                 Assert.IsTrue(ascii.IsVisible);
-                var rightEdge = menus[^1].TranslatePoint(new Point(menus[^1].ActualWidth, 0), commandBar).X;
+                var rightEdge = viewSettings.TranslatePoint(new Point(viewSettings.ActualWidth, 0), commandBar).X;
                 Assert.IsLessThanOrEqualTo(commandBar.ActualWidth, rightEdge,
-                    "The last menu must remain reachable at the minimum supported window width.");
+                    "The view controls after Preferences must remain reachable at the minimum supported window width.");
 
                 var fileItems = menus[0].Items.Cast<MenuItem>().First().Items.OfType<MenuItem>().ToArray();
                 CollectionAssert.AreEqual(new[]
