@@ -54,6 +54,17 @@ public sealed class LiveCompareScrollingAcceptanceTests
                 Assert.IsLessThan(TimeSpan.FromMilliseconds(100), elapsed,
                     $"Wheel scrolling did not update the aligned viewport within 100 ms ({elapsed.TotalMilliseconds:F1} ms).");
 
+                var arrowBar = Descendants<ScrollBar>(left).Single(item => item.Orientation == Orientation.Vertical && item.IsVisible);
+                var arrowStart = left.FirstVisibleRowIndex;
+                ScrollBar.LineDownCommand.Execute(null, arrowBar);
+                Pump(window.Dispatcher);
+                Assert.AreEqual(arrowStart + 1, left.FirstVisibleRowIndex);
+                Assert.AreEqual(left.FirstVisibleRowIndex, right.FirstVisibleRowIndex);
+                ScrollBar.LineUpCommand.Execute(null, arrowBar);
+                Pump(window.Dispatcher);
+                Assert.AreEqual(arrowStart, left.FirstVisibleRowIndex);
+                Assert.AreEqual(left.FirstVisibleRowIndex, right.FirstVisibleRowIndex);
+
                 var previousRow = right.FirstVisibleRowIndex;
                 started = Stopwatch.StartNew();
                 RaiseWheel(right);

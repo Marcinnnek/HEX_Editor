@@ -132,7 +132,7 @@
           </StackPanel>
         </ScrollViewer>
         <ScrollBar x:Name="RowThumb" Grid.Column="1" Orientation="Vertical"
-                   Minimum="0" Maximum="0" ViewportSize="1" SmallChange="3" LargeChange="10"
+                   Minimum="0" Maximum="0" ViewportSize="1" SmallChange="1" LargeChange="10"
                    ValueChanged="RowThumb_ValueChanged">
           <ScrollBar.Template>
             <ControlTemplate TargetType="ScrollBar">

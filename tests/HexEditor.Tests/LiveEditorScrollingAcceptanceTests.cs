@@ -461,6 +461,13 @@ public sealed class LiveEditorScrollingAcceptanceTests
                 Assert.IsLessThan(TimeSpan.FromMilliseconds(100), wheelElapsed,
                     $"Wheel scrolling did not show the expected address within 100 ms ({wheelElapsed.TotalMilliseconds:F1} ms).");
 
+                ScrollBar.LineDownCommand.Execute(null, bar);
+                Pump(window.Dispatcher);
+                Assert.AreEqual(4, view.FirstVisibleRowIndex, "The down arrow moves one display row.");
+                ScrollBar.LineUpCommand.Execute(null, bar);
+                Pump(window.Dispatcher);
+                Assert.AreEqual(3, view.FirstVisibleRowIndex, "The up arrow moves one display row.");
+
                 var thumb = Descendants<Thumb>(bar).First(item => item.ActualHeight >= 30);
                 thumb.RaiseEvent(new DragStartedEventArgs(0, 0) { RoutedEvent = Thumb.DragStartedEvent, Source = thumb });
                 var thumbStarted = Stopwatch.StartNew();

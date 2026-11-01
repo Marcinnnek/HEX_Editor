@@ -7,7 +7,8 @@ namespace HexEditor.UI;
 
 internal static class SelectionClipboardText
 {
-    public static bool TryCopy(MemoryImage image, uint? selectionStart, uint? selectionEnd)
+    public static bool TryCopy(MemoryImage image, uint? selectionStart, uint? selectionEnd,
+        SelectionTextFormat format = SelectionTextFormat.Hex)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (selectionStart is not uint start || selectionEnd is not uint end) return false;
@@ -21,9 +22,14 @@ internal static class SelectionClipboardText
             var rangeEnd = Math.Min(range.EndAddress, end);
             for (ulong address = rangeStart; address <= rangeEnd; address++)
             {
-                if (text.Length > 0) text.Append(' ');
                 range.TryGetByte((uint)address, out var value);
-                text.Append(value.ToString("X2", CultureInfo.InvariantCulture));
+                if (format == SelectionTextFormat.Ascii)
+                    text.Append(ByteText.FromByte(value).Ascii);
+                else
+                {
+                    if (text.Length > 0) text.Append(' ');
+                    text.Append(value.ToString("X2", CultureInfo.InvariantCulture));
+                }
             }
         }
 
@@ -32,3 +38,5 @@ internal static class SelectionClipboardText
         return true;
     }
 }
+
+public enum SelectionTextFormat { Hex, Ascii }

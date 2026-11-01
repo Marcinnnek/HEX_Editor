@@ -43,10 +43,15 @@ public partial class MainWindow : Window
     private uint? _selectionStart;
     private uint? _selectionEnd;
     private bool _suppressSegmentNavigation;
+    private bool _confirmingApplicationClose;
+    private bool _closeAfterConfirmation;
 
     public MainWindow()
     {
         InitializeComponent();
+        AllowDrop = true;
+        AddHandler(DragDrop.PreviewDragOverEvent, new DragEventHandler(FileDrop_DragOver), handledEventsToo: true);
+        AddHandler(DragDrop.PreviewDropEvent, new DragEventHandler(FileDrop_Drop), handledEventsToo: true);
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopySelection_Executed, CopySelection_CanExecute));
         ViewModel = new MainViewModel { DefaultBytesPerRow = RowWidthSettings.Current.DefaultBytesPerRow };
         ViewModel.ImageChanged += (_, _) => InvalidateFind("Image changed. Search again.");
@@ -169,25 +174,39 @@ public partial class MainWindow : Window
         FileOperationPanel.Visibility = Visibility.Visible;
         FileOperationProgress.IsIndeterminate = true;
         FileOperationText.Text = "Working...";
+        var progressGate = new object();
+        MemoryImageFileProgress? latestProgress = null;
+        var progressTimer = new System.Windows.Threading.DispatcherTimer(
+            System.Windows.Threading.DispatcherPriority.Background, Dispatcher)
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+        progressTimer.Tick += (_, _) =>
+        {
+            MemoryImageFileProgress? update;
+            lock (progressGate)
+            {
+                update = latestProgress;
+                latestProgress = null;
+            }
+            if (update is null) return;
+            var unit = update.Stage.Contains("fill", StringComparison.OrdinalIgnoreCase) ? "addresses" : "bytes";
+            FileOperationText.Text = update.Total is { } total
+                ? $"{update.Stage}: {update.Completed:N0} / {total:N0} {unit}"
+                : $"{update.Stage}: {update.Completed:N0}";
+            FileOperationProgress.IsIndeterminate = update.Total is null or 0;
+            if (update.Total is > 0)
+            {
+                FileOperationProgress.Minimum = 0;
+                FileOperationProgress.Maximum = update.Total.Value;
+                FileOperationProgress.Value = Math.Min(update.Completed, update.Total.Value);
+            }
+        };
+        progressTimer.Start();
         var progress = new InlineProgress<MemoryImageFileProgress>(update =>
         {
             progressObserver?.Report(update);
-            void UpdateProgress()
-            {
-                var unit = update.Stage.Contains("fill", StringComparison.OrdinalIgnoreCase) ? "addresses" : "bytes";
-                FileOperationText.Text = update.Total is { } total
-                    ? $"{update.Stage}: {update.Completed:N0} / {total:N0} {unit}"
-                    : $"{update.Stage}: {update.Completed:N0}";
-                FileOperationProgress.IsIndeterminate = update.Total is null or 0;
-                if (update.Total is > 0)
-                {
-                    FileOperationProgress.Minimum = 0;
-                    FileOperationProgress.Maximum = update.Total.Value;
-                    FileOperationProgress.Value = Math.Min(update.Completed, update.Total.Value);
-                }
-            }
-            if (Dispatcher.CheckAccess()) UpdateProgress();
-            else Dispatcher.BeginInvoke(new Action(UpdateProgress));
+            lock (progressGate) latestProgress = update;
         });
         try
         {
@@ -195,6 +214,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            progressTimer.Stop();
             _fileOperationCancellation = null;
             FileOperationPanel.Visibility = Visibility.Collapsed;
             FileOperationProgress.IsIndeterminate = true;
@@ -367,8 +387,10 @@ public partial class MainWindow : Window
             if (dialog.ShowDialog() != true) return;
 
             var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
+            if (!ReferenceEquals(ViewModel.CurrentImage, destination.Image) &&
+                !await ConfirmCloseImageAsync(ViewModel.Workspace.Document)) return;
             if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides,
-                    () => ConfirmCloseImage(ViewModel.Workspace.Document))) return;
+                    () => true)) return;
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
@@ -423,12 +445,50 @@ public partial class MainWindow : Window
             return;
         }
 
+        await OpenPathAsync(dialog.FileName);
+    }
+
+    public async Task OpenPathsAsync(IReadOnlyList<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        if (paths.Count == 0) return;
+        if (paths.Count != 1)
+        {
+            MessageBox.Show(this, "Open one file at a time.", "Unable to open files", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (!File.Exists(paths[0]))
+        {
+            MessageBox.Show(this, $"The file does not exist or cannot be accessed:\n\n{paths[0]}",
+                "Unable to open file", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+        await OpenPathAsync(paths[0]);
+    }
+
+    private void FileDrop_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void FileDrop_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] paths)
+            await OpenPathsAsync(paths);
+        e.Handled = true;
+    }
+
+    private async Task OpenPathAsync(string path)
+    {
+        if (!ViewModel.CanStartOpenCompareOrMerge || _fileOperationCancellation is not null) return;
         var replacedDocument = ViewModel.Workspace.Document;
-        if (!ConfirmCloseImage(replacedDocument)) return;
+        if (!await ConfirmCloseImageAsync(replacedDocument)) return;
+        if (!ReferenceEquals(replacedDocument, ViewModel.Workspace.Document)) return;
 
         try
         {
-            var preview = await LoadOpenReplacementAsync(dialog.FileName);
+            var preview = await LoadOpenReplacementAsync(path);
             if (!ViewModel.ApplyOpenImport(preview, mismatch =>
                     ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch")))
                 return;
@@ -436,7 +496,7 @@ public partial class MainWindow : Window
             ViewModel.ActivateEditor();
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Open"); }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException)
         {
             RecordError("Open", exception);
             MessageBox.Show(this, exception.Message, "Unable to open file", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -445,22 +505,32 @@ public partial class MainWindow : Window
 
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (!ViewModel.CanEdit) return;
-        var document = ActiveDocument;
+        if (!ViewModel.CanEdit || _fileOperationCancellation is not null) return;
+        await SaveDocumentAsync(ActiveDocument);
+    }
+
+    /// <summary>Saves an associated document through the window's progress and cancellation controls.</summary>
+    public async Task<bool> SaveDocumentAsync(EditorDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_fileOperationCancellation is not null) return false;
         try
         {
-            if (document.SourcePath is null || document.SourceFormat is null) { await TrySaveAsAsync(document); return; }
+            if (document.SourcePath is null || document.SourceFormat is null)
+                return await TrySaveAsAsync(document);
             if (!_files.ConfirmSaveFormat(document, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
-                    mismatch.Message, "Filename format mismatch"))) return;
+                    mismatch.Message, "Filename format mismatch"))) return false;
             await RunFileOperationAsync((token, progress) => document.SaveAsync(token, progress));
             RefreshSavedDocumentTabs(document);
             InvalidateFind("Image saved. Search again.");
+            return true;
         }
-        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); }
+        catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Save"); return false; }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
             RecordError("Save", exception);
             MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
         }
     }
 
@@ -527,13 +597,23 @@ public partial class MainWindow : Window
 
     private async Task<bool> TrySaveAsAsync(EditorDocument document)
     {
+        if (_fileOperationCancellation is not null) return false;
         if (!TryGetSaveAsSelection(document, out var selection)) return false;
-        if (!_files.ConfirmSaveAsFormat(selection.Path, selection.Format, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
+        return await SaveDocumentAsAsync(document, selection.Path, selection.Format, selection.Overwrite);
+    }
+
+    /// <summary>Saves through the window's progress and cancellation controls.</summary>
+    public async Task<bool> SaveDocumentAsAsync(EditorDocument document, string path,
+        MemoryImageExportFormat format, bool overwriteExisting)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        if (_fileOperationCancellation is not null) return false;
+        if (!_files.ConfirmSaveAsFormat(path, format, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
                 $"The destination '{mismatch.FileName}' has an extension associated with {mismatch.ExpectedFormat.GetDisplayName()}, " +
                 $"but the selected output format is {mismatch.DetectedFormat.GetDisplayName()}.", "Save As format mismatch"))) return false;
         try
         {
-            await RunFileOperationAsync((token, progress) => document.SaveAsAsync(selection.Path, selection.Format, selection.Overwrite,
+            await RunFileOperationAsync((token, progress) => document.SaveAsAsync(path, format, overwriteExisting,
                 token, progress));
             ViewModel.RefreshActiveCommandState();
             RefreshSavedDocumentTabs(document);
@@ -560,30 +640,9 @@ public partial class MainWindow : Window
     private void CopySelection_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         if (!ViewModel.ActiveIsEditor) return;
-        SelectionClipboardText.TryCopy(ViewModel.ActiveImage, HexRowsView.SelectionStart, HexRowsView.SelectionEnd);
+        SelectionClipboardText.TryCopy(ViewModel.ActiveImage, HexRowsView.SelectionStart, HexRowsView.SelectionEnd,
+            HexRowsView.ClipboardFormat);
         e.Handled = true;
-    }
-
-    private bool TrySaveAs(EditorDocument document)
-    {
-        if (!TryGetSaveAsSelection(document, out var selection)) return false;
-        if (!_files.ConfirmSaveAsFormat(selection.Path, selection.Format, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
-                $"The destination '{mismatch.FileName}' has an extension associated with {mismatch.ExpectedFormat.GetDisplayName()}, " +
-                $"but the selected output format is {mismatch.DetectedFormat.GetDisplayName()}.", "Save As format mismatch"))) return false;
-        try
-        {
-            document.SaveAs(selection.Path, selection.Format, selection.Overwrite);
-            ViewModel.RefreshActiveCommandState();
-            RefreshSavedDocumentTabs(document);
-            InvalidateFind("Image saved. Search again.");
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
-        {
-            RecordError("Save as", exception);
-            MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
-            return false;
-        }
     }
 
     private bool TryGetSaveAsSelection(EditorDocument document, out SaveAsSelection selection)
@@ -625,11 +684,12 @@ public partial class MainWindow : Window
         return header;
     }
 
-    private void CloseCompareView(TabItem tab)
+    private async void CloseCompareView(TabItem tab)
     {
         if (!ViewModel.CanEdit) return;
         if (tab.Content is not CompareView view || view.Workspace.BaseDocument is not { } document) return;
-        if (ViewModel.Workspace.IsLastView(document, view.Workspace) && !ConfirmCloseImage(document)) return;
+        if (ViewModel.Workspace.IsLastView(document, view.Workspace) && !await ConfirmCloseImageAsync(document)) return;
+        if (!WorkspaceTabs.Items.Contains(tab)) return;
         ViewModel.Workspace.CloseView(view.Workspace);
         var wasSelected = ReferenceEquals(WorkspaceTabs.SelectedItem, tab);
         WorkspaceTabs.Items.Remove(tab);
@@ -645,11 +705,12 @@ public partial class MainWindow : Window
             WorkspaceTabs.Items.Remove(tab);
     }
 
-    private void CloseImage_Click(object sender, RoutedEventArgs e)
+    private async void CloseImage_Click(object sender, RoutedEventArgs e)
     {
         if (!ViewModel.CanEdit) return;
         var document = ActiveDocument;
-        if (!ConfirmCloseImage(document)) return;
+        if (!await ConfirmCloseImageAsync(document)) return;
+        if (!ReferenceEquals(document, ActiveDocument)) return;
         CloseDocumentViews(document);
         if (ReferenceEquals(document, ViewModel.Workspace.Document)) ViewModel.CloseImage();
     }
@@ -825,12 +886,23 @@ public partial class MainWindow : Window
 
     private void ShowEditError(Exception exception) => MessageBox.Show(this, exception.Message, "Unable to edit image", MessageBoxButton.OK, MessageBoxImage.Error);
 
-    private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    private async void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        e.Cancel = !DirtyDocumentCloseWorkflow.ConfirmAll(ViewModel.Workspace, ConfirmCloseImage);
+        if (_closeAfterConfirmation) return;
+        if (_confirmingApplicationClose) { e.Cancel = true; return; }
+        if (ViewModel.Workspace.GetDirtyEditableDocuments().Count == 0) return;
+        e.Cancel = true;
+        _confirmingApplicationClose = true;
+        try
+        {
+            if (!await DirtyDocumentCloseWorkflow.ConfirmAllAsync(ViewModel.Workspace, ConfirmCloseImageAsync)) return;
+            _closeAfterConfirmation = true;
+            _ = Dispatcher.BeginInvoke(new Action(Close));
+        }
+        finally { _confirmingApplicationClose = false; }
     }
 
-    private bool ConfirmCloseImage(EditorDocument document)
+    private async Task<bool> ConfirmCloseImageAsync(EditorDocument document)
     {
         if (!document.IsModified) return true;
         var imageName = string.IsNullOrWhiteSpace(document.SourcePath)
@@ -839,21 +911,7 @@ public partial class MainWindow : Window
         var choice = SaveChangesDialog.Show(this, imageName);
         if (choice == MessageBoxResult.Cancel) return false;
         if (choice == MessageBoxResult.No) return true;
-        if (document.SourcePath is null || document.SourceFormat is null) return TrySaveAs(document);
-        try
-        {
-            if (!_files.ConfirmSaveFormat(document, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
-                    mismatch.Message, "Filename format mismatch"))) return false;
-            document.Save();
-            RefreshSavedDocumentTabs(document);
-            return true;
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
-        {
-            RecordError("Save before close", exception);
-            MessageBox.Show(this, exception.Message, "Unable to save file", MessageBoxButton.OK, MessageBoxImage.Error);
-            return false;
-        }
+        return await SaveDocumentAsync(document) && !document.IsModified;
     }
 
     private void GoToAddressDialog_Click(object sender, RoutedEventArgs e)

@@ -13,6 +13,11 @@ public partial class App : Application
     {
         ApplicationAppearance.Apply(AppearanceMode.Light);
         base.OnStartup(e);
+        var window = new MainWindow();
+        MainWindow = window;
+        window.Show();
+        if (e.Args.Length > 0)
+            window.Dispatcher.BeginInvoke(new Action(async () => await window.OpenPathsAsync(e.Args)));
     }
 }
 

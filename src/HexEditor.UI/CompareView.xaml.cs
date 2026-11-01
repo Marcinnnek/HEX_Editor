@@ -64,7 +64,7 @@ public partial class CompareView : UserControl
     {
         var panel = SelectedPanel;
         var image = _lastSelectedSide == ComparePanelSide.Base ? ViewModel.FileA : ViewModel.FileB;
-        SelectionClipboardText.TryCopy(image, panel.SelectionStart, panel.SelectionEnd);
+        SelectionClipboardText.TryCopy(image, panel.SelectionStart, panel.SelectionEnd, panel.ClipboardFormat);
         e.Handled = true;
     }
 
