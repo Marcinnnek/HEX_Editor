@@ -62,6 +62,9 @@
     <Style x:Key="MemoryBlockListItemContainerStyle" TargetType="ListBoxItem">
         <Setter Property="HorizontalContentAlignment" Value="Left" />
     </Style>
+    <DataTemplate x:Key="MemoryBlockGroupHeaderTemplate">
+        <TextBlock Text="{Binding}" Margin="6,4,4,6" />
+    </DataTemplate>
     <DataTemplate x:Key="MemoryBlockListItemTemplate">
         <TextBlock Text="{Binding Description}" TextWrapping="NoWrap" />
     </DataTemplate>
