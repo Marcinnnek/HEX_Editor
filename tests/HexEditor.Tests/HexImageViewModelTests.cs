@@ -257,6 +257,34 @@ public sealed class HexImageViewModelTests
     }
 
     [TestMethod]
+    public void EditorAndComparison_ShowOneEmptyRowAcrossRegionBoundary()
+    {
+        var image = MemoryImage.FromSegments([
+            new MemorySegment(0xA0FFFFFF, [0xA1]),
+            new MemorySegment(0xA1000011, [0xB2])]);
+        var editor = new HexImageViewModel(image, bytesPerRow: 17);
+        var comparison = new CompareViewModel(image, image, bytesPerRow: 17);
+
+        Assert.HasCount(3, editor.Rows);
+        Assert.HasCount(editor.Rows.Count, comparison.Rows);
+        Assert.AreEqual("A0FFFFFF", editor.Rows[0].Address);
+        Assert.AreEqual("A1000000", editor.Rows[1].Address);
+        Assert.AreEqual("A1000011", editor.Rows[2].Address);
+        Assert.IsFalse(editor.Rows[1].IsGapMarker);
+        Assert.IsTrue(editor.Rows[1].Cells.All(cell => cell.Hex.Length == 0));
+        Assert.AreEqual("A1", editor.Rows[0].Cells[0].Hex);
+        for (var index = 0; index < editor.Rows.Count; index++)
+        {
+            Assert.AreEqual(editor.Rows[index].Address, comparison.Rows[index].Address);
+            Assert.AreEqual(editor.Rows[index].IsGapMarker, comparison.Rows[index].IsGapMarker);
+        }
+        Assert.AreEqual("B2", editor.Rows[2].Cells[0].Hex);
+        Assert.AreEqual("A1", comparison.FileARows[0].Cells[0].Hex);
+        Assert.IsTrue(comparison.FileARows[1].Cells.All(cell => cell.Hex.Length == 0));
+        Assert.AreEqual("B2", comparison.FileARows[2].Cells[0].Hex);
+    }
+
+    [TestMethod]
     public void NavigatingIntoCollapsedGap_ReindexesRowsAndKeepsFollowingSegmentAddressable()
     {
         var image = MemoryImage.FromSegments([

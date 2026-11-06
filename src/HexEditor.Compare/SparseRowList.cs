@@ -8,6 +8,8 @@ internal sealed record IndexedSparseRowSpan(ulong StartAddress, ulong EndAddress
 
 internal readonly record struct SparseRowPosition(bool IsGap, ulong RowAddress, ulong GapStartAddress, ulong GapEndAddress);
 
+internal enum SparseRowLayout { WithGaps, Compact }
+
 internal static class AddressRowGrid
 {
     private const ulong RegionSize = 0x01000000;
@@ -47,15 +49,17 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
     private readonly uint _rowWidth;
     private int _count;
 
-    public SparseRowList(IEnumerable<SparseRowSpan> spans, int bytesPerRow, Func<SparseRowPosition, T> createItem,
+    public SparseRowList(IEnumerable<(ulong StartAddress, ulong EndAddress)> addressRanges, int bytesPerRow,
+        Func<SparseRowPosition, T> createItem, SparseRowLayout layout = SparseRowLayout.WithGaps,
         object? sourceIdentity = null)
     {
         if (bytesPerRow <= 0) throw new ArgumentOutOfRangeException(nameof(bytesPerRow));
+        ArgumentNullException.ThrowIfNull(addressRanges);
         _rowWidth = (uint)bytesPerRow;
         _createItem = createItem ?? throw new ArgumentNullException(nameof(createItem));
         SourceIdentity = sourceIdentity;
 
-        (_spans, _count) = SparseRowIndexBuilder.Build(spans, _rowWidth);
+        (_spans, _count) = SparseRowIndexBuilder.Build(BuildSpans(addressRanges, _rowWidth, layout), _rowWidth);
     }
 
     public override int Count => _count;
@@ -81,7 +85,7 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         {
             var middle = low + ((high - low) / 2);
             var span = _spans[middle];
-            var spanEnd = span.IsGap ? span.EndAddress : AddressRowGrid.RowEnd(span.EndAddress, _rowWidth);
+            var spanEnd = AddressRowGrid.RowEnd(span.EndAddress, _rowWidth);
             if (middle + 1 < _spans.Count)
                 spanEnd = Math.Min(spanEnd, _spans[middle + 1].StartAddress - 1);
             if (address < span.StartAddress)
@@ -152,6 +156,45 @@ internal sealed class SparseRowList<T> : ReadOnlyListAdapter<T>, INotifyCollecti
         throw new InvalidOperationException("The row index is not represented by the sparse row map.");
     }
 
+    private static IReadOnlyList<SparseRowSpan> BuildSpans(
+        IEnumerable<(ulong StartAddress, ulong EndAddress)> addressRanges, uint rowWidth, SparseRowLayout layout)
+    {
+        var aligned = addressRanges
+            .SelectMany(range => AddressRowGrid.RowsForRange(range.StartAddress, range.EndAddress, rowWidth))
+            .OrderBy(range => range.First)
+            .ToArray();
+        if (aligned.Length == 0) return Array.Empty<SparseRowSpan>();
+
+        var spans = new List<SparseRowSpan>();
+        var start = aligned[0].First;
+        var end = aligned[0].Last;
+        foreach (var next in aligned.Skip(1))
+        {
+            var nextRow = AddressRowGrid.RowEnd(end, rowWidth) + 1;
+            var afterOneBlankRow = nextRow > uint.MaxValue
+                ? nextRow
+                : AddressRowGrid.RowEnd(nextRow, rowWidth) + 1;
+            var mergeLimit = layout == SparseRowLayout.WithGaps ? afterOneBlankRow : nextRow;
+            if (AddressRowGrid.RegionStart(next.First) == AddressRowGrid.RegionStart(start) &&
+                next.First <= mergeLimit)
+            {
+                end = Math.Max(end, next.Last);
+                continue;
+            }
+
+            spans.Add(new SparseRowSpan(start, end));
+            if (layout == SparseRowLayout.WithGaps && nextRow < next.First)
+            {
+                var lastMissingRow = AddressRowGrid.RowStart(next.First - 1, rowWidth);
+                spans.Add(new SparseRowSpan(nextRow, lastMissingRow,
+                    IsGap: nextRow != lastMissingRow));
+            }
+            start = next.First;
+            end = next.Last;
+        }
+        spans.Add(new SparseRowSpan(start, end));
+        return spans;
+    }
 }
 
 internal static class SparseRowIndexBuilder

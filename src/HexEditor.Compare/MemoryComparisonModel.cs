@@ -346,7 +346,7 @@ public sealed class MemoryComparisonModel
     }
 
     private SparseRowList<CompareViewRow> CreateRows() =>
-        new(BuildRanges(), _bytesPerRow, position =>
+        new(DisplayedAddressRanges(), _bytesPerRow, position =>
         {
             if (position.IsGap)
             {
@@ -366,19 +366,16 @@ public sealed class MemoryComparisonModel
                     : CompareByteState.Equal;
             }).ToArray();
             return new CompareViewRow(address.ToString("X8"), a, b, states, false, null);
-        });
+        }, layout: _viewMode == CompareViewMode.DifferencesOnly
+            ? SparseRowLayout.Compact : SparseRowLayout.WithGaps);
 
-    private IReadOnlyList<SparseRowSpan> BuildRanges()
+    private IEnumerable<(ulong StartAddress, ulong EndAddress)> DisplayedAddressRanges()
     {
-        var width = (uint)_bytesPerRow;
         if (_viewMode == CompareViewMode.DifferencesOnly)
-        {
-            var intervals = GetDifferenceRows().Select(address => ((ulong)address, (ulong)address));
-            return BuildSparseRanges(intervals, width, includeOneBlankRow: false, markLargeGaps: false);
-        }
+            return GetDifferenceRows().Select(address => ((ulong)address, (ulong)address));
 
         var intervalsToDisplay = _fileA.Ranges.Concat(_fileB.Ranges)
-            .SelectMany(range =>
+            .Select(range =>
             {
                 var start = (ulong)range.StartAddress;
                 var end = (ulong)range.EndAddress;
@@ -387,41 +384,14 @@ public sealed class MemoryComparisonModel
                     start = Math.Max(start, _rangeStart);
                     end = Math.Min(end, _rangeEnd);
                 }
-                return start <= end
-                    ? AddressRowGrid.RowsForRange(start, end, width)
-                    : Enumerable.Empty<(ulong First, ulong Last)>();
+                return (StartAddress: start, EndAddress: end);
             })
+            .Where(range => range.StartAddress <= range.EndAddress)
             .ToList();
         if (_navigationAddress is uint address &&
             (_viewMode != CompareViewMode.AddressRange || IsInSelectedAddressRange(address)))
-        {
-            var rowAddress = AddressRowGrid.RowStart(address, width);
-            intervalsToDisplay.Add((rowAddress, rowAddress));
-        }
-        intervalsToDisplay.Sort((left, right) => left.First.CompareTo(right.First));
-        return BuildSparseRanges(intervalsToDisplay, width, includeOneBlankRow: true, markLargeGaps: true);
-    }
-
-    private static IReadOnlyList<SparseRowSpan> BuildSparseRanges(IEnumerable<(ulong Start, ulong End)> input, uint width, bool includeOneBlankRow, bool markLargeGaps)
-    {
-        var spans = input.OrderBy(item => item.Start).ToArray();
-        if (spans.Length == 0) return Array.Empty<SparseRowSpan>();
-        var ranges = new List<SparseRowSpan>();
-        var start = spans[0].Start;
-        var end = spans[0].End;
-        foreach (var span in spans.Skip(1))
-        {
-            var sameRegion = AddressRowGrid.RegionStart(span.Start) == AddressRowGrid.RegionStart(start);
-            var mergeLimit = includeOneBlankRow ? end + width * 2UL : end + width;
-            if (sameRegion && span.Start <= mergeLimit) { end = Math.Max(end, span.End); continue; }
-            ranges.Add(new SparseRowSpan(start, end));
-            if (span.Start > AddressRowGrid.RowEnd(end, width) + width && markLargeGaps)
-                ranges.Add(new SparseRowSpan(AddressRowGrid.RowEnd(end, width) + 1, span.Start - width, IsGap: true));
-            start = span.Start;
-            end = span.End;
-        }
-        ranges.Add(new SparseRowSpan(start, end));
-        return ranges;
+            intervalsToDisplay.Add((address, address));
+        return intervalsToDisplay;
     }
 
     private static ComparePanelRow EmptyPanel() => new(Array.Empty<CompareByteCell>(), string.Empty, null);

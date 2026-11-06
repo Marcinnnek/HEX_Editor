@@ -94,7 +94,8 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
     }
 
     private SparseRowList<HexViewRow> CreateRows(MemoryImage image, int bytesPerRow, bool showAscii) =>
-        new(BuildRanges(image, bytesPerRow), bytesPerRow, position => position.IsGap
+        new(image.Ranges.Select(range => ((ulong)range.StartAddress, (ulong)range.EndAddress)),
+            bytesPerRow, position => position.IsGap
             ? HexViewRow.Gap((uint)position.GapStartAddress, (uint)position.GapEndAddress)
             : CreateRow(image, bytesPerRow, showAscii, (uint)position.RowAddress), sourceIdentity: image);
 
@@ -119,37 +120,6 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
             cells[offset] = new HexByteCell(text.Hex, text.Ascii.ToString(), byteAddress, ByteHighlightState.None, isFindMatch, isEdited);
         }
         return new HexViewRow(rowAddress.ToString("X8"), hex.ToString(), ascii?.ToString(), false, null) { Cells = cells };
-    }
-
-    private static IReadOnlyList<SparseRowSpan> BuildRanges(MemoryImage image, int bytesPerRow)
-    {
-        if (image.Ranges.Count == 0) return Array.Empty<SparseRowSpan>();
-        var width = (uint)bytesPerRow;
-        var rowRanges = image.Ranges
-            .SelectMany(range => AddressRowGrid.RowsForRange(range.StartAddress, range.EndAddress, width))
-            .ToArray();
-
-        var ranges = new List<SparseRowSpan>();
-        var start = rowRanges[0].First;
-        var end = rowRanges[0].Last;
-        for (var index = 1; index < rowRanges.Length; index++)
-        {
-            var next = rowRanges[index];
-            var sameRegion = AddressRowGrid.RegionStart(next.First) == AddressRowGrid.RegionStart(start);
-            if (sameRegion && next.First <= end + (2UL * width))
-            {
-                end = Math.Max(end, next.Last);
-                continue;
-            }
-
-            ranges.Add(new SparseRowSpan(start, end));
-            if (next.First > end + (2UL * width))
-                ranges.Add(new SparseRowSpan(AddressRowGrid.RowEnd(end, width) + 1, next.First - width, IsGap: true));
-            start = next.First;
-            end = next.Last;
-        }
-        ranges.Add(new SparseRowSpan(start, end));
-        return ranges;
     }
 
     private static void ValidateRowWidth(int bytesPerRow)
