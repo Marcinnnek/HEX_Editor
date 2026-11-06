@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using HexEditor.Core;
@@ -60,6 +61,69 @@ public sealed class EditorViewportAfterEditAcceptanceTests
     });
 
     [TestMethod]
+    public void FillWithPatternProgressDoesNotMoveTheEditor() => RunAtSelectedByte((window, view, address) =>
+    {
+        var panel = (Border)window.FindName("FileOperationPanel");
+        var editorTop = view.TranslatePoint(new Point(), window).Y;
+        var positions = new List<double>();
+        var progressBottoms = new List<double>();
+        DependencyPropertyChangedEventHandler visibilityChanged = (_, _) =>
+        {
+            window.UpdateLayout();
+            positions.Add(view.TranslatePoint(new Point(), window).Y);
+            if (panel.IsVisible)
+                progressBottoms.Add(panel.TranslatePoint(new Point(0, panel.ActualHeight), window).Y);
+        };
+        panel.IsVisibleChanged += visibilityChanged;
+
+        var dialogAccepted = false;
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(10) };
+        timer.Tick += (_, _) =>
+        {
+            var dialog = window.OwnedWindows.OfType<RangeEditDialog>().FirstOrDefault();
+            if (dialog is null) return;
+            timer.Stop();
+            Descendants<TextBox>(dialog).Single(input => input.MinWidth == 220).Text = "34";
+            Descendants<RadioButton>(dialog)
+                .Single(button => Equals(button.Content, "Overwrite existing data")).IsChecked = true;
+            Descendants<Wpf.Ui.Controls.Button>(dialog)
+                .Single(button => Equals(button.Content, "OK"))
+                .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            dialogAccepted = true;
+        };
+
+        timer.Start();
+        try
+        {
+            view.ContextMenu.Items.OfType<MenuItem>()
+                .Single(item => Equals(item.Header, "Fill with Pattern..."))
+                .RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while ((!dialogAccepted || panel.Visibility != Visibility.Collapsed ||
+                    !window.ViewModel.CurrentImage.TryGetByte(address, out var value) || value != 0x34) &&
+                   DateTime.UtcNow < deadline) Pump(window);
+            Pump(window);
+        }
+        finally
+        {
+            timer.Stop();
+            panel.IsVisibleChanged -= visibilityChanged;
+        }
+
+        Assert.IsTrue(dialogAccepted);
+        Assert.AreEqual(Visibility.Collapsed, panel.Visibility);
+        Assert.IsNotEmpty(positions, "The progress panel should change visibility during Fill.");
+        Assert.IsTrue(positions.All(position => Math.Abs(position - editorTop) < 1),
+            $"Fill moved the Editor from Y={editorTop:F1} to {string.Join(", ", positions.Select(position => position.ToString("F1")))}.");
+        Assert.IsNotEmpty(progressBottoms);
+        Assert.IsTrue(progressBottoms.All(bottom => bottom <= editorTop + 1),
+            $"The progress panel covered the byte view; panel bottom={string.Join(", ", progressBottoms)} and Editor top={editorTop:F1}.");
+        Assert.AreEqual(50, view.FirstVisibleRowIndex);
+        Assert.IsTrue(window.ViewModel.CurrentImage.TryGetByte(address, out var filled));
+        Assert.AreEqual((byte)0x34, filled);
+    });
+
+    [TestMethod]
     public void RemovingSeveralVisibleRowsKeepsTheViewportNearTheRemovedRange() => RunAtSelectedByte((window, view, _) =>
     {
         var rowWidth = (uint)window.ViewModel.ImageView.BytesPerRow;
@@ -89,6 +153,7 @@ public sealed class EditorViewportAfterEditAcceptanceTests
             try
             {
                 window = new MainWindow();
+                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(window.Dispatcher));
                 window.ViewModel.LoadImage(MemoryImage.FromPatternRange(0, 8191, [0x12]), null, null);
                 window.Show();
                 window.UpdateLayout();
@@ -114,6 +179,7 @@ public sealed class EditorViewportAfterEditAcceptanceTests
                         editing.Undo();
                     window.Close();
                 }
+                SynchronizationContext.SetSynchronizationContext(null);
             }
         });
         thread.SetApartmentState(ApartmentState.STA);

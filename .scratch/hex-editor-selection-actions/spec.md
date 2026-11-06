@@ -12,6 +12,9 @@ The Fill dialog styles its repeating-pattern input like other form text fields, 
 
 Editor edits, selected-byte deletion or zeroing, and Fill with Pattern preserve the viewport near the affected address. If the selected byte still exists, its selection and visible position remain. If it was removed, the viewport stays near the removed range rather than jumping to the beginning of the image.
 
+The viewport must remain stable throughout an edit refresh, without briefly showing the first rows before returning to the affected address. This also applies to zeroing, Fill with Pattern, deletion, Undo, and Redo; opening a different document may start at its first row.
+Showing and hiding the asynchronous Fill progress panel must not move or resize the visible Editor or Compare data area.
+
 Ctrl+V and Paste clipboard bytes parse system clipboard HEX text into a contiguous byte sequence beginning at the selection start. A single confirmation shows byte count, target address, overlap count, and Overwrite/Keep existing/Cancel choices. The operation affects exactly the clipboard byte count, leaves any longer selected tail untouched, rejects 32-bit overflow atomically, and is one Undo step. Retain the separate sparse internal Copy range/Paste workflow.
 
 Draw selection as an exterior outline in HEX and ASCII, without lines between adjacent selected bytes horizontally or vertically. Address gaps split visible outlines. Right-click preserves the selection and exposes applicable actions. Repair context menu rendering in Light and Dark themes.

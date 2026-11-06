@@ -76,15 +76,6 @@
                           VerticalAlignment="Center" Padding="4,0" />
             </StackPanel>
         </StackPanel>
-        <Border DockPanel.Dock="Top" x:Name="FileOperationPanel" Visibility="Collapsed" BorderBrush="{DynamicResource HexBorderBrush}" BorderThickness="1" Padding="6" Margin="0,0,0,6">
-                <DockPanel>
-                    <ui:Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
-                    <StackPanel>
-                        <TextBlock x:Name="FileOperationText" Text="Working..." Margin="0,0,0,3" />
-                        <ProgressBar x:Name="FileOperationProgress" Height="8" IsIndeterminate="True" />
-                    </StackPanel>
-                </DockPanel>
-        </Border>
         <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
             <TextBlock>
                 <Run Text="Address: " /><Run Text="{Binding ViewModel.EditorStatus.CurrentAddressText, Mode=OneWay}" />
@@ -94,6 +85,7 @@
             </TextBlock>
             <TextBlock Margin="0,3,0,0" Text="{Binding ViewModel.StatusMessage}" />
         </StackPanel>
+        <Grid>
         <TabControl x:Name="WorkspaceTabs" SelectionChanged="WorkspaceTabs_SelectionChanged">
             <TabItem Header="Editor">
                 <Grid>
@@ -139,5 +131,18 @@
                 </Grid>
             </TabItem>
         </TabControl>
+        <Border x:Name="FileOperationPanel" Panel.ZIndex="1" Visibility="Collapsed"
+                HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="8,36,8,0"
+                Background="{DynamicResource HexSurfaceBrush}" BorderBrush="{DynamicResource HexBorderBrush}"
+                BorderThickness="1" Padding="6">
+            <DockPanel>
+                <ui:Button DockPanel.Dock="Right" Content="Cancel" Padding="10,3" Click="CancelFileOperation_Click" />
+                <StackPanel>
+                    <TextBlock x:Name="FileOperationText" Text="Working..." Margin="0,0,0,3" />
+                    <ProgressBar x:Name="FileOperationProgress" Height="8" IsIndeterminate="True" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        </Grid>
     </DockPanel>
 </Window>
