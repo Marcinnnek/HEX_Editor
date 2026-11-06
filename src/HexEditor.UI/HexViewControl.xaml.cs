@@ -10,7 +10,6 @@ using System.Globalization;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.ComponentModel;
-using HexEditor.Compare;
 
 namespace HexEditor.UI;
 
@@ -29,8 +28,7 @@ public partial class HexViewControl : UserControl
     private bool _hasRefreshedDuringDrag;
     private int? _pendingDragRow;
     private readonly DispatcherTimer _dragRefreshTimer;
-    private int _windowStart;
-    private int _visibleRowCount = 24;
+    private readonly RowViewportState _viewport = new();
     private int _selectedRowIndex = -1;
     private static readonly DependencyPropertyKey HexDataColumnWidthPropertyKey = DependencyProperty.RegisterReadOnly(
         nameof(HexDataColumnWidth), typeof(double), typeof(HexViewControl), new PropertyMetadata(0d));
@@ -112,7 +110,7 @@ public partial class HexViewControl : UserControl
     public double HexDataColumnWidth => (double)GetValue(HexDataColumnWidthProperty);
     public double HexDataContentWidth => (double)GetValue(HexDataContentWidthProperty);
 
-    public int FirstVisibleRowIndex => _windowStart;
+    public int FirstVisibleRowIndex => _viewport.FirstRowIndex;
 
     public DataGrid ItemsGrid => HexGrid;
 
@@ -311,31 +309,10 @@ public partial class HexViewControl : UserControl
         if (e.OldValue is INotifyCollectionChanged previous)
             previous.CollectionChanged -= control.ItemsSource_CollectionChanged;
 
-        var nextStart = 0;
-        if (e.OldValue is SparseRowList<HexViewRow> oldRows &&
-            e.NewValue is SparseRowList<HexViewRow> newRows &&
-            oldRows.SourceIdentity is not null &&
-            ReferenceEquals(oldRows.SourceIdentity, newRows.SourceIdentity))
-        {
-            if (control.RowThumb.Maximum > 0 && control._windowStart >= control.RowThumb.Maximum)
-            {
-                nextStart = Math.Max(0, newRows.Count - control._visibleRowCount);
-            }
-            else if ((uint)control._windowStart < (uint)oldRows.Count)
-            {
-                var oldRow = oldRows[control._windowStart];
-                if (!oldRow.IsGapMarker && HexAddressParser.TryParse(oldRow.Address, out var address) &&
-                    newRows.TryGetRowIndex(address, out var rowIndex))
-                    nextStart = rowIndex;
-                else
-                    nextStart = (int)((long)control._windowStart * newRows.Count / oldRows.Count);
-            }
-        }
-
+        control._viewport.ReplaceRows(e.NewValue as IList<HexViewRow>);
         if (e.NewValue is INotifyCollectionChanged current)
             current.CollectionChanged += control.ItemsSource_CollectionChanged;
         control.HexGrid.ItemsSource = control.UseWindowedScrolling ? null : e.NewValue as IEnumerable;
-        control._windowStart = nextStart;
         control.RefreshWindow();
     }
 
@@ -354,7 +331,7 @@ public partial class HexViewControl : UserControl
         control.HexGrid.Visibility = enabled ? Visibility.Collapsed : Visibility.Visible;
         control.WindowedView.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
         ScrollViewer.SetCanContentScroll(control.WindowedScroll, enabled);
-        control._windowStart = 0;
+        control._viewport.ResetToStart();
         control.RefreshWindow();
     }
 
@@ -362,29 +339,25 @@ public partial class HexViewControl : UserControl
     {
         if (ItemsSource is not IList<HexViewRow> rows || rows.Count == 0) return;
         CancelPendingDrag();
-        var max = Math.Max(0, rows.Count - _visibleRowCount);
-        var previousStart = _windowStart;
-        _windowStart = Math.Clamp(index, 0, max);
+        var previousStart = _viewport.FirstRowIndex;
+        _viewport.MoveTo(index);
         _refreshingWindow = true;
-        RowThumb.Value = _windowStart;
+        RowThumb.Value = _viewport.FirstRowIndex;
         _refreshingWindow = false;
         RefreshWindow();
-        if (_windowStart != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
+        if (_viewport.FirstRowIndex != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void RefreshWindow()
     {
         if (!UseWindowedScrolling || !IsLoaded || ItemsSource is not IList<HexViewRow> rows) return;
-        var wasAtEnd = RowThumb.Maximum > 0 && _windowStart >= RowThumb.Maximum;
-        _visibleRowCount = GetVisibleRowCount();
-        var maxStart = Math.Max(0, rows.Count - _visibleRowCount);
-        _windowStart = wasAtEnd ? maxStart : Math.Clamp(_windowStart, 0, maxStart);
+        _viewport.SetVisibleRowCount(GetVisibleRowCount());
         _refreshingWindow = true;
-        RowThumb.Maximum = maxStart;
-        RowThumb.ViewportSize = GetVisibleThumbViewport(maxStart);
-        RowThumb.Value = _windowStart;
+        RowThumb.Maximum = _viewport.MaximumStart;
+        RowThumb.ViewportSize = GetVisibleThumbViewport(_viewport.MaximumStart);
+        RowThumb.Value = _viewport.FirstRowIndex;
         _refreshingWindow = false;
-        WindowRows.ReplaceAll(rows, _windowStart, Math.Min(rows.Count, _windowStart + _visibleRowCount));
+        WindowRows.ReplaceAll(rows, _viewport.FirstRowIndex, _viewport.EndExclusive);
         foreach (var item in WindowRows) item.IsSelected = item.RowIndex == _selectedRowIndex;
     }
 
@@ -423,11 +396,11 @@ public partial class HexViewControl : UserControl
         var trackHeight = track is { ActualHeight: > 0 }
             ? track.ActualHeight
             : Math.Max(0, WindowedView.ActualHeight - 36);
-        if (maxStart == 0 || trackHeight <= minimumReservedThumbHeight) return _visibleRowCount;
+        if (maxStart == 0 || trackHeight <= minimumReservedThumbHeight) return _viewport.VisibleRowCount;
 
         var minimumViewport = Math.Ceiling((double)maxStart * minimumReservedThumbHeight /
             (trackHeight - minimumReservedThumbHeight));
-        return Math.Max(_visibleRowCount, minimumViewport);
+        return Math.Max(_viewport.VisibleRowCount, minimumViewport);
     }
 
     private void RowThumb_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -472,11 +445,11 @@ public partial class HexViewControl : UserControl
         if (_pendingDragRow is not int rowIndex) return;
         _pendingDragRow = null;
         _hasRefreshedDuringDrag = true;
-        if (_windowStart == rowIndex) return;
-        var previousStart = _windowStart;
-        _windowStart = rowIndex;
+        if (_viewport.FirstRowIndex == rowIndex) return;
+        var previousStart = _viewport.FirstRowIndex;
+        _viewport.MoveTo(rowIndex);
         RefreshWindow();
-        if (_windowStart != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
+        if (_viewport.FirstRowIndex != previousStart) FirstVisibleRowChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void WindowedScroll_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -635,7 +608,7 @@ public partial class HexViewControl : UserControl
             return;
         }
         if (UseWindowedScrolling)
-            SetWindowStart(_windowStart + _byteDragScrollDirection);
+            SetWindowStart(_viewport.FirstRowIndex + _byteDragScrollDirection);
         else
         {
             var viewer = FindScrollViewer(HexGrid);
