@@ -37,6 +37,9 @@ Combining two memory images by absolute address, with explicit handling for addr
 **Comparison difference**:
 An absolute address where two memory images contain unequal byte values or where only one image contains a byte. An address absent from both images is not a difference.
 
+**Comparison cursor**:
+The base or reference image side and address used as the starting point for navigation within an open comparison. The address may come from a selected byte, a visible row, or an address entered by the user.
+
 **Edited byte**:
 An occupied byte whose current value differs from the value at the same address in the image's last saved state, including a byte newly added at that address. A removed byte has no visible cell in the Editor.
 

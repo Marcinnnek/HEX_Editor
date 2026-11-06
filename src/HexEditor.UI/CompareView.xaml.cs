@@ -13,11 +13,7 @@ namespace HexEditor.UI;
 public partial class CompareView : UserControl
 {
     private bool _syncingScroll;
-    private ComparePanelSide _lastSelectedSide = ComparePanelSide.Base;
-    private uint? _selectedByteAddress;
-    private uint? _rowWidthChangeAddress;
-    private bool _rowWidthChangeHadByteSelection;
-    private ComparePanelSide _rowWidthChangeSide;
+    private readonly CompareNavigationSession _navigation;
 
     public CompareView(CompareWorkspaceTabViewModel workspace)
     {
@@ -25,9 +21,10 @@ public partial class CompareView : UserControl
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopySelection_Executed, CopySelection_CanExecute));
         Workspace = workspace ?? throw new ArgumentNullException(nameof(workspace));
         ViewModel = workspace.Comparison;
+        _navigation = new CompareNavigationSession(ViewModel);
+        AddressBox.TextChanged += (_, _) => _navigation.SetAddressDraft(AddressBox.Text);
         ViewModes = Enum.GetValues<CompareViewMode>();
         DataContext = this;
-        _rowWidthChangeSide = _lastSelectedSide;
         ViewModel.BytesPerRowChanging += ViewModel_BytesPerRowChanging;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         FileAView.UseWindowedScrolling = true;
@@ -38,9 +35,8 @@ public partial class CompareView : UserControl
 
     public CompareWorkspaceTabViewModel Workspace { get; }
     public CompareViewModel ViewModel { get; }
-    public (ComparePanelSide Side, uint Address)? CurrentFindCursor => SelectedAddress() is uint address
-        ? (_lastSelectedSide, address)
-        : null;
+    public (ComparePanelSide Side, uint Address)? CurrentFindCursor =>
+        _navigation.CurrentCursor(VisibleRowAddress(), ViewModel.BytesPerRow, FileAView.UseWindowedScrolling);
     public IReadOnlyList<int> SelectedBaseSegmentIndexes => FileABlocks.SelectedItems
         .Cast<CompareMemoryBlockRow>().Select(row => Workspace.BlocksA.IndexOf(row)).Where(index => index >= 0).ToArray();
     public CompareViewMode[] ViewModes { get; }
@@ -48,7 +44,7 @@ public partial class CompareView : UserControl
     public event Action<string>? StatusRequested;
     public event Action<string, Exception, ComparePanelSide, int, uint?>? InteractionFailed;
 
-    private HexViewControl SelectedPanel => _lastSelectedSide == ComparePanelSide.Base ? FileAView : FileBView;
+    private HexViewControl SelectedPanel => _navigation.Side == ComparePanelSide.Base ? FileAView : FileBView;
 
     private void CopySelection_CanExecute(object sender, CanExecuteRoutedEventArgs e)
     {
@@ -60,7 +56,7 @@ public partial class CompareView : UserControl
     private void CopySelection_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         var panel = SelectedPanel;
-        var image = _lastSelectedSide == ComparePanelSide.Base ? ViewModel.FileA : ViewModel.FileB;
+        var image = _navigation.Side == ComparePanelSide.Base ? ViewModel.FileA : ViewModel.FileB;
         SelectionClipboardText.TryCopy(image, panel.SelectionStart, panel.SelectionEnd, panel.ClipboardFormat);
         e.Handled = true;
     }
@@ -83,9 +79,10 @@ public partial class CompareView : UserControl
     private void Panel_AddressRowSelected(object? sender, AddressRowSelectedEventArgs e)
     {
         if (sender is not HexViewControl panel) return;
-        _lastSelectedSide = SideOf(panel);
         var rowAddress = HexAddressParser.TryParse(e.Row.Address, out var address) ? address : (uint?)null;
-        SelectAddressRow(e.RowIndex, e.Row, rowAddress);
+        _navigation.SelectAddressRow(SideOf(panel), e.Row.IsGapMarker ? null : rowAddress);
+        SelectAddressRow(e.RowIndex);
+        AddressBox.Text = _navigation.AddressText;
     }
 
     private ComparePanelSide SideOf(object panel) => ReferenceEquals(panel, FileAView) ||
@@ -108,19 +105,16 @@ public partial class CompareView : UserControl
 
     public bool NavigateToAddress(uint address)
     {
-        if (!ViewModel.TryNavigateToAddress(address, out var rowIndex)) return false;
-        Navigate(address);
-        return rowIndex >= 0;
+        if (!_navigation.TryNavigate(address, out var rowIndex)) return false;
+        ApplyNavigation(rowIndex);
+        return true;
     }
 
     public void NavigateToFindMatch(ComparePanelSide side, uint start, uint end)
     {
-        _lastSelectedSide = side;
-        _selectedByteAddress = start;
-        ViewModel.ClearFindMatch();
-        ViewModel.SetFindMatch(side == ComparePanelSide.Base, start, end);
-        AddressBox.Text = start.ToString("X8");
-        if (!ViewModel.TryNavigateToAddress(start, out var rowIndex)) return;
+        var found = _navigation.NavigateToFindMatch(side, start, end, out var rowIndex);
+        AddressBox.Text = _navigation.AddressText;
+        if (!found) return;
         SelectFindMatchRow(rowIndex);
     }
 
@@ -151,7 +145,7 @@ public partial class CompareView : UserControl
                 address = hitAddress;
             }
 
-            _lastSelectedSide = side;
+            _navigation.FocusSide(side);
             if (e.ClickCount == 1)
             {
                 // Byte clicks are handled by HexViewControl, which retains shift-range selection.
@@ -171,12 +165,11 @@ public partial class CompareView : UserControl
         }
     }
 
-    private void SelectAddressRow(int rowIndex, HexViewRow row, uint? rowStart)
+    private void SelectAddressRow(int rowIndex)
     {
         _syncingScroll = true;
         try
         {
-            _selectedByteAddress = null;
             FileAView.SetSelectedRow(rowIndex);
             FileBView.SetSelectedRow(rowIndex);
             if (!FileAView.UseWindowedScrolling)
@@ -184,8 +177,6 @@ public partial class CompareView : UserControl
                 FileAView.ItemsGrid.SelectedIndex = -1;
                 FileBView.ItemsGrid.SelectedIndex = -1;
             }
-            if (!row.IsGapMarker && rowStart is uint address)
-                AddressBox.Text = address.ToString("X8");
         }
         finally { _syncingScroll = false; }
     }
@@ -204,7 +195,7 @@ public partial class CompareView : UserControl
                 !ViewModel.TryNavigateToAddress(rowStartAddress, out rowIndex)) return;
 
             address = hitAddress;
-            _lastSelectedSide = side;
+            _navigation.FocusSide(side);
             e.MouseEvent.Handled = true;
             ActivateSelectedRow(side, rowIndex, rowStartAddress, hitAddress);
         }
@@ -247,12 +238,11 @@ public partial class CompareView : UserControl
 
     private void Go_Click(object sender, RoutedEventArgs e)
     {
-        if (!HexAddressParser.TryParse(AddressBox.Text, out var address) || !ViewModel.TryNavigateToAddress(address, out var rowIndex))
+        if (!_navigation.TryGo(out var rowIndex))
         {
             MessageBox.Show(Window.GetWindow(this), "Enter an address in the displayed comparison range.", "Address not found", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        _selectedByteAddress = address;
         SelectRow(rowIndex);
     }
 
@@ -275,25 +265,16 @@ public partial class CompareView : UserControl
 
     private void ViewModel_BytesPerRowChanging()
     {
-        _rowWidthChangeAddress = SelectedAddress();
-        _rowWidthChangeHadByteSelection = _selectedByteAddress is not null;
-        _rowWidthChangeSide = _lastSelectedSide;
+        _navigation.BeginRowWidthChange(VisibleRowAddress(), ViewModel.BytesPerRow, FileAView.UseWindowedScrolling);
     }
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(CompareViewModel.BytesPerRow)) return;
 
-        var address = _rowWidthChangeAddress;
-        var hadByteSelection = _rowWidthChangeHadByteSelection;
-        _lastSelectedSide = _rowWidthChangeSide;
-        _rowWidthChangeAddress = null;
-        _rowWidthChangeHadByteSelection = false;
-
         FileAView.UseWindowedScrolling = true;
         FileBView.UseWindowedScrolling = true;
-        if (address is not uint selectedAddress || !ViewModel.TryNavigateToAddress(selectedAddress, out var rowIndex)) return;
-        if (hadByteSelection) _selectedByteAddress = selectedAddress;
+        if (!_navigation.FinishRowWidthChange(out var rowIndex)) return;
         SelectRow(rowIndex);
     }
 
@@ -302,22 +283,19 @@ public partial class CompareView : UserControl
         uint? context = null;
         try
         {
-            var selected = SelectedAddress();
-            var hasAddressText = !string.IsNullOrWhiteSpace(AddressBox.Text);
-            var hasValidAnchor = HexAddressParser.TryParse(AddressBox.Text, out var parsedAddress);
-            if (selected is null && hasAddressText && !hasValidAnchor)
+            var visibleRowAddress = VisibleRowAddress();
+            context = _navigation.DifferenceContext(visibleRowAddress, ViewModel.BytesPerRow, FileAView.UseWindowedScrolling);
+            var result = _navigation.NavigateDifference(forward, visibleRowAddress, ViewModel.BytesPerRow,
+                FileAView.UseWindowedScrolling);
+            if (result.Kind == CompareDifferenceNavigationKind.InvalidAddress)
             {
                 StatusRequested?.Invoke("Enter a valid hexadecimal address to navigate differences.");
                 return;
             }
-            uint? anchor = hasValidAnchor ? parsedAddress : null;
-            context = selected ?? anchor;
-            var found = forward
-                ? ViewModel.TryFindNextDifferenceFromAddress(selected, anchor, out var address)
-                : ViewModel.TryFindPreviousDifferenceFromAddress(selected, anchor, out address);
-            if (found)
+            if (result.Kind == CompareDifferenceNavigationKind.Found)
             {
-                Navigate(address);
+                AddressBox.Text = _navigation.AddressText;
+                ApplyNavigation(result.RowIndex);
                 return;
             }
 
@@ -326,33 +304,29 @@ public partial class CompareView : UserControl
         catch (Exception exception)
         {
             ReportInteractionFailure(forward ? "Next Difference" : "Previous Difference",
-                _lastSelectedSide, -1, context, exception);
+                _navigation.Side, -1, context, exception);
         }
     }
 
-    private uint? SelectedAddress()
+    private uint? VisibleRowAddress()
     {
-        if (FileAView.UseWindowedScrolling && _selectedByteAddress is uint selectedByte)
-            return selectedByte;
         var selected = FileAView.UseWindowedScrolling && FileAView.WindowRows.Count > 0
             ? FileAView.WindowRows[0].Row : FileAView.ItemsGrid.SelectedItem as HexViewRow;
-        if (selected is { } row && HexAddressParser.TryParse(row.Address, out var rowAddress))
-        {
-            if (HexAddressParser.TryParse(AddressBox.Text, out var byteAddress) &&
-                (ulong)byteAddress >= rowAddress && (ulong)byteAddress < (ulong)rowAddress + (uint)ViewModel.BytesPerRow)
-                return byteAddress;
-            return rowAddress;
-        }
-        return null;
+        return selected is { } row && HexAddressParser.TryParse(row.Address, out var address) ? address : null;
     }
 
     private void Navigate(uint address)
     {
+        var navigated = _navigation.Navigate(address, out var rowIndex);
+        AddressBox.Text = _navigation.AddressText;
+        ApplyNavigation(navigated ? rowIndex : -1);
+    }
+
+    private void ApplyNavigation(int rowIndex)
+    {
         FileAView.SetSelectedRow(-1);
         FileBView.SetSelectedRow(-1);
-        _selectedByteAddress = address;
-        AddressBox.Text = address.ToString("X8");
-        if (ViewModel.TryNavigateToAddress(address, out var rowIndex)) SelectRow(rowIndex);
+        if (rowIndex >= 0) SelectRow(rowIndex);
     }
 
     private void SelectRow(int index)
@@ -403,7 +377,7 @@ public partial class CompareView : UserControl
         var side = SideOf(source);
         try
         {
-            _lastSelectedSide = side;
+            _navigation.FocusSide(side);
             _syncingScroll = true;
             var target = OppositeGrid(side);
             if ((uint)source.SelectedIndex < (uint)target.Items.Count)
@@ -412,7 +386,10 @@ public partial class CompareView : UserControl
                 target.SelectedIndex = source.SelectedIndex;
                 target.ScrollIntoView(targetRow);
                 if (source.SelectedItem is HexViewRow row && HexAddressParser.TryParse(row.Address, out var address))
-                    AddressBox.Text = address.ToString("X8");
+                {
+                    _navigation.ObserveGridRow(side, address);
+                    AddressBox.Text = _navigation.AddressText;
+                }
             }
         }
         catch (Exception exception)
@@ -429,11 +406,10 @@ public partial class CompareView : UserControl
         FileAView.SetSelectedRow(-1);
         FileBView.SetSelectedRow(-1);
         var side = SideOf(sender!);
-        _lastSelectedSide = side;
         try
         {
-            _selectedByteAddress = e.EndAddress;
-            AddressBox.Text = e.EndAddress.ToString("X8");
+            _navigation.SelectByte(side, e.EndAddress);
+            AddressBox.Text = _navigation.AddressText;
         }
         catch (Exception exception) { ReportInteractionFailure("single-click", side, -1, e.EndAddress, exception); }
     }
@@ -464,12 +440,13 @@ public partial class CompareView : UserControl
         if (_syncingScroll || sender is not HexViewControl source) return;
         try
         {
-            _selectedByteAddress = null;
             var target = ReferenceEquals(source, FileAView) ? FileBView : FileAView;
             _syncingScroll = true;
             target.ScrollToRow(source.FirstVisibleRowIndex);
-            if (source.WindowRows.Count > 0 && HexAddressParser.TryParse(source.WindowRows[0].Row.Address, out var address))
-                AddressBox.Text = address.ToString("X8");
+            var firstAddress = source.WindowRows.Count > 0 &&
+                HexAddressParser.TryParse(source.WindowRows[0].Row.Address, out var address) ? address : (uint?)null;
+            _navigation.ScrollToFirstRow(firstAddress);
+            AddressBox.Text = _navigation.AddressText;
         }
         catch (Exception exception)
         {

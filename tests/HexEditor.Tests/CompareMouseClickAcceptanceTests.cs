@@ -46,6 +46,7 @@ public sealed class CompareMouseClickAcceptanceTests
 
                 var panels = FindChildren<HexViewControl>(view).ToArray();
                 Assert.HasCount(2, panels);
+                foreach (var panel in panels) panel.UseWindowedScrolling = false;
                 foreach (var panel in panels)
                 {
                     var grid = panel.ItemsGrid;

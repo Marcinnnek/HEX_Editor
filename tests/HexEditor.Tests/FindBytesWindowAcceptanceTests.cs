@@ -342,10 +342,10 @@ public sealed class FindBytesWindowAcceptanceTests
                 tabs.SelectedIndex = tabs.Items.Count - 1;
                 main.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
 
-                var baseTargetRowIndex = Enumerable.Range(0, compare.FileAView.ItemsGrid.Items.Count)
-                    .Single(index => ((HexViewRow)compare.FileAView.ItemsGrid.Items[index]).Address == "000011F0");
-                var referenceTargetRowIndex = Enumerable.Range(0, compare.FileBView.ItemsGrid.Items.Count)
-                    .Single(index => ((HexViewRow)compare.FileBView.ItemsGrid.Items[index]).Address == "000021F0");
+                var baseTargetRowIndex = Enumerable.Range(0, compare.ViewModel.FileARows.Count)
+                    .Single(index => compare.ViewModel.FileARows[index].Address == "000011F0");
+                var referenceTargetRowIndex = Enumerable.Range(0, compare.ViewModel.FileBRows.Count)
+                    .Single(index => compare.ViewModel.FileBRows[index].Address == "000021F0");
                 var aScroll = Descendants<ScrollViewer>(compare.FileAView).Single(viewer => ScrollViewer.GetCanContentScroll(viewer));
                 var bScroll = Descendants<ScrollViewer>(compare.FileBView).Single(viewer => ScrollViewer.GetCanContentScroll(viewer));
                 aScroll.ScrollToHorizontalOffset(100);
@@ -417,6 +417,12 @@ public sealed class FindBytesWindowAcceptanceTests
     {
         view.UpdateLayout();
         view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+        if (view.UseWindowedScrolling)
+        {
+            Assert.AreEqual(rowIndex, view.FirstVisibleRowIndex,
+                $"The synchronized row {rowIndex} should be the first rendered data row.");
+            return;
+        }
         var firstVisibleIndex = Enumerable.Range(0, view.ItemsGrid.Items.Count)
             .Select(index => (Index: index, Row: view.ItemsGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow))
             .Where(item => item.Row is { IsVisible: true, ActualHeight: > 0 } && RowIntersectsViewport(item.Row, scroll))
