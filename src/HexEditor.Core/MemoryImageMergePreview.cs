@@ -52,14 +52,36 @@ public sealed class MemoryImageMergePreview
             .ToArray();
         ValidateOverrides(overrides);
 
+        if (overrides.Length == 0)
+            return Destination.WithRangesOverlay(Source.Ranges,
+                overwriteExisting: defaultChoice == MemoryImageMergeChoice.KeepSource);
+
+        // Keep all source-only addresses, then overlay source slices where the user chose it.
+        // Working with logical ranges also preserves repeated ranges larger than a materialized segment.
+        var result = Destination.WithRangesOverlay(Source.Ranges, overwriteExisting: false);
+        var sourceWins = new List<MemoryImageRange>();
         var overrideIndex = 0;
-        return MemoryImageSparseOverlay.Combine(Destination, Source, (address, hasDestination, destinationValue, hasSource, sourceValue) =>
+        foreach (var sourceRange in Source.Ranges)
         {
-            var choice = GetChoice(address, overrides, ref overrideIndex, defaultChoice.Value);
-            return hasSource && (!hasDestination || choice == MemoryImageMergeChoice.KeepSource)
-                ? sourceValue
-                : destinationValue;
-        });
+            ulong cursor = sourceRange.StartAddress;
+            while (cursor <= sourceRange.EndAddress)
+            {
+                while (overrideIndex < overrides.Length && overrides[overrideIndex].EndAddress < cursor)
+                    overrideIndex++;
+                var choice = GetChoice((uint)cursor, overrides, ref overrideIndex, defaultChoice.Value);
+                var nextBoundary = (ulong)sourceRange.EndAddress + 1;
+                if (overrideIndex < overrides.Length)
+                {
+                    var current = overrides[overrideIndex];
+                    nextBoundary = Math.Min(nextBoundary, cursor < current.StartAddress
+                        ? current.StartAddress : (ulong)current.EndAddress + 1);
+                }
+                if (choice == MemoryImageMergeChoice.KeepSource)
+                    sourceWins.Add(sourceRange.Slice((uint)cursor, (uint)(nextBoundary - 1)));
+                cursor = nextBoundary;
+            }
+        }
+        return result.WithRangesOverlay(sourceWins, overwriteExisting: true);
     }
 
     private static MemoryImageOverlapRange[] SummarizeOverlaps(MemoryImage destination, MemoryImage source)
@@ -73,21 +95,29 @@ public sealed class MemoryImageMergePreview
         long identical = 0;
         long different = 0;
 
-        while (destinationIndex < destination.Segments.Count && sourceIndex < source.Segments.Count)
+        while (destinationIndex < destination.Ranges.Count && sourceIndex < source.Ranges.Count)
         {
-            var destinationSegment = destination.Segments[destinationIndex];
-            var sourceSegment = source.Segments[sourceIndex];
-            var start = Math.Max(destinationSegment.StartAddress, sourceSegment.StartAddress);
-            var end = Math.Min(destinationSegment.EndAddress, sourceSegment.EndAddress);
+            var destinationRange = destination.Ranges[destinationIndex];
+            var sourceRange = source.Ranges[sourceIndex];
+            var start = Math.Max(destinationRange.StartAddress, sourceRange.StartAddress);
+            var end = Math.Min(destinationRange.EndAddress, sourceRange.EndAddress);
             if (start <= end)
             {
                 if (total > 0 && currentEnd + 1 != start) Flush();
                 if (total == 0) currentStart = start;
 
-                for (var address = (ulong)start; address <= end; address++)
+                var leftSlice = destinationRange.Slice(start, end);
+                var rightSlice = sourceRange.Slice(start, end);
+                if (leftSlice.ContentEquals(rightSlice))
                 {
-                    var left = destinationSegment.Data.Span[(int)(address - destinationSegment.StartAddress)];
-                    var right = sourceSegment.Data.Span[(int)(address - sourceSegment.StartAddress)];
+                    var count = checked((long)leftSlice.ByteCount);
+                    total += count;
+                    identical += count;
+                }
+                else for (var address = (ulong)start; address <= end; address++)
+                {
+                    leftSlice.TryGetByte((uint)address, out var left);
+                    rightSlice.TryGetByte((uint)address, out var right);
                     total++;
                     if (left == right) identical++;
                     else different++;
@@ -95,8 +125,8 @@ public sealed class MemoryImageMergePreview
                 currentEnd = end;
             }
 
-            if (destinationSegment.EndAddress <= sourceSegment.EndAddress) destinationIndex++;
-            if (sourceSegment.EndAddress <= destinationSegment.EndAddress) sourceIndex++;
+            if (destinationRange.EndAddress <= sourceRange.EndAddress) destinationIndex++;
+            if (sourceRange.EndAddress <= destinationRange.EndAddress) sourceIndex++;
         }
 
         Flush();

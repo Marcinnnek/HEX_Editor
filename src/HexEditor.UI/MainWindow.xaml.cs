@@ -12,6 +12,7 @@ using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using HexEditor.Core;
+using HexEditor.Compare;
 using HexEditor.Formats;
 using HexEditor.Tools;
 using MessageBox = HexEditor.UI.ThemedMessageBox;
@@ -45,6 +46,7 @@ public partial class MainWindow : Window
     private bool _suppressSegmentNavigation;
     private bool _confirmingApplicationClose;
     private bool _closeAfterConfirmation;
+    private bool _syncingRowWidth;
 
     public MainWindow()
     {
@@ -53,14 +55,14 @@ public partial class MainWindow : Window
         AddHandler(DragDrop.PreviewDragOverEvent, new DragEventHandler(FileDrop_DragOver), handledEventsToo: true);
         AddHandler(DragDrop.PreviewDropEvent, new DragEventHandler(FileDrop_Drop), handledEventsToo: true);
         CommandBindings.Add(new CommandBinding(ApplicationCommands.Copy, CopySelection_Executed, CopySelection_CanExecute));
+        CommandBindings.Add(new CommandBinding(ApplicationCommands.Paste, PasteClipboard_Executed, PasteClipboard_CanExecute));
         ViewModel = new MainViewModel { DefaultBytesPerRow = RowWidthSettings.Current.DefaultBytesPerRow };
         ViewModel.ImageChanged += (_, _) => InvalidateFind("Image changed. Search again.");
         ViewModel.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(MainViewModel.ActiveBytesPerRow))
             {
-                if (RowWidthBox.Text != ViewModel.ActiveBytesPerRow.ToString(CultureInfo.InvariantCulture))
-                    RowWidthBox.Text = ViewModel.ActiveBytesPerRow.ToString(CultureInfo.InvariantCulture);
+                SynchronizeRowWidthBox();
                 if (!ViewModel.ActiveIsEditor) return;
                 var address = ViewModel.EditorStatus.CurrentAddress;
                 if (address is null) return;
@@ -79,6 +81,7 @@ public partial class MainWindow : Window
         HexRowsView.ItemsGrid.AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler(EditorRow_DoubleClick), handledEventsToo: true);
         HexRowsView.WindowedByteDoubleClicked += EditorWindowedByte_DoubleClick;
         HexRowsView.AddressRowSelected += Editor_AddressRowSelected;
+        HexRowsView.KeyDown += SelectedBytes_KeyDown;
         DataContext = this;
         Closing += MainWindow_Closing;
         _windowsAppearance = new WindowsAppearanceSource(this);
@@ -266,8 +269,21 @@ public partial class MainWindow : Window
 
     private void RowWidthBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingRowWidth) return;
         if (RowWidthBox.SelectedItem is int width && width != ViewModel.ActiveBytesPerRow)
             ViewModel.ActiveBytesPerRow = width;
+    }
+
+    private void SynchronizeRowWidthBox()
+    {
+        _syncingRowWidth = true;
+        try
+        {
+            var width = ViewModel.ActiveBytesPerRow;
+            RowWidthBox.SelectedItem = ViewModel.RowWidths.Contains(width) ? width : null;
+            RowWidthBox.Text = width.ToString(CultureInfo.InvariantCulture);
+        }
+        finally { _syncingRowWidth = false; }
     }
 
     private void RowWidthBox_PreviewTextInput(object sender, TextCompositionEventArgs e) =>
@@ -280,7 +296,17 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void RowWidthBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitRowWidth();
+    private void RowWidthBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        // A tab click may blur the editable ComboBox before SelectionChanged updates
+        // the active tab. Finish the focus transition before deciding whether to commit.
+        var tabAtBlur = WorkspaceTabs.SelectedItem;
+        _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+        {
+            if (!ReferenceEquals(tabAtBlur, WorkspaceTabs.SelectedItem)) SynchronizeRowWidthBox();
+            else CommitRowWidth();
+        }));
+    }
 
     private void RowWidthBox_Pasting(object sender, DataObjectPastingEventArgs e)
     {
@@ -323,10 +349,15 @@ public partial class MainWindow : Window
                 {
                     WorkspaceTabs.SelectedIndex = 0;
                 }, token, progress, baseDocument,
-                mismatch => ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch")));
+                mismatch => ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch"),
+                ChooseImportOverlap));
             if (comparison is null) return;
 
             var view = new CompareView(comparison);
+            view.FileAView.KeyDown += SelectedBytes_KeyDown;
+            view.BaseFillWithPatternRequested += (_, _) => Fill_Click(view, new RoutedEventArgs());
+            view.BasePasteClipboardRequested += (_, _) => PasteClipboardBytes();
+            view.BaseDeleteRequested += (_, _) => DeleteSelectedBytes();
             view.StatusRequested += ViewModel.ReportCompareInteraction;
             view.InteractionFailed += (operation, exception, side, rowIndex, address) =>
             {
@@ -370,51 +401,31 @@ public partial class MainWindow : Window
         {
             var editorDocument = ViewModel.Workspace.Document;
             var editorHasImage = editorDocument.CurrentImage.OccupiedByteCount > 0;
-            string? destinationPath = null;
-            string sourcePath;
-            if (editorHasImage)
-            {
-                var sourceDialog = FirmwareImageDialog.CreateOpen(
-                    "Select the source image to merge",
-                    editorDocument.SourcePath is null ? null : System.IO.Path.GetDirectoryName(editorDocument.SourcePath));
-                if (sourceDialog.ShowDialog(this) != true) return;
-                sourcePath = sourceDialog.FileName;
-            }
-            else
-            {
-                var destinationDialog = FirmwareImageDialog.CreateOpen("Select the destination image");
-                if (destinationDialog.ShowDialog(this) != true) return;
-                destinationPath = destinationDialog.FileName;
-                var sourceDialog = FirmwareImageDialog.CreateOpen("Select the source image to merge",
-                    System.IO.Path.GetDirectoryName(destinationPath));
-                if (sourceDialog.ShowDialog(this) != true) return;
-                sourcePath = sourceDialog.FileName;
-            }
+            var editorName = editorHasImage
+                ? (editorDocument.SourcePath is null ? "Untitled" : System.IO.Path.GetFileName(editorDocument.SourcePath))
+                : null;
+            var orderDialog = new OrderedMergeFilesDialog(editorName) { Owner = this };
+            if (orderDialog.ShowDialog() != true) return;
+            var paths = orderDialog.Paths;
+            var loaded = await LoadOrderedMergeImagesAsync(paths);
+            foreach (var image in loaded)
+                if (image.FormatMismatch is { } mismatch &&
+                    !ThemedMessageBox.ShowMergeAnyway(this, mismatch.Message, "Filename format mismatch")) return;
 
-            var diskImages = editorHasImage
-                ? (First: (LoadedMemoryImage?)null, Second: await LoadMergeImageAsync(sourcePath, "Source image"))
-                : await LoadMergeImagesAsync(destinationPath!, sourcePath);
-            // Always read the selected source from disk. This intentionally handles a source path
-            // equal to the Editor path as the saved version rather than its in-memory document.
-            var imageA = editorHasImage
-                ? new LoadedMemoryImage(editorDocument.CurrentImage, editorDocument.SourcePath, editorDocument.SourceFormat)
-                : diskImages.First!;
-            var imageB = diskImages.Second;
-            if (!_files.ConfirmMergeFormats(imageA, imageB, mismatch =>
-                    ThemedMessageBox.ShowMergeAnyway(this, mismatch.Message, "Filename format mismatch"))) return;
-            var destinationName = editorHasImage
-                ? (editorDocument.SourcePath is null ? "Untitled" : System.IO.Path.GetFileName(editorDocument.SourcePath) ?? "Editor")
-                : System.IO.Path.GetFileName(destinationPath!) ?? "Destination";
-            var sourceName = System.IO.Path.GetFileName(sourcePath) ?? sourcePath;
-            var dialog = new MergeWindow(imageA.Image, imageB.Image,
-                destinationName, sourceName, fixedDestination: editorHasImage) { Owner = this };
-            if (dialog.ShowDialog() != true) return;
-
-            var destination = ReferenceEquals(dialog.DestinationImage, imageA.Image) ? imageA : imageB;
-            if (!ReferenceEquals(ViewModel.CurrentImage, destination.Image) &&
-                !await ConfirmCloseImageAsync(ViewModel.Workspace.Document)) return;
-            if (!_files.ApplyMerge(destination, dialog.Preview, dialog.DefaultChoice, dialog.RangeOverrides,
-                    () => true)) return;
+            var preview = await RunFileOperationAsync((token, _) => Task.Run(() =>
+            {
+                token.ThrowIfCancellationRequested();
+                var staged = editorDocument.Editing.PreviewOrderedMerge(loaded.Select(image => image.Image));
+                token.ThrowIfCancellationRequested();
+                return staged;
+            }, token));
+            var names = (editorHasImage ? new[] { editorName! } : Array.Empty<string>())
+                .Concat(paths.Select(path => System.IO.Path.GetFileName(path) ?? path)).ToArray();
+            var previewDialog = new OrderedMergePreviewDialog(preview, names) { Owner = this };
+            if (previewDialog.ShowDialog() != true) return;
+            editorDocument.Editing.ApplyOrderedMerge(preview);
+            ViewModel.ReportCompareInteraction($"Merged {paths.Count:N0} file(s) in order." +
+                (editorHasImage ? string.Empty : " Save As to write the result."));
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Merge"); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or FormatException or ArgumentException or InvalidOperationException)
@@ -432,16 +443,21 @@ public partial class MainWindow : Window
             return (first, second);
         });
 
-    private Task<LoadedMemoryImage> LoadMergeImageAsync(string path, string stage) =>
-        RunFileOperationAsync((token, progress) => _comparisonImageLoader.LoadReferenceAsync(
-            path, token, AddProgressStage(progress, stage)));
-
-    private Task<(LoadedMemoryImage First, LoadedMemoryImage Second)> LoadMergeImagesAsync(string firstPath, string secondPath) =>
+    private Task<IReadOnlyList<LoadedMemoryImage>> LoadOrderedMergeImagesAsync(IReadOnlyList<string> paths) =>
         RunFileOperationAsync(async (token, progress) =>
         {
-            var first = await _comparisonImageLoader.LoadReferenceAsync(firstPath, token, AddProgressStage(progress, "Destination image"));
-            var second = await _comparisonImageLoader.LoadReferenceAsync(secondPath, token, AddProgressStage(progress, "Source image"));
-            return (first, second);
+            var loaded = new List<LoadedMemoryImage>(paths.Count);
+            for (var index = 0; index < paths.Count; index++)
+            {
+                var path = paths[index];
+                var preview = await _comparisonImageLoader.LoadReferencePreviewAsync(path, token,
+                    AddProgressStage(progress, $"Image {index + 1} of {paths.Count}"));
+                var decision = ChooseImportOverlap(preview);
+                if (decision == OverlapDecision.Cancel) throw new OperationCanceledException(token);
+                var imported = preview.Apply(decision)!;
+                loaded.Add(new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat, preview.FormatMismatch));
+            }
+            return (IReadOnlyList<LoadedMemoryImage>)loaded;
         });
 
     private static IProgress<MemoryImageFileProgress> AddProgressStage(
@@ -459,8 +475,8 @@ public partial class MainWindow : Window
         if (!ViewModel.CanStartOpenCompareOrMerge) return;
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Open HEX or S-Record file",
-            Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot|All files (*.*)|*.*",
+            Title = "Open firmware image",
+            Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot;*.vbf)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot;*.vbf|All files (*.*)|*.*",
             CheckFileExists = true
         };
 
@@ -514,7 +530,8 @@ public partial class MainWindow : Window
         {
             var preview = await LoadOpenReplacementAsync(path);
             if (!ViewModel.ApplyOpenImport(preview, mismatch =>
-                    ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch")))
+                    ThemedMessageBox.ShowOpenAnyway(this, mismatch.Message, "Filename format mismatch"),
+                    ChooseImportOverlap))
                 return;
             CloseDocumentViews(replacedDocument);
             ViewModel.ActivateEditor();
@@ -540,7 +557,7 @@ public partial class MainWindow : Window
         if (_fileOperationCancellation is not null) return false;
         try
         {
-            if (document.SourcePath is null || document.SourceFormat is null)
+            if (document.SourcePath is null || document.SourceFormat is null or MemoryImageExportFormat.Vbf)
                 return await TrySaveAsAsync(document);
             if (!_files.ConfirmSaveFormat(document, mismatch => ThemedMessageBox.ShowSaveAnyway(this,
                     mismatch.Message, "Filename format mismatch"))) return false;
@@ -669,7 +686,10 @@ public partial class MainWindow : Window
             Title = "Save memory image as",
             Filter = "Intel HEX (*.hex)|*.hex|Motorola S-Record (*.s19)|*.s19",
             FilterIndex = document.SourceFormat == MemoryImageExportFormat.SRecord ? 2 : 1,
-            FileName = document.SourcePath is null ? string.Empty : System.IO.Path.GetFileName(document.SourcePath),
+            FileName = document.SourcePath is null ? string.Empty :
+                document.SourceFormat == MemoryImageExportFormat.Vbf
+                    ? System.IO.Path.GetFileNameWithoutExtension(document.SourcePath)
+                    : System.IO.Path.GetFileName(document.SourcePath),
             AddExtension = true,
             OverwritePrompt = false
         };
@@ -775,10 +795,11 @@ public partial class MainWindow : Window
         if (!ViewModel.CanEdit) return;
         try
         {
-            var (start, end) = GetSelectionDefaults();
+            var (start, end) = GetActiveEditableSelection() ?? GetSelectionDefaults();
             var dialog = new RangeEditDialog(RangeEditDialogKind.Fill, start, end, ViewModel.GetFillAllRegion()) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Result is not { } input) return;
-            await RunFileOperationAsync((token, progress) => ViewModel.FillRangeAsync(
+            var editing = ViewModel.ActiveDocument.Editing;
+            await RunFileOperationAsync((token, progress) => editing.FillRangeAsync(
                 input.Start, input.End, input.Pattern!, input.FillPolicy, token, progress));
         }
         catch (OperationCanceledException) { ViewModel.ReportFileOperationCancelled("Fill"); }
@@ -807,6 +828,114 @@ public partial class MainWindow : Window
     private void Copy_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanEdit) RunSelectedRangeEdit((start, end) => _imageEdits.Copy(start, end)); }
     private void Cut_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanEdit) RunSelectedRangeEdit((start, end) => _imageEdits.Cut(start, end)); }
     private void Delete_Click(object sender, RoutedEventArgs e) { if (ViewModel.CanEdit) RunSelectedRangeEdit((start, end) => _imageEdits.Delete(start, end)); }
+
+    private void SelectedBytes_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Delete || GetActiveEditableSelection() is null) return;
+        DeleteSelectedBytes();
+        e.Handled = true;
+    }
+
+    private void DeleteSelectedBytes()
+    {
+        if (!ViewModel.CanEdit || GetActiveEditableSelection() is not { } selected) return;
+        var choice = ThemedMessageBox.ShowChoices(this,
+            $"Selected addresses: 0x{selected.Start:X8}–0x{selected.End:X8}.\n\n" +
+            "Remove occupied bytes, or set only occupied bytes to 00? Address gaps remain empty.",
+            "Edit selected bytes", "Remove bytes", "Set bytes to 00");
+        try
+        {
+            if (choice == MessageBoxResult.Yes)
+                ViewModel.ActiveDocument.Editing.DeleteRange(selected.Start, selected.End);
+            else if (choice == MessageBoxResult.No)
+                ViewModel.ActiveDocument.Editing.ZeroOccupiedRange(selected.Start, selected.End);
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
+        {
+            RecordError("Delete selection", exception);
+            ShowEditError(exception);
+        }
+    }
+
+    private void DeleteSelectedBytes_Click(object sender, RoutedEventArgs e) => DeleteSelectedBytes();
+
+    private void PasteClipboardBytes_Click(object sender, RoutedEventArgs e) => PasteClipboardBytes();
+
+    private void PasteClipboard_CanExecute(object sender, CanExecuteRoutedEventArgs e)
+    {
+        e.CanExecute = ViewModel.CanEdit && GetActiveEditableSelection() is not null &&
+            IsByteGridFocused() && Clipboard.ContainsText();
+        e.Handled = true;
+    }
+
+    private void PasteClipboard_Executed(object sender, ExecutedRoutedEventArgs e)
+    {
+        PasteClipboardBytes();
+        e.Handled = true;
+    }
+
+    private void PasteClipboardBytes()
+    {
+        if (!ViewModel.CanEdit || GetActiveEditableSelection() is not { } selected) return;
+        try
+        {
+            var bytes = SelectionClipboardText.ParseHexBytes(Clipboard.GetText());
+            var editing = ViewModel.ActiveDocument.Editing;
+            var overlapCount = editing.GetSystemPasteOverlapCount(selected.Start, bytes.Length);
+            var end = (uint)((ulong)selected.Start + (uint)bytes.Length - 1);
+            var message = $"Paste {bytes.Length:N0} byte(s) at 0x{selected.Start:X8}–0x{end:X8}?\n" +
+                $"{overlapCount:N0} occupied destination byte(s) overlap.";
+            OverlapDecision choice;
+            if (overlapCount > 0)
+            {
+                choice = ThemedMessageBox.ShowChoices(this, message, "Paste clipboard bytes",
+                    "Overwrite", "Keep existing") switch
+                {
+                    MessageBoxResult.Yes => OverlapDecision.OverwriteIncoming,
+                    MessageBoxResult.No => OverlapDecision.KeepExisting,
+                    _ => OverlapDecision.Cancel
+                };
+            }
+            else
+            {
+                choice = ThemedMessageBox.Show(this, message, "Paste clipboard bytes",
+                    MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes
+                    ? OverlapDecision.OverwriteIncoming : OverlapDecision.Cancel;
+            }
+            editing.PasteSystemBytes(selected.Start, bytes, choice);
+        }
+        catch (Exception exception) when (exception is FormatException or ArgumentException or InvalidOperationException)
+        {
+            RecordError("Paste clipboard bytes", exception);
+            ShowEditError(exception);
+        }
+    }
+
+    private (uint Start, uint End)? GetActiveEditableSelection()
+    {
+        if (WorkspaceTabs.SelectedContent is CompareView compare)
+        {
+            if (compare.SelectedSide != ComparePanelSide.Base ||
+                compare.FileAView.SelectionStart is not uint compareStart ||
+                compare.FileAView.SelectionEnd is not uint compareEnd) return null;
+            return (Math.Min(compareStart, compareEnd), Math.Max(compareStart, compareEnd));
+        }
+        if (HexRowsView.SelectionStart is not uint start || HexRowsView.SelectionEnd is not uint end) return null;
+        return (Math.Min(start, end), Math.Max(start, end));
+    }
+
+    private bool IsByteGridFocused()
+    {
+        var focus = Keyboard.FocusedElement as DependencyObject;
+        while (focus is not null)
+        {
+            if (ReferenceEquals(focus, HexRowsView)) return WorkspaceTabs.SelectedContent is not CompareView;
+            if (WorkspaceTabs.SelectedContent is CompareView compare && ReferenceEquals(focus, compare.FileAView))
+                return compare.SelectedSide == ComparePanelSide.Base;
+            focus = focus is Visual ? VisualTreeHelper.GetParent(focus) : LogicalTreeHelper.GetParent(focus);
+        }
+        return false;
+    }
 
     private void Paste_Click(object sender, RoutedEventArgs e)
     {
@@ -1173,21 +1302,24 @@ public partial class MainWindow : Window
         ApplySelection(result.Start, result.End);
     }
 
-    private async void ExportImage_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.EntireImage);
-    private async void ExportSegments_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.SelectedSegments);
-    private async void ExportRange_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync(ExportScope.AddressRange);
+    private async void ExportImage_Click(object sender, RoutedEventArgs e) => await ExportToFileAsync();
 
-    private async Task ExportToFileAsync(ExportScope initialScope)
+    private async Task ExportToFileAsync()
     {
         var compareView = WorkspaceTabs.SelectedContent as CompareView;
         var document = compareView?.Workspace.BaseDocument ?? ViewModel.Workspace.Document;
-        var exportSegments = document.CurrentImage.Ranges.Select((range, index) => new MemorySegmentRow(
-            range.StartAddress.ToString("X8"), range.EndAddress.ToString("X8"), checked((long)range.ByteCount), index + 1)).ToArray();
+        var exportSegments = document.CurrentImage.Blocks.Select((block, index) => new MemorySegmentRow(
+            block.StartAddress.ToString("X8"), block.EndAddress.ToString("X8"), checked((long)block.ByteCount), index + 1)).ToArray();
         var selectedSegments = compareView is null
             ? SegmentsGrid.SelectedItems.Cast<MemorySegmentRow>().Select(ViewModel.Segments.IndexOf).ToArray()
             : compareView.SelectedBaseSegmentIndexes;
+        var selectedStart = compareView is null ? HexRowsView.SelectionStart : compareView.FileAView.SelectionStart;
+        var selectedEnd = compareView is null ? HexRowsView.SelectionEnd : compareView.FileAView.SelectionEnd;
+        var initialScope = selectedSegments.Count > 0 ? ExportScope.SelectedSegments
+            : selectedStart is not null && selectedEnd is not null ? ExportScope.AddressRange
+            : ExportScope.EntireImage;
         var dialog = new ExportOptionsDialog(exportSegments, selectedSegments,
-            _exportSettings.MaxDataBytesPerRecord, initialScope) { Owner = this };
+            _exportSettings.MaxDataBytesPerRecord, initialScope, selectedStart, selectedEnd) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Options is not { } options) return;
         if (!_files.ConfirmExportFormat(options.Path, options.Format, mismatch =>
                 ThemedMessageBox.ShowSaveAnyway(this, mismatch.Message, "Export format mismatch"))) return;
@@ -1263,6 +1395,24 @@ public partial class MainWindow : Window
         catch (ArgumentOutOfRangeException exception)
         {
             MessageBox.Show(this, exception.Message, "Invalid relocation", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void RemapBanks_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.CanEdit || !ViewModel.ActiveHasImage) return;
+        var document = ViewModel.ActiveDocument;
+        var dialog = new BankRemapDialog(document.CurrentImage) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Preview is not { } preview) return;
+        try
+        {
+            document.Editing.ApplyBankRemap(preview, dialog.DefaultChoice, dialog.RangeOverrides);
+            ViewModel.ReportCompareInteraction($"Remapped {preview.Moved.OccupiedByteCount:N0} occupied byte(s).");
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException)
+        {
+            RecordError("Bank remap", exception);
+            ShowEditError(exception);
         }
     }
 

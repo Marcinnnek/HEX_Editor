@@ -7,6 +7,23 @@ namespace HexEditor.UI;
 
 internal static class SelectionClipboardText
 {
+    public static byte[] ParseHexBytes(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var chunks = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        if (chunks.Length == 0) throw new FormatException("The clipboard contains no hexadecimal bytes.");
+        var bytes = new byte[chunks.Length];
+        for (var index = 0; index < chunks.Length; index++)
+        {
+            var token = chunks[index].StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                ? chunks[index][2..] : chunks[index];
+            if (token.Length is < 1 or > 2 ||
+                !byte.TryParse(token, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out bytes[index]))
+                throw new FormatException($"'{chunks[index]}' is not a hexadecimal byte. Use text such as 00 FF 3A.");
+        }
+        return bytes;
+    }
+
     public static bool TryCopy(MemoryImage image, uint? selectionStart, uint? selectionEnd,
         SelectionTextFormat format = SelectionTextFormat.Hex)
     {

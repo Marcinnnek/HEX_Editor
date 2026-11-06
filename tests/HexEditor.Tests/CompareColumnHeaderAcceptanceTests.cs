@@ -38,22 +38,20 @@ public sealed class CompareColumnHeaderAcceptanceTests
                     Assert.IsInstanceOfType<SolidColorBrush>(panel.ItemsGrid.Background);
                     Assert.AreEqual(expected, ((SolidColorBrush)panel.ItemsGrid.Background).Color,
                         $"{panelName} empty header area should use the Editor surface.");
-                    var headers = Descendants<DataGridColumnHeader>(panel.ItemsGrid)
-                        .Where(header => header.Content?.ToString() is "Address" or "HEX Data" or "ASCII")
+                    var headerSurface = (Grid)panel.FindName("WindowedColumnHeader");
+                    Assert.IsNotNull(headerSurface);
+                    Assert.IsInstanceOfType<SolidColorBrush>(headerSurface.Background);
+                    Assert.AreEqual(expected, ((SolidColorBrush)headerSurface.Background).Color,
+                        $"{panelName} visible header should use the same surface as the Editor.");
+                    var headers = Descendants<TextBlock>(headerSurface)
+                        .Where(header => header.Text is "Address" or "HEX Data" or "ASCII")
                         .ToArray();
                     Assert.HasCount(3, headers, $"{panelName} should show Address, HEX Data, and ASCII headers.");
-                    foreach (var header in Descendants<DataGridColumnHeader>(panel.ItemsGrid))
-                    {
-                        Assert.IsInstanceOfType<SolidColorBrush>(header.Background,
-                            $"{panelName} header '{header.Content}' should have an explicit themed surface.");
-                        Assert.AreEqual(expected, ((SolidColorBrush)header.Background).Color,
-                            $"{panelName} header '{header.Content}' should use the same surface as the Editor.");
-                    }
                     foreach (var header in headers)
                     {
                         Assert.IsInstanceOfType<SolidColorBrush>(header.Foreground);
                         Assert.AreEqual(expectedText, ((SolidColorBrush)header.Foreground).Color,
-                            $"{panelName} header '{header.Content}' should use readable application text.");
+                            $"{panelName} header '{header.Text}' should use readable application text.");
                     }
                 }
             }

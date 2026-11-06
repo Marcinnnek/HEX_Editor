@@ -155,7 +155,7 @@ public sealed class MemoryImageFileService
             throw new ArgumentException("The output stream must be writable.", nameof(output));
         }
 
-        if (!Enum.IsDefined(format))
+        if (format is not (MemoryImageExportFormat.IntelHex or MemoryImageExportFormat.SRecord))
         {
             throw new ArgumentOutOfRangeException(nameof(format), format, "Choose Intel HEX or Motorola S-Record output.");
         }
@@ -176,6 +176,8 @@ public sealed class MemoryImageFileService
             case MemoryImageExportFormat.SRecord:
                 SRecordWriter.Write(image.Ranges, image.OccupiedByteCount, maxDataBytesPerRecord, output, GetSRecordMetadata(formatMetadata), cancellationToken, progress);
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(format), format, "Choose Intel HEX or Motorola S-Record output.");
         }
     }
 
@@ -294,6 +296,12 @@ public sealed class MemoryImageFileService
                 throw new MemoryImageImportException(1, "The file contains no records.");
 
             content.Position = originalPosition;
+            if (firstRecord.StartsWith("vbf_version", StringComparison.OrdinalIgnoreCase))
+            {
+                var vbfRecords = VbfReader.Read(content, originalPosition, _maximumOccupiedByteCount, cancellationToken, progress);
+                return new MemoryImageImportPreview(existingImage ?? HexEditor.Core.MemoryImage.Empty,
+                    vbfRecords, MemoryImageExportFormat.Vbf, sourcePath, null, _maximumOccupiedByteCount);
+            }
             using var trackedContent = new ProgressReadStream(content, progress, cancellationToken);
             var (records, format, metadata) = firstRecord[0] switch
             {

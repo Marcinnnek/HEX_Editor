@@ -2,7 +2,7 @@ namespace HexEditor.UI;
 
 internal static class FirmwareImageDialog
 {
-    private const string Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot|All files (*.*)|*.*";
+    private const string Filter = "Firmware images (*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot;*.vbf)|*.hex;*.ihx;*.s19;*.s28;*.s37;*.srec;*.mot;*.vbf|All files (*.*)|*.*";
 
     public static Microsoft.Win32.OpenFileDialog CreateOpen(string title, string? initialDirectory = null)
     {

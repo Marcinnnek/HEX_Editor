@@ -46,14 +46,14 @@ public sealed class EditorDocument : INotifyPropertyChanged
 
     public void Save()
     {
-        if (string.IsNullOrWhiteSpace(SourcePath) || SourceFormat is null)
+        if (string.IsNullOrWhiteSpace(SourcePath) || SourceFormat is null or MemoryImageExportFormat.Vbf)
             throw new InvalidOperationException("Choose Save As and select a file format first.");
         SaveAs(SourcePath, SourceFormat.Value, overwriteExisting: true);
     }
 
     public Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
-        if (string.IsNullOrWhiteSpace(SourcePath) || SourceFormat is null)
+        if (string.IsNullOrWhiteSpace(SourcePath) || SourceFormat is null or MemoryImageExportFormat.Vbf)
             throw new InvalidOperationException("Choose Save As and select a file format first.");
         return SaveAsAsync(SourcePath, SourceFormat.Value, overwriteExisting: true, cancellationToken, progress);
     }

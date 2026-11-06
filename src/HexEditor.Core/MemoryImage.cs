@@ -95,6 +95,27 @@ public sealed class MemoryImage
         return FromRanges(remaining);
     }
 
+    /// <summary>Sets only already occupied addresses in an inclusive range to zero.</summary>
+    public MemoryImage ZeroOccupiedRange(uint startAddress, uint endAddress)
+    {
+        if (endAddress < startAddress) throw new ArgumentOutOfRangeException(nameof(endAddress));
+        var result = new List<MemoryImageRange>(_ranges.Count + 2);
+        foreach (var range in _ranges)
+        {
+            if (range.EndAddress < startAddress || range.StartAddress > endAddress)
+            {
+                result.Add(range);
+                continue;
+            }
+            var first = Math.Max(range.StartAddress, startAddress);
+            var last = Math.Min(range.EndAddress, endAddress);
+            if (range.StartAddress < first) result.Add(range.Slice(range.StartAddress, first - 1));
+            result.Add(MemoryImageRange.Repeated(first, last, new byte[] { 0 }));
+            if (last < range.EndAddress) result.Add(range.Slice(last + 1, range.EndAddress));
+        }
+        return FromRanges(result);
+    }
+
     /// <summary>Fills an inclusive address interval without materializing its bytes as one array.</summary>
     public MemoryImage WithPatternRange(uint startAddress, uint endAddress, ReadOnlySpan<byte> pattern, bool overwriteExisting)
     {

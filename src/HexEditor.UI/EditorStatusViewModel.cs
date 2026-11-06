@@ -21,6 +21,7 @@ public sealed class EditorStatusViewModel : INotifyPropertyChanged
     {
         MemoryImageExportFormat.IntelHex => "Intel HEX",
         MemoryImageExportFormat.SRecord => "Motorola S-Record",
+        MemoryImageExportFormat.Vbf => "VBF",
         _ => "Unknown format"
     };
     public string ModifiedStateText => _isModified ? "Modified" : "Saved";

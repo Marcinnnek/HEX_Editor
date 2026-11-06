@@ -69,6 +69,34 @@ public sealed class ImageEditingSession
 
     public MemoryImageMergePreview PreviewMerge(MemoryImage source) => new(_currentImage, source);
 
+    public OrderedMemoryMergePreview PreviewOrderedMerge(IEnumerable<MemoryImage> sources) =>
+        new(_currentImage, sources, MemoryImageFileService.DefaultMaximumOccupiedByteCount);
+
+    public void ApplyOrderedMerge(OrderedMemoryMergePreview preview)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        if (!ReferenceEquals(preview.BaseImage, _currentImage))
+            throw new InvalidOperationException("The image changed after the merge preview was created. Preview again before applying.");
+        EnsureWithinUserImageLimit(preview.Result.OccupiedByteCount);
+        Commit(preview.Result);
+    }
+
+    public MemoryBankRemapPreview PreviewBankRemap(BankRemapConfiguration configuration) =>
+        new(_currentImage, configuration);
+
+    public bool ApplyBankRemap(MemoryBankRemapPreview preview, MemoryImageMergeChoice? defaultChoice,
+        IEnumerable<MemoryImageMergeRangeOverride>? rangeOverrides = null)
+    {
+        ArgumentNullException.ThrowIfNull(preview);
+        if (!ReferenceEquals(preview.Source, _currentImage))
+            throw new InvalidOperationException("The image changed after the remap preview was created. Preview again before applying.");
+        var result = preview.Resolve(defaultChoice, rangeOverrides);
+        if (result is null) return false;
+        EnsureWithinUserImageLimit(result.OccupiedByteCount);
+        Commit(result);
+        return true;
+    }
+
     public void ApplyMerge(MemoryImageMergePreview preview, MemoryImageMergeChoice? defaultChoice,
         IEnumerable<MemoryImageMergeRangeOverride>? rangeOverrides = null)
     {
@@ -113,6 +141,34 @@ public sealed class ImageEditingSession
         Commit(MemoryImageEdits.Overlay(_currentImage, BuildPasteImage(address), overlapDecision ?? OverlapDecision.OverwriteIncoming));
     }
 
+    public long GetSystemPasteOverlapCount(uint address, int byteCount)
+    {
+        if (byteCount <= 0 || (ulong)address + (uint)byteCount - 1 > uint.MaxValue)
+            throw new ArgumentOutOfRangeException(nameof(byteCount), "Pasted bytes extend beyond the 32-bit address space.");
+        var end = (ulong)address + (uint)byteCount - 1;
+        long count = 0;
+        foreach (var range in _currentImage.Ranges)
+        {
+            var first = Math.Max((ulong)range.StartAddress, address);
+            var last = Math.Min((ulong)range.EndAddress, end);
+            if (first <= last) count += checked((long)(last - first + 1));
+        }
+        return count;
+    }
+
+    public void PasteSystemBytes(uint address, IReadOnlyList<byte> bytes, OverlapDecision decision)
+    {
+        ArgumentNullException.ThrowIfNull(bytes);
+        var overlaps = GetSystemPasteOverlapCount(address, bytes.Count);
+        if (decision == OverlapDecision.Cancel) return;
+        if (decision is not (OverlapDecision.KeepExisting or OverlapDecision.OverwriteIncoming))
+            throw new ArgumentOutOfRangeException(nameof(decision));
+        EnsureWithinUserImageLimit(checked(_currentImage.OccupiedByteCount + (ulong)bytes.Count - (ulong)overlaps));
+        var input = bytes is byte[] array ? array : bytes.ToArray();
+        var incoming = MemoryImage.FromSegments([new MemorySegment(address, input)]);
+        Commit(_currentImage.WithRangesOverlay(incoming.Ranges, decision == OverlapDecision.OverwriteIncoming));
+    }
+
     public long GetPasteOverlapCount(uint address)
     {
         if (_clipboard is null) throw new InvalidOperationException("Copy a byte range before pasting.");
@@ -136,6 +192,12 @@ public sealed class ImageEditingSession
     {
         ValidateRange(startAddress, endAddress);
         Commit(_currentImage.WithoutRange(startAddress, endAddress));
+    }
+
+    public void ZeroOccupiedRange(uint startAddress, uint endAddress)
+    {
+        ValidateRange(startAddress, endAddress);
+        Commit(_currentImage.ZeroOccupiedRange(startAddress, endAddress));
     }
 
     public void DeleteSegment(int segmentIndex)

@@ -164,10 +164,10 @@ public sealed class OuterInsetRowSelectionAcceptanceTests
                     foreach (var panel in panels) panel.UseWindowedScrolling = windowed;
                     compare.UpdateLayout();
                     var control = Descendants<HexByteRowControl>(panels[0])
-                        .Single(item => item.IsAscii && item.Row?.Address == "00002000");
+                        .Single(item => item.IsVisible && item.IsAscii && item.Row?.Address == "00002000");
 
                     RaiseOuterBlankClick(panels[0], Descendants<HexByteRowControl>(panels[0])
-                        .Single(item => !item.IsAscii && item.Row?.Address == "00002000"), 1);
+                        .Single(item => item.IsVisible && !item.IsAscii && item.Row?.Address == "00002000"), 1);
                     Assert.AreEqual(0, panels[0].SelectedRowIndex);
                     Assert.AreEqual(0, panels[1].SelectedRowIndex,
                         "Compare mirrors a HEX outer-margin row selection in both panels.");

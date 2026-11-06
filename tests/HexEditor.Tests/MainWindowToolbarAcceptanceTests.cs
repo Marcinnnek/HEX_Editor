@@ -96,9 +96,8 @@ public sealed class MainWindowToolbarAcceptanceTests
                 var fileItems = ((MenuItem)menu.Items[0]).Items.OfType<MenuItem>().ToArray();
                 CollectionAssert.AreEqual(new[]
                 {
-                    "Open HEX / S-Record...", "Save", "Save As...", "Close Image",
-                    "Compare images...", "Merge images...", "Export Image...",
-                    "Export Selected Segments...", "Export Address Range..."
+                    "Open...", "Save", "Save As...", "Close Image",
+                    "Compare images...", "Merge images...", "Export..."
                 }, fileItems.Select(item => item.Header.ToString()).ToArray());
 
                 var menuItems = LogicalDescendants<MenuItem>(window).ToArray();
@@ -106,14 +105,14 @@ public sealed class MainWindowToolbarAcceptanceTests
                     "Go to address remains reachable from View with its keyboard shortcut.");
                 foreach (var command in new[]
                 {
-                    "Open HEX / S-Record...", "Save As...", "Close Image", "Compare images...", "Merge images...",
+                    "Open...", "Save As...", "Close Image", "Compare images...", "Merge images...",
                     "Undo", "Redo", "Select range", "Edit / Insert", "Fill range", "Copy range", "Cut range",
                     "Paste at start", "Delete range", "Relocate selected segment", "Checksum / Calculate...",
-                    "Export Image...", "Export Selected Segments...", "Export Address Range..."
+                    "Export..."
                 })
                     Assert.IsTrue(menuItems.Any(item => item.Header?.ToString() == command), $"'{command}' remains available in a menu.");
 
-                Assert.AreEqual(1, menuItems.Count(item => item.Header?.ToString() == "Export Image..."));
+                Assert.AreEqual(1, menuItems.Count(item => item.Header?.ToString() == "Export..."));
 
                 var tabs = (TabControl)window.FindName("WorkspaceTabs");
                 tabs.SelectedIndex = 0;

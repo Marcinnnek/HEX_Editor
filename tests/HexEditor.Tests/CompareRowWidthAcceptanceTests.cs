@@ -11,6 +11,79 @@ namespace HexEditor.Tests;
 public sealed class CompareRowWidthAcceptanceTests
 {
     [TestMethod]
+    public void SelectingTheSamePresetAfterSwitchingTabsUpdatesTheActiveCompareWidth()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10, 0x20])]);
+            var view = new CompareView(new CompareWorkspaceTabViewModel(image, image, "base.hex", "reference.hex"));
+            view.ViewModel.BytesPerRow = 32;
+            var window = new MainWindow();
+            try
+            {
+                var tabs = (TabControl)window.FindName("WorkspaceTabs");
+                tabs.Items.Add(new TabItem { Header = "Compare", Content = view });
+                window.Show();
+                var widthBox = (ComboBox)window.FindName("RowWidthBox");
+                window.ViewModel.ActiveBytesPerRow = 32;
+                widthBox.SelectedItem = 16;
+                Assert.AreEqual(16, window.ViewModel.ImageView.BytesPerRow);
+                Assert.AreEqual(32, view.ViewModel.BytesPerRow);
+
+                tabs.SelectedIndex = 1;
+                Assert.AreEqual("32", widthBox.Text);
+                Assert.AreEqual(32, widthBox.SelectedItem);
+                widthBox.SelectedItem = 16;
+                window.UpdateLayout();
+                Assert.AreEqual(16, view.ViewModel.BytesPerRow);
+                Assert.AreEqual("16", widthBox.Text);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
+    [TestMethod]
+    public void SwitchingTabsDiscardsUncommittedRowWidthText()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+            var view = new CompareView(new CompareWorkspaceTabViewModel(image, image, "base.hex", "reference.hex"));
+            view.ViewModel.BytesPerRow = 32;
+            var window = new MainWindow();
+            try
+            {
+                var tabs = (TabControl)window.FindName("WorkspaceTabs");
+                var compareTab = new TabItem { Header = "Compare", Content = view };
+                tabs.Items.Add(compareTab);
+                window.Show();
+                var widthBox = (ComboBox)window.FindName("RowWidthBox");
+                widthBox.Focus();
+                widthBox.Text = "24";
+                compareTab.Focus();
+                tabs.SelectedItem = compareTab;
+                window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                Assert.AreEqual(16, window.ViewModel.ImageView.BytesPerRow);
+                Assert.AreEqual(32, view.ViewModel.BytesPerRow);
+                Assert.AreEqual("32", widthBox.Text);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+    }
+
+    [TestMethod]
     public void MainCommandBarControlsCompareWidthAndAsciiWhileKeepingCurrentPanelAddress()
     {
         Exception? failure = null;

@@ -225,7 +225,8 @@ public sealed class LiveCompareScrollingAcceptanceTests
                     .Single(button => Equals(button.Content, "Next difference"));
                 next.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 var addressBox = (Wpf.Ui.Controls.TextBox)compare.FindName("AddressBox");
-                Assert.AreEqual((address + 1).ToString("X8"), addressBox.Text);
+                Assert.AreEqual(address.ToString("X8"), addressBox.Text,
+                    "The entire contiguous differing range is one navigation group.");
             }
             catch (Exception exception) { failure = exception; }
             finally { window?.Close(); }

@@ -1,6 +1,6 @@
-# HEX / S-Record Memory Editing
+# Firmware Memory Image Editing
 
-This context covers inspecting, comparing, editing, merging, and exporting firmware memory images represented by Intel HEX or Motorola S-Record files.
+This context covers inspecting, comparing, editing, merging, and exporting firmware memory images imported from Intel HEX, Motorola S-Record, or VBF files.
 
 ## Language
 
@@ -16,14 +16,23 @@ A maximal contiguous range of occupied addresses. Segment boundaries come from a
 **Block**:
 An alternate name for a memory segment: one maximal contiguous range of occupied addresses. Its boundaries follow occupied addresses, not source file records.
 
+**Bank**:
+A fixed-size source address interval in an ordered series of intervals whose starts are separated by a configured bank offset. A bank is independent of memory-segment boundaries.
+
+**Bank remapping**:
+An address transformation that maps occupied bytes from spaced source banks into consecutive destination banks beginning at a linear base address.
+
+**Linear base address**:
+The destination address at which the first remapped bank begins.
+
 **Address gap**:
 A range of unoccupied addresses between or around occupied bytes. A gap is not implicitly filled with any byte value.
 
 **Overlap**:
-Incoming data that supplies an address already occupied by another value or record. Overlaps are surfaced for a user decision even when the values are identical.
+An address supplied by more than one input image or record, including when the byte values are identical. The chosen input order or an explicit collision decision determines the resulting value.
 
 **Import**:
-Reading a HEX or S-Record file into a memory image while retaining its absolute addresses and recording source format metadata.
+Reading a supported firmware file (Intel HEX, Motorola S-Record, or VBF) into a memory image while retaining its absolute addresses and recording source format metadata.
 
 **Source record**:
 An encoded entry in an Intel HEX or Motorola S-Record file. Its boundary does not define a memory segment.
@@ -32,10 +41,13 @@ An encoded entry in an Intel HEX or Motorola S-Record file. Its boundary does no
 An ordered list of byte values used as a search pattern across consecutive occupied addresses in a memory image. It is independent of source-record boundaries and does not cross address gaps.
 
 **Merge**:
-Combining two memory images by absolute address, with explicit handling for addresses occupied by both images.
+Combining two or more ordered memory images by absolute address, with explicit handling for addresses occupied by multiple images.
 
 **Comparison difference**:
 An absolute address where two memory images contain unequal byte values or where only one image contains a byte. An address absent from both images is not a difference.
+
+**Comparison difference group**:
+A maximal run of comparison differences at consecutive addresses. An equal address or an address absent from both images separates groups.
 
 **Comparison cursor**:
 The base or reference image side and address used as the starting point for navigation within an open comparison. The address may come from a selected byte, a visible row, or an address entered by the user.

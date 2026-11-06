@@ -21,6 +21,7 @@ public static class MemoryImageFormatClassifier
         {
             ".hex" or ".ihx" => MemoryImageExportFormat.IntelHex,
             ".s19" or ".s28" or ".s37" or ".srec" or ".mot" => MemoryImageExportFormat.SRecord,
+            ".vbf" => MemoryImageExportFormat.Vbf,
             _ => (MemoryImageExportFormat?)null
         };
 

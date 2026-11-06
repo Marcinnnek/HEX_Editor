@@ -8,6 +8,27 @@ namespace HexEditor.Tests;
 public sealed class MemoryComparisonModelTests
 {
     [TestMethod]
+    public void DifferenceNavigationSkipsTheCurrentContiguousGroup()
+    {
+        var left = MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x10, 0x11, 0x12, 0x13, 0x14, 0x15]),
+            new MemorySegment(0x1010, [0x20, 0x21])]);
+        var right = MemoryImage.FromSegments([
+            new MemorySegment(0x1000, [0x10, 0x91, 0x92, 0x13, 0x94, 0x95]),
+            new MemorySegment(0x1010, [0x90, 0x91])]);
+        var comparison = new MemoryComparisonModel(left, right);
+
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(0x1001, null, out var next));
+        Assert.AreEqual(0x1004u, next);
+        Assert.IsTrue(comparison.TryFindNextDifferenceFromAddress(0x1005, null, out next));
+        Assert.AreEqual(0x1010u, next);
+        Assert.IsTrue(comparison.TryFindPreviousDifferenceFromAddress(0x1004, null, out var previous));
+        Assert.AreEqual(0x1002u, previous);
+        Assert.IsFalse(comparison.TryFindNextDifferenceFromAddress(0x1010, null, out _));
+        Assert.IsFalse(comparison.TryFindPreviousDifferenceFromAddress(0x1001, null, out _));
+    }
+
+    [TestMethod]
     public void ComparisonPanels_UseSharedHexAsciiAndMissingByteText()
     {
         var left = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x41, 0x00, 0x7F])]);

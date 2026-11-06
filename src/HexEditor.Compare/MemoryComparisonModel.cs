@@ -88,18 +88,10 @@ public sealed class MemoryComparisonModel
     public bool TryFindPreviousDifference(uint address, out uint difference) => TryFindDifference(address, forward: false, out difference);
 
     public bool TryFindNextDifferenceFromSelection(uint? selectedAddress, out uint difference) =>
-        selectedAddress is null
-            ? TryFindNextDifference(0, out difference)
-            : selectedAddress == uint.MaxValue
-                ? SetNoDifference(out difference)
-                : TryFindNextDifference(selectedAddress.Value + 1, out difference);
+        TryFindDifferenceGroup(selectedAddress, forward: true, out difference);
 
     public bool TryFindPreviousDifferenceFromSelection(uint? selectedAddress, out uint difference) =>
-        selectedAddress is null
-            ? TryFindPreviousDifference(uint.MaxValue, out difference)
-            : selectedAddress == 0
-                ? SetNoDifference(out difference)
-                : TryFindPreviousDifference(selectedAddress.Value - 1, out difference);
+        TryFindDifferenceGroup(selectedAddress, forward: false, out difference);
 
     public bool TryFindNextDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, out uint difference) =>
         TryFindDifferenceFromAddress(selectedAddress, anchorAddress, forward: true, out difference);
@@ -110,19 +102,59 @@ public sealed class MemoryComparisonModel
     private bool TryFindDifferenceFromAddress(uint? selectedAddress, uint? anchorAddress, bool forward, out uint difference)
     {
         var position = selectedAddress ?? anchorAddress;
-        if (position is null)
-            return forward
-                ? TryFindNextDifference(0, out difference)
-                : TryFindPreviousDifference(uint.MaxValue, out difference);
+        return TryFindDifferenceGroup(position, forward, out difference);
+    }
 
-        if (forward)
+    private bool TryFindDifferenceGroup(uint? position, bool forward, out uint difference)
+    {
+        uint? previousEnd = null;
+        foreach (var (start, end) in GetDifferenceGroups())
         {
-            if (position.Value == uint.MaxValue) return SetNoDifference(out difference);
-            return TryFindNextDifference(position.Value + 1, out difference);
+            if (forward)
+            {
+                if (position is null || start > position.Value)
+                {
+                    difference = start;
+                    return true;
+                }
+            }
+            else
+            {
+                if (position is not null && start >= position.Value) break;
+                if (position is not null && end >= position.Value) break;
+                previousEnd = end;
+            }
         }
+        if (!forward && previousEnd is uint previous)
+        {
+            difference = previous;
+            return true;
+        }
+        return SetNoDifference(out difference);
+    }
 
-        if (position.Value == 0) return SetNoDifference(out difference);
-        return TryFindPreviousDifference(position.Value - 1, out difference);
+    private IEnumerable<(uint Start, uint End)> GetDifferenceGroups()
+    {
+        uint? start = null;
+        uint end = 0;
+        foreach (var address in GetOccupiedAddresses())
+        {
+            if (!IsInSelectedAddressRange(address) || GetState(address) == CompareByteState.Equal)
+            {
+                if (start is uint completed) yield return (completed, end);
+                start = null;
+                continue;
+            }
+            if (start is null)
+                start = address;
+            else if ((ulong)end + 1 != address)
+            {
+                yield return (start.Value, end);
+                start = address;
+            }
+            end = address;
+        }
+        if (start is uint last) yield return (last, end);
     }
 
     private static bool SetNoDifference(out uint difference)
@@ -350,7 +382,7 @@ public sealed class MemoryComparisonModel
         {
             if (position.IsGap)
             {
-                var description = $"Skipped 0x{position.GapStartAddress:X8}...0x{position.GapEndAddress:X8}";
+                var description = $"Empty 0x{position.GapStartAddress:X8}...0x{position.GapEndAddress:X8}";
                 return new CompareViewRow(string.Empty, EmptyPanel(), EmptyPanel(), Array.Empty<CompareByteState>(), true, description);
             }
 

@@ -31,18 +31,48 @@ public partial class CompareView : UserControl
         FileBView.UseWindowedScrolling = true;
         ConfigurePanel(FileAView);
         ConfigurePanel(FileBView);
+        FileAView.PreviewMouseRightButtonDown += (_, _) => _navigation.FocusSide(ComparePanelSide.Base);
+        ConfigureBaseContextMenu();
     }
 
     public CompareWorkspaceTabViewModel Workspace { get; }
     public CompareViewModel ViewModel { get; }
+    public ComparePanelSide SelectedSide => _navigation.Side;
     public (ComparePanelSide Side, uint Address)? CurrentFindCursor =>
         _navigation.CurrentCursor(VisibleRowAddress(), ViewModel.BytesPerRow, FileAView.UseWindowedScrolling);
     public IReadOnlyList<int> SelectedBaseSegmentIndexes => FileABlocks.SelectedItems
         .Cast<CompareMemoryBlockRow>().Select(row => Workspace.BlocksA.IndexOf(row)).Where(index => index >= 0).ToArray();
     public CompareViewMode[] ViewModes { get; }
     public event Action<uint, uint>? BaseRowActivated;
+    public event EventHandler? BaseFillWithPatternRequested;
+    public event EventHandler? BasePasteClipboardRequested;
+    public event EventHandler? BaseDeleteRequested;
     public event Action<string>? StatusRequested;
     public event Action<string, Exception, ComparePanelSide, int, uint?>? InteractionFailed;
+
+    private void ConfigureBaseContextMenu()
+    {
+        var menu = new ContextMenu();
+        var fill = new MenuItem { Header = "Fill with Pattern..." };
+        var paste = new MenuItem { Header = "Paste clipboard bytes" };
+        var delete = new MenuItem { Header = "Delete selected bytes" };
+        fill.Click += (_, _) => BaseFillWithPatternRequested?.Invoke(this, EventArgs.Empty);
+        paste.Click += (_, _) => BasePasteClipboardRequested?.Invoke(this, EventArgs.Empty);
+        delete.Click += (_, _) => BaseDeleteRequested?.Invoke(this, EventArgs.Empty);
+        foreach (var item in new[] { fill, paste, delete })
+        {
+            item.Style = (Style)FindResource("HexContextMenuItemStyle");
+            menu.Items.Add(item);
+        }
+        menu.Opened += (_, _) =>
+        {
+            var selected = FileAView.SelectionStart is not null && FileAView.SelectionEnd is not null;
+            fill.IsEnabled = selected;
+            paste.IsEnabled = selected;
+            delete.IsEnabled = selected;
+        };
+        FileAView.ContextMenu = menu;
+    }
 
     private HexViewControl SelectedPanel => _navigation.Side == ComparePanelSide.Base ? FileAView : FileBView;
 

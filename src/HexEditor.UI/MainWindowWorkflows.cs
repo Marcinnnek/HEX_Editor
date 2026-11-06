@@ -68,16 +68,24 @@ public sealed class ComparisonImageLoader(MainViewModel viewModel)
     }
 
     public Task<LoadedMemoryImage> LoadReferenceAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress) => LoadReferenceWithDefaultOverlapAsync(path, cancellationToken, progress);
+
+    private async Task<LoadedMemoryImage> LoadReferenceWithDefaultOverlapAsync(string path, CancellationToken cancellationToken,
+        IProgress<MemoryImageFileProgress>? progress)
+    {
+        var preview = await LoadReferencePreviewAsync(path, cancellationToken, progress);
+        var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
+            ?? throw new InvalidOperationException("The selected reference image could not be imported.");
+        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat, preview.FormatMismatch);
+    }
+
+    public Task<MemoryImageImportPreview> LoadReferencePreviewAsync(string path, CancellationToken cancellationToken,
         IProgress<MemoryImageFileProgress>? progress) => Task.Run(() =>
     {
         cancellationToken.ThrowIfCancellationRequested();
         using var stream = File.OpenRead(path);
-        var preview = new MemoryImageFileService().PrepareImport(stream, MemoryImage.Empty, path,
+        return new MemoryImageFileService().PrepareImport(stream, MemoryImage.Empty, path,
             cancellationToken, progress);
-        cancellationToken.ThrowIfCancellationRequested();
-        var imported = preview.Apply(OverlapDecision.OverwriteIncoming)
-            ?? throw new InvalidOperationException("The selected reference image could not be imported.");
-        return new LoadedMemoryImage(imported.Image, path, imported.DetectedFormat, preview.FormatMismatch);
     }, cancellationToken);
 }
 
@@ -90,7 +98,8 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
         Func<string, string?, string?> chooseFile, Action baseOpened,
         CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress,
         EditorDocument? baseDocument = null,
-        Func<MemoryImageFormatMismatch, bool>? confirmMismatch = null)
+        Func<MemoryImageFormatMismatch, bool>? confirmMismatch = null,
+        Func<MemoryImageImportPreview, OverlapDecision>? chooseOverlap = null)
     {
         ArgumentNullException.ThrowIfNull(chooseFile);
         ArgumentNullException.ThrowIfNull(baseOpened);
@@ -103,7 +112,9 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
             var preview = await viewModel.PrepareOpenAsync(basePath, cancellationToken, progress);
             cancellationToken.ThrowIfCancellationRequested();
             if (preview.FormatMismatch is { } baseMismatch && !(confirmMismatch?.Invoke(baseMismatch) ?? false)) return null;
-            viewModel.ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+            var baseDecision = chooseOverlap?.Invoke(preview) ?? OverlapDecision.OverwriteIncoming;
+            if (baseDecision == OverlapDecision.Cancel) return null;
+            viewModel.ApplyImport(preview, baseDecision);
             baseOpened();
         }
 
@@ -114,14 +125,17 @@ public sealed class CompareCurrentImageWorkflow(MainViewModel viewModel)
             document.SourcePath is null ? null : Path.GetDirectoryName(document.SourcePath));
         if (referencePath is null) return null;
 
-        var reference = await _loader.LoadReferenceAsync(referencePath, cancellationToken, progress);
+        var referencePreview = await _loader.LoadReferencePreviewAsync(referencePath, cancellationToken, progress);
         cancellationToken.ThrowIfCancellationRequested();
-        if (reference.FormatMismatch is { } mismatch && !(confirmMismatch?.Invoke(mismatch) ?? false)) return null;
+        if (referencePreview.FormatMismatch is { } mismatch && !(confirmMismatch?.Invoke(mismatch) ?? false)) return null;
+        var referenceDecision = chooseOverlap?.Invoke(referencePreview) ?? OverlapDecision.OverwriteIncoming;
+        if (referenceDecision == OverlapDecision.Cancel) return null;
+        var reference = referencePreview.Apply(referenceDecision)!;
         var baseName = document.SourcePath is null ? "Untitled" : Path.GetFileName(document.SourcePath);
         var comparisonProgress = progress is null ? null : new Progress<ComparisonProgress>(update =>
             progress.Report(new MemoryImageFileProgress(update.Stage, update.Completed, update.Total)));
         return await Task.Run(() => new CompareWorkspaceTabViewModel(document.CurrentImage, reference.Image,
-            baseName, Path.GetFileName(referencePath), document.SourcePath, reference.Path, document,
+            baseName, Path.GetFileName(referencePath), document.SourcePath, referencePath, document,
             cancellationToken, comparisonProgress, viewModel.DefaultBytesPerRow), cancellationToken);
     }
 }

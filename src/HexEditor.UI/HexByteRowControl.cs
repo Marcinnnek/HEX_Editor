@@ -107,6 +107,10 @@ public sealed class HexByteRowControl : Control
         if (IsAscii && TryFindResource("HexAsciiBackgroundBrush") is Brush asciiBackground)
             drawingContext.DrawRectangle(asciiBackground, null, dataBounds);
         if (row is null || row.IsGapMarker) return;
+        var owner = SelectionStart is not null && SelectionEnd is not null ? FindOwner() : null;
+        var above = owner?.GetAdjacentRow(row, -1);
+        var below = owner?.GetAdjacentRow(row, 1);
+        var bytesPerRow = owner?.BytesPerRow ?? RowCapacity;
         for (var index = 0; index < row.Cells.Count; index++)
         {
             var cellAddress = row.Cells[index].Address;
@@ -140,7 +144,22 @@ public sealed class HexByteRowControl : Control
                 SelectionStart is uint selectionStart && SelectionEnd is uint selectionEnd &&
                 address >= selectionStart && address <= selectionEnd &&
                 TryFindResource("HexFocusBrush") is Brush selectionBrush)
-                drawingContext.DrawRectangle(null, new Pen(selectionBrush, 2), layout.GetHighlightBounds(index, IsAscii));
+            {
+                var edges = SelectionOutlineEdges.ForCell(row, above, below, index, bytesPerRow,
+                    selectionStart, selectionEnd);
+                var bounds = layout.GetHighlightBounds(index, IsAscii);
+                var selectedLeft = index > 0 && !edges.Left;
+                var selectedRight = index + 1 < row.Cells.Count && !edges.Right;
+                var halfSpacing = IsAscii ? 0 : layout.HorizontalSpacing / 2d;
+                var left = bounds.Left - (selectedLeft ? halfSpacing : 0);
+                var right = bounds.Right + (selectedRight ? halfSpacing : 0);
+                var pen = new Pen(selectionBrush, 2);
+                if (edges.Top) drawingContext.DrawLine(pen, new Point(left, bounds.Top), new Point(right, bounds.Top));
+                if (edges.Bottom) drawingContext.DrawLine(pen, new Point(left, bounds.Bottom), new Point(right, bounds.Bottom));
+                var sideBottom = edges.Bottom ? bounds.Bottom : bounds.Bottom + layout.VerticalSpacing;
+                if (edges.Left) drawingContext.DrawLine(pen, new Point(bounds.Left, bounds.Top), new Point(bounds.Left, sideBottom));
+                if (edges.Right) drawingContext.DrawLine(pen, new Point(bounds.Right, bounds.Top), new Point(bounds.Right, sideBottom));
+            }
         }
 
         drawingContext.DrawDrawing(GetRowDrawing(row, layout));
@@ -174,6 +193,13 @@ public sealed class HexByteRowControl : Control
         _lineHeight,
         GridSpacingSettings.Current.HorizontalByteSpacing,
         GridSpacingSettings.Current.VerticalRowSpacing);
+
+    private HexViewControl? FindOwner()
+    {
+        for (DependencyObject? current = this; current is not null; current = VisualTreeHelper.GetParent(current))
+            if (current is HexViewControl owner) return owner;
+        return null;
+    }
 
     private void Control_Loaded(object sender, RoutedEventArgs e)
     {

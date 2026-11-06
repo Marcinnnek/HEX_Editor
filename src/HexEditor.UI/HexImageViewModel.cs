@@ -140,7 +140,7 @@ public sealed record HexViewRow(string Address, string HexData, string? Ascii, b
         string.Empty,
         null,
         true,
-        $"Skipped 0x{startAddress:X8}...0x{endAddress:X8}");
+        $"Empty 0x{startAddress:X8}...0x{endAddress:X8}");
 }
 
 public enum ByteHighlightState { None, Different, OnlyInPanel, OnlyOther, OnlyInA, OnlyInB }

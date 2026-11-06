@@ -32,8 +32,8 @@ internal sealed class ThemedMessageBox : Window
         switch (buttons)
         {
             case MessageBoxButton.YesNoCancel:
-                AddButton(actions, "Yes", MessageBoxResult.Yes, isDefault: true);
-                AddButton(actions, "No", MessageBoxResult.No);
+                AddButton(actions, yesLabel ?? "Yes", MessageBoxResult.Yes, isDefault: true);
+                AddButton(actions, noLabel ?? "No", MessageBoxResult.No);
                 AddButton(actions, "Cancel", MessageBoxResult.Cancel, isCancel: true);
                 break;
             case MessageBoxButton.YesNo:
@@ -62,6 +62,15 @@ internal sealed class ThemedMessageBox : Window
         MessageBoxButton buttons, MessageBoxImage image)
     {
         var dialog = new ThemedMessageBox(owner, message, title, buttons);
+        dialog.ShowDialog();
+        return dialog._result;
+    }
+
+    public static MessageBoxResult ShowChoices(Window? owner, string message, string title,
+        string firstLabel, string secondLabel)
+    {
+        var dialog = new ThemedMessageBox(owner, message, title, MessageBoxButton.YesNoCancel,
+            firstLabel, secondLabel);
         dialog.ShowDialog();
         return dialog._result;
     }

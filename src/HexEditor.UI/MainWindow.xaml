@@ -20,7 +20,7 @@
         <StackPanel x:Name="MainCommandBar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
             <Menu VerticalAlignment="Center">
             <ui:MenuItem Header="_File">
-                <ui:MenuItem x:Name="OpenMenuItem" Header="Open HEX / S-Record..." Click="OpenImage_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" InputGestureText="Ctrl+O" />
+                <ui:MenuItem x:Name="OpenMenuItem" Header="Open..." Click="OpenImage_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" InputGestureText="Ctrl+O" />
                 <Separator />
                 <ui:MenuItem x:Name="SaveMenuItem" Header="Save" Click="Save_Click" IsEnabled="{Binding ViewModel.ActiveCanSave}" InputGestureText="Ctrl+S" />
                 <ui:MenuItem Header="Save As..." Click="SaveAs_Click" IsEnabled="{Binding ViewModel.ActiveCanSaveAs}" InputGestureText="Ctrl+Shift+S" />
@@ -28,9 +28,7 @@
                 <ui:MenuItem x:Name="CompareMenuItem" Header="Compare images..." Click="CompareImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
                 <ui:MenuItem x:Name="MergeMenuItem" Header="Merge images..." Click="MergeImages_Click" IsEnabled="{Binding ViewModel.CanStartOpenCompareOrMerge}" />
                 <Separator />
-                <ui:MenuItem Header="Export Image..." Click="ExportImage_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
-                <ui:MenuItem Header="Export Selected Segments..." Click="ExportSegments_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
-                <ui:MenuItem Header="Export Address Range..." Click="ExportRange_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
+                <ui:MenuItem Header="Export..." Click="ExportImage_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             <ui:MenuItem x:Name="EditMenuItem" Header="_Edit" IsEnabled="{Binding ViewModel.CanEdit}">
                 <ui:MenuItem Header="Undo" Click="Undo_Click" IsEnabled="{Binding ViewModel.ActiveCanUndo}" InputGestureText="Ctrl+Z" />
@@ -56,6 +54,7 @@
             <ui:MenuItem Header="_Tools" IsEnabled="{Binding ViewModel.CanEdit}">
                 <ui:MenuItem Header="Checksum / Calculate..." Click="CalculateChecksum_Click" />
                 <ui:MenuItem Header="Relocate selected segment" Click="RelocateSegment_Click" IsEnabled="{Binding ViewModel.ActiveCanRelocate}" />
+                <ui:MenuItem Header="Remap bank addresses..." Click="RemapBanks_Click" IsEnabled="{Binding ViewModel.ActiveHasImage}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_Preferences..." Click="Preferences_Click" />
             </Menu>
@@ -128,10 +127,13 @@
                                           AddressRangeSelected="HexView_AddressRangeSelected">
                         <local:HexViewControl.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Select Range..." Click="SelectRange_Click" />
-                                <Separator />
-                                <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" />
-                                <MenuItem Header="Fill Range..." Click="Fill_Click" />
+                                <MenuItem Header="Select Range..." Click="SelectRange_Click" Style="{StaticResource HexContextMenuItemStyle}" />
+                                <Separator Style="{StaticResource HexContextMenuSeparatorStyle}" />
+                                <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" Style="{StaticResource HexContextMenuItemStyle}" />
+                                <MenuItem Header="Fill Range..." Click="Fill_Click" Style="{StaticResource HexContextMenuItemStyle}" />
+                                <MenuItem Header="Fill with Pattern..." Click="Fill_Click" Style="{StaticResource HexContextMenuItemStyle}" />
+                                <MenuItem Header="Paste clipboard bytes" Click="PasteClipboardBytes_Click" Style="{StaticResource HexContextMenuItemStyle}" />
+                                <MenuItem Header="Delete selected bytes" Click="DeleteSelectedBytes_Click" Style="{StaticResource HexContextMenuItemStyle}" />
                             </ContextMenu>
                         </local:HexViewControl.ContextMenu>
                     </local:HexViewControl>

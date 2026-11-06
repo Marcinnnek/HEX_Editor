@@ -20,7 +20,8 @@ public sealed class ExportOptionsDialog : Window
     private readonly ComboBox _scope = new() { ItemsSource = new[] { "Entire image", "Selected memory segments", "Address range" }, SelectedIndex = 0 };
     private readonly ComboBox _format = new()
     {
-        ItemsSource = Enum.GetValues<MemoryImageExportFormat>().Select(format => new FormatChoice(format, format.GetDisplayName())).ToArray(),
+        ItemsSource = new[] { MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord }
+            .Select(format => new FormatChoice(format, format.GetDisplayName())).ToArray(),
         SelectedIndex = 0
     };
     private readonly ComboBox _recordSize = new() { ItemsSource = new[] { 8, 16, 32 }, SelectedItem = 16 };
@@ -30,7 +31,7 @@ public sealed class ExportOptionsDialog : Window
     private readonly ListBox _segments = new() { SelectionMode = SelectionMode.Extended, MinHeight = 90 };
 
     public ExportOptionsDialog(IReadOnlyList<MemorySegmentRow> segments, IEnumerable<int> selectedSegments,
-        int previousRecordSize, ExportScope initialScope)
+        int previousRecordSize, ExportScope initialScope, uint? initialStart = null, uint? initialEnd = null)
     {
         Title = "Export memory data";
         Width = 600;
@@ -42,6 +43,11 @@ public sealed class ExportOptionsDialog : Window
         HexAddressInput.Configure(_start);
         HexAddressInput.Configure(_end);
         _scope.SelectedIndex = (int)initialScope;
+        if (initialStart is uint start && initialEnd is uint end)
+        {
+            _start.Text = Math.Min(start, end).ToString("X8");
+            _end.Text = Math.Max(start, end).ToString("X8");
+        }
         _recordSize.SelectedItem = previousRecordSize;
         foreach (var row in segments) _segments.Items.Add($"{row.StartAddress} – {row.EndAddress} ({row.ByteCount:N0} bytes)");
         foreach (var index in selectedSegments.Where(index => index >= 0 && index < segments.Count)) _segments.SelectedItems.Add(_segments.Items[index]);

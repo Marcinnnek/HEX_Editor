@@ -18,6 +18,7 @@ public sealed class CompareSegmentListLayoutTests
         Exception? failure = null;
         var thread = new Thread(() =>
         {
+            Window? window = null;
             try
             {
                 var workspace = new CompareWorkspaceTabViewModel(
@@ -25,9 +26,9 @@ public sealed class CompareSegmentListLayoutTests
                     MemoryImage.FromSegments([new MemorySegment(0x2000, [0x20]), new MemorySegment(0x2010, new byte[0x15BC])]),
                     "base.hex", "reference.hex");
                 var view = new CompareView(workspace);
-                view.Measure(new Size(width, 650));
-                view.Arrange(new Rect(0, 0, width, 650));
-                view.UpdateLayout();
+                window = new Window { Content = view, Width = width, Height = 650, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
 
                 var segmentLists = Descendants<ListBox>(view)
                     .Where(list => ReferenceEquals(list.ItemsSource, workspace.BlocksA) ||
@@ -80,8 +81,11 @@ public sealed class CompareSegmentListLayoutTests
                 {
                     foreach (var panel in dataPanels)
                     {
-                        Assert.IsInstanceOfType<HexViewRow>(panel.ItemsGrid.SelectedItem);
-                        Assert.AreEqual(expectedAddress, ((HexViewRow)panel.ItemsGrid.SelectedItem).Address);
+                        var selected = panel.UseWindowedScrolling
+                            ? panel.WindowRows.FirstOrDefault()?.Row
+                            : panel.ItemsGrid.SelectedItem as HexViewRow;
+                        Assert.IsNotNull(selected);
+                        Assert.AreEqual(expectedAddress, selected.Address);
                     }
                 }
 
@@ -98,6 +102,7 @@ public sealed class CompareSegmentListLayoutTests
                 }
             }
             catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
         });
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();

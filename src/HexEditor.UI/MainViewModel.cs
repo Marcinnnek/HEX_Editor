@@ -47,7 +47,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<MemorySegmentRow> Segments { get; } = new();
     public int[] RowWidths { get; } = [8, 16, 32];
     public int[] ExportPayloadSizes { get; } = [8, 16, 32];
-    public MemoryImageExportFormat[] ExportFormats { get; } = Enum.GetValues<MemoryImageExportFormat>();
+    public MemoryImageExportFormat[] ExportFormats { get; } = [MemoryImageExportFormat.IntelHex, MemoryImageExportFormat.SRecord];
 
     public MemoryImage CurrentImage => Workspace.Document.CurrentImage;
     /// <summary>The editable base image for the selected workspace tab.</summary>
@@ -222,12 +222,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         if (!ReferenceEquals(previousImage, CurrentImage)) NotifyImageChanged(previousImage, CurrentImage);
     }
 
-    public bool ApplyOpenImport(MemoryImageImportPreview preview, Func<MemoryImageFormatMismatch, bool> confirmMismatch)
+    public bool ApplyOpenImport(MemoryImageImportPreview preview, Func<MemoryImageFormatMismatch, bool> confirmMismatch,
+        Func<MemoryImageImportPreview, OverlapDecision>? chooseOverlap = null)
     {
         ArgumentNullException.ThrowIfNull(preview);
         ArgumentNullException.ThrowIfNull(confirmMismatch);
         if (preview.FormatMismatch is { } mismatch && !confirmMismatch(mismatch)) return false;
-        ApplyImport(preview, OverlapDecision.OverwriteIncoming);
+        var decision = chooseOverlap?.Invoke(preview) ?? OverlapDecision.OverwriteIncoming;
+        if (decision == OverlapDecision.Cancel) return false;
+        ApplyImport(preview, decision);
         return true;
     }
 

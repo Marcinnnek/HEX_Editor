@@ -114,6 +114,25 @@ public partial class HexViewControl : UserControl
 
     public DataGrid ItemsGrid => HexGrid;
 
+    internal HexViewRow? GetAdjacentRow(HexViewRow row, int direction)
+    {
+        if (UseWindowedScrolling)
+        {
+            for (var index = 0; index < WindowRows.Count; index++)
+                if (ReferenceEquals(WindowRows[index].Row, row))
+                {
+                    var neighbor = index + direction;
+                    return (uint)neighbor < (uint)WindowRows.Count ? WindowRows[neighbor].Row : null;
+                }
+            return null;
+        }
+
+        var rowIndex = HexGrid.Items.IndexOf(row);
+        var next = rowIndex + direction;
+        return rowIndex >= 0 && (uint)next < (uint)HexGrid.Items.Count
+            ? HexGrid.Items[next] as HexViewRow : null;
+    }
+
     public Thickness RowGap
     {
         get => (Thickness)GetValue(RowGapProperty);

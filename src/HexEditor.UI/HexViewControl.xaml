@@ -64,7 +64,8 @@
                       FontStretch="{Binding FontStretch, ElementName=HexGrid}"
                       PreviewMouseWheel="WindowedScroll_PreviewMouseWheel">
           <StackPanel>
-            <Grid Margin="0,4,0,4" TextElement.FontWeight="Bold">
+            <Grid x:Name="WindowedColumnHeader" Margin="0,4,0,4" TextElement.FontWeight="Bold"
+                  Background="{DynamicResource HexWindowBrush}" TextElement.Foreground="{DynamicResource HexTextBrush}">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="{Binding AddressColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/><ColumnDefinition Width="{Binding HexDataColumnWidth, RelativeSource={RelativeSource AncestorType={x:Type local:HexViewControl}}}"/>
                 <ColumnDefinition x:Name="WindowedHeaderAsciiColumn" Width="Auto">
