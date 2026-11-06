@@ -10,6 +10,47 @@ namespace HexEditor.Tests;
 [DoNotParallelize]
 public sealed class CompareSegmentListLayoutTests
 {
+    [TestMethod]
+    public void CompareBlockListsDoNotScrollHorizontallyWhenDescriptionsFit()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var workspace = new CompareWorkspaceTabViewModel(
+                    MemoryImage.FromSegments([new MemorySegment(0x1000, [0x12])]),
+                    MemoryImage.FromSegments([new MemorySegment(0x2000, [0x34])]),
+                    "base.hex", "reference.hex");
+                var view = new CompareView(workspace);
+                window = new Window { Content = view, Width = 1250, Height = 650, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+
+                foreach (var blocks in new[]
+                {
+                    (ListBox)view.FindName("FileABlocks"),
+                    (ListBox)view.FindName("FileBBlocks")
+                })
+                {
+                    var scroll = Descendants<ScrollViewer>(blocks).Single();
+                    var text = Descendants<TextBlock>(blocks).Single(item => item.Text.StartsWith("Block 0 Starts at:"));
+                    Assert.IsLessThan(scroll.ViewportWidth, text.ActualWidth,
+                        "The Block description should fit before testing for an unnecessary scrollbar.");
+                    Assert.AreEqual(0d, scroll.ScrollableWidth, 0.5);
+                    Assert.AreEqual(Visibility.Collapsed, scroll.ComputedHorizontalScrollBarVisibility);
+                }
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     [DataRow(1100)]
     [DataRow(650)]
     [TestMethod]
@@ -50,8 +91,12 @@ public sealed class CompareSegmentListLayoutTests
                 {
                     Assert.AreEqual(ScrollBarVisibility.Auto, ScrollViewer.GetHorizontalScrollBarVisibility(list));
                     var horizontalScroll = Descendants<ScrollViewer>(list).Single();
-                    Assert.IsGreaterThan(0, horizontalScroll.ScrollableWidth,
-                        "The full one-line Block description should remain reachable in a narrow Compare column.");
+                    if (width == 650)
+                        Assert.IsGreaterThan(0, horizontalScroll.ScrollableWidth,
+                            "The full one-line Block description should remain reachable in a narrow Compare column.");
+                    else
+                        Assert.AreEqual(0d, horizontalScroll.ScrollableWidth, 0.5,
+                            "A wide Compare column should not show an unnecessary horizontal scrollbar.");
                     var firstRow = (ListBoxItem)list.ItemContainerGenerator.ContainerFromIndex(0);
                     var text = Descendants<TextBlock>(firstRow).Single();
                     Assert.AreEqual(TextWrapping.NoWrap, text.TextWrapping);

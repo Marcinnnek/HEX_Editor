@@ -13,6 +13,38 @@ namespace HexEditor.Tests;
 public sealed class EditorSegmentListLayoutTests
 {
     [TestMethod]
+    public void EditorBlockListDoesNotScrollHorizontallyWhenDescriptionFits()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            MainWindow? window = null;
+            try
+            {
+                window = new MainWindow { Width = 650 };
+                window.ViewModel.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x12])]), null, null);
+                window.Show();
+                window.UpdateLayout();
+
+                var blocks = (ListBox)window.FindName("SegmentsGrid");
+                var scroll = Descendants<ScrollViewer>(blocks).Single();
+                var text = Descendants<TextBlock>(blocks).Single(item =>
+                    item.Text == ((MemorySegmentRow)blocks.Items[0]).Description);
+                Assert.IsLessThan(scroll.ViewportWidth, text.ActualWidth,
+                    "The Block description should fit before testing for an unnecessary scrollbar.");
+                Assert.AreEqual(0d, scroll.ScrollableWidth, 0.5);
+                Assert.AreEqual(Visibility.Collapsed, scroll.ComputedHorizontalScrollBarVisibility);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void EditorBlocksAreOneLineOrderedDescriptionsWithHorizontalScrollingAndExtendedSelection()
     {
         Exception? failure = null;
@@ -47,6 +79,9 @@ public sealed class EditorSegmentListLayoutTests
                 var text = Descendants<TextBlock>(firstRow).Single();
                 Assert.AreEqual(TextWrapping.NoWrap, text.TextWrapping);
                 Assert.AreEqual(((MemorySegmentRow)blocks.Items[0]).Description, text.Text);
+                blocks.Width = 340;
+                blocks.HorizontalAlignment = HorizontalAlignment.Left;
+                window.UpdateLayout();
                 Assert.IsGreaterThan(0, horizontalScroll.ScrollableWidth,
                     "The full one-line descriptions should remain reachable when the Editor is narrow.");
                 blocks.SelectedIndex = 1;

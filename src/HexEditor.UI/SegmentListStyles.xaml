@@ -63,6 +63,6 @@
         <Setter Property="HorizontalContentAlignment" Value="Left" />
     </Style>
     <DataTemplate x:Key="MemoryBlockListItemTemplate">
-        <TextBlock Text="{Binding Description}" TextWrapping="NoWrap" MinWidth="680" />
+        <TextBlock Text="{Binding Description}" TextWrapping="NoWrap" />
     </DataTemplate>
 </ResourceDictionary>
