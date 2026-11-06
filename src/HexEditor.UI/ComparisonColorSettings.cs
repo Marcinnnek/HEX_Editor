@@ -3,12 +3,20 @@ using System.Text.Json;
 
 namespace HexEditor.UI;
 
-public enum ComparisonColorKind { Different, OnlyInA, OnlyInB, EditedByte }
-
-public sealed record ComparisonColorPalette(string Different, string OnlyInA, string OnlyInB, string EditedByte = "#AA2EAD62")
+public enum ComparisonColorKind
 {
-    public static ComparisonColorPalette LightDefaults { get; } = new("#55D03838", "#55D08514", "#55707070", "#AA18864B");
-    public static ComparisonColorPalette DarkDefaults { get; } = new("#885E3138", "#88634A25", "#88535C67", "#AA53D69A");
+    Different, OnlyInA, OnlyInB, EditedByte,
+    SelectedByteBorder, SelectedByteBackground, EditedByteBackground
+}
+
+public sealed record ComparisonColorPalette(string Different, string OnlyInA, string OnlyInB,
+    string EditedByte = "#AA2EAD62", string? SelectedByteBorder = null,
+    string? SelectedByteBackground = null, string? EditedByteBackground = null)
+{
+    public static ComparisonColorPalette LightDefaults { get; } = new("#55D03838", "#55D08514", "#55707070",
+        "#AA18864B", "#FF246CA4", "#FFC4DDF5", "#332EAD62");
+    public static ComparisonColorPalette DarkDefaults { get; } = new("#885E3138", "#88634A25", "#88535C67",
+        "#AA53D69A", "#FF79BCFF", "#FF315F8A", "#3353D69A");
 
     public string Get(ComparisonColorKind kind) => kind switch
     {
@@ -16,6 +24,9 @@ public sealed record ComparisonColorPalette(string Different, string OnlyInA, st
         ComparisonColorKind.OnlyInA => OnlyInA,
         ComparisonColorKind.OnlyInB => OnlyInB,
         ComparisonColorKind.EditedByte => EditedByte,
+        ComparisonColorKind.SelectedByteBorder => SelectedByteBorder ?? throw new InvalidOperationException("Palette is missing the selected byte border color."),
+        ComparisonColorKind.SelectedByteBackground => SelectedByteBackground ?? throw new InvalidOperationException("Palette is missing the selected byte background color."),
+        ComparisonColorKind.EditedByteBackground => EditedByteBackground ?? throw new InvalidOperationException("Palette is missing the edited byte background color."),
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 
@@ -25,11 +36,14 @@ public sealed record ComparisonColorPalette(string Different, string OnlyInA, st
         ComparisonColorKind.OnlyInA => this with { OnlyInA = color },
         ComparisonColorKind.OnlyInB => this with { OnlyInB = color },
         ComparisonColorKind.EditedByte => this with { EditedByte = color },
+        ComparisonColorKind.SelectedByteBorder => this with { SelectedByteBorder = color },
+        ComparisonColorKind.SelectedByteBackground => this with { SelectedByteBackground = color },
+        ComparisonColorKind.EditedByteBackground => this with { EditedByteBackground = color },
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     };
 }
 
-/// <summary>Persists separate comparison highlight palettes for Light and Dark appearances.</summary>
+/// <summary>Persists byte highlight palettes for Light and Dark appearances.</summary>
 public sealed class ComparisonColorSettings
 {
     private static readonly Lazy<ComparisonColorSettings> Shared = new(() => new());
@@ -71,10 +85,11 @@ public sealed class ComparisonColorSettings
     internal static void Validate(ComparisonColorPalette palette)
     {
         ArgumentNullException.ThrowIfNull(palette);
-        foreach (var color in new[] { palette.Different, palette.OnlyInA, palette.OnlyInB, palette.EditedByte })
+        foreach (var color in new[] { palette.Different, palette.OnlyInA, palette.OnlyInB, palette.EditedByte,
+                     palette.SelectedByteBorder, palette.SelectedByteBackground, palette.EditedByteBackground })
         {
             if (color is null || color.Length != 9 || color[0] != '#' || !color.AsSpan(1).ToString().All(Uri.IsHexDigit))
-                throw new ArgumentException("Comparison colors must use #AARRGGBB format.", nameof(palette));
+                throw new ArgumentException("Highlight colors must use #AARRGGBB format.", nameof(palette));
         }
     }
 
@@ -85,8 +100,8 @@ public sealed class ComparisonColorSettings
             var stored = JsonSerializer.Deserialize<StoredSettings>(File.ReadAllText(path));
             if (stored?.Light is not null && stored.Dark is not null)
             {
-                var light = stored.Light with { EditedByte = stored.Light.EditedByte ?? ComparisonColorPalette.LightDefaults.EditedByte };
-                var dark = stored.Dark with { EditedByte = stored.Dark.EditedByte ?? ComparisonColorPalette.DarkDefaults.EditedByte };
+                var light = WithLegacyDefaults(stored.Light, ComparisonColorPalette.LightDefaults);
+                var dark = WithLegacyDefaults(stored.Dark, ComparisonColorPalette.DarkDefaults);
                 Validate(light);
                 Validate(dark);
                 return (light, dark);
@@ -98,6 +113,15 @@ public sealed class ComparisonColorSettings
         catch (ArgumentException) { }
         return (ComparisonColorPalette.LightDefaults, ComparisonColorPalette.DarkDefaults);
     }
+
+    private static ComparisonColorPalette WithLegacyDefaults(ComparisonColorPalette saved, ComparisonColorPalette defaults) =>
+        saved with
+        {
+            EditedByte = saved.EditedByte ?? defaults.EditedByte,
+            SelectedByteBorder = saved.SelectedByteBorder ?? defaults.SelectedByteBorder,
+            SelectedByteBackground = saved.SelectedByteBackground ?? defaults.SelectedByteBackground,
+            EditedByteBackground = saved.EditedByteBackground ?? defaults.EditedByteBackground
+        };
 
     private sealed record StoredSettings(ComparisonColorPalette Light, ComparisonColorPalette Dark);
 }

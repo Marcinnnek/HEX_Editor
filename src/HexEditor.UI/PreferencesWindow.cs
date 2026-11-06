@@ -20,6 +20,7 @@ public sealed class PreferencesWindow : Window
         Title = "Preferences";
         Width = 470;
         SizeToContent = SizeToContent.Height;
+        MaxHeight = Math.Max(320, SystemParameters.WorkArea.Height - 24);
         ResizeMode = ResizeMode.NoResize;
         WindowStyle = WindowStyle.SingleBorderWindow;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -90,7 +91,10 @@ public sealed class PreferencesWindow : Window
         AddColorRow(panel, "Unequal bytes", ComparisonColorKind.Different);
         AddColorRow(panel, "Bytes only in A", ComparisonColorKind.OnlyInA);
         AddColorRow(panel, "Bytes only in B", ComparisonColorKind.OnlyInB);
-        AddColorRow(panel, "Edited bytes", ComparisonColorKind.EditedByte);
+        AddColorRow(panel, "Selected byte border", ComparisonColorKind.SelectedByteBorder);
+        AddColorRow(panel, "Selected byte background", ComparisonColorKind.SelectedByteBackground);
+        AddColorRow(panel, "Edited byte border", ComparisonColorKind.EditedByte);
+        AddColorRow(panel, "Edited byte background", ComparisonColorKind.EditedByteBackground);
         var reset = new Wpf.Ui.Controls.Button { Content = "Reset palette", MinWidth = 100,
             HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 0) };
         reset.Click += (_, _) => { choices.ResetPalette(_palette); RefreshSwatches(); };
@@ -114,7 +118,12 @@ public sealed class PreferencesWindow : Window
         actions.Children.Add(cancel);
         actions.Children.Add(save);
         panel.Children.Add(actions);
-        Content = panel;
+        Content = new ScrollViewer
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
         RefreshSwatches();
     }
 

@@ -92,6 +92,51 @@ public sealed class AsciiRenderingTests
         }
     }
 
+    [STATestMethod]
+    public void SelectedAndEditedBackgroundsLayerBehindOutlinesInHexAndAscii()
+    {
+        var row = new HexViewRow("00001000", "20 20 20", "   ", false, null)
+        {
+            Cells =
+            [
+                new HexByteCell("20", " ", 0x1000, ByteHighlightState.Different, IsEdited: true),
+                new HexByteCell("20", " ", 0x1001, ByteHighlightState.None, IsFindMatch: true, IsEdited: true),
+                new HexByteCell("20", " ", 0x1002, ByteHighlightState.None)
+            ]
+        };
+        foreach (var isAscii in new[] { false, true })
+        {
+            var control = new HexByteRowControl
+            {
+                Row = row, IsAscii = isAscii, SelectionStart = 0x1001, SelectionEnd = 0x1002,
+                FontFamily = new FontFamily("Consolas"), FontSize = 16
+            };
+            control.Resources["HexDifferentBrush"] = new SolidColorBrush(Colors.Gray);
+            control.Resources["HexEditedByteBackgroundBrush"] = new SolidColorBrush(Colors.Green);
+            control.Resources["HexEditedByteBrush"] = new SolidColorBrush(Colors.Red);
+            control.Resources["HexSelectionBrush"] = new SolidColorBrush(Colors.Blue);
+            control.Resources["HexSelectedByteBorderBrush"] = new SolidColorBrush(Colors.Yellow);
+            control.Resources["HexFindMatchBrush"] = new SolidColorBrush(Colors.Magenta);
+
+            var pixels = Render(control);
+            var spacing = isAscii ? 0 : GridSpacingSettings.Current.HorizontalByteSpacing;
+            var byteWidth = (control.DesiredSize.Width - (isAscii ? 12 : 2 * spacing)) / 3;
+            var stride = byteWidth + spacing;
+            var startX = isAscii ? 6 : 0;
+            var middleY = (int)((control.DesiredSize.Height - GridSpacingSettings.Current.VerticalRowSpacing) / 2);
+            int FillCount(int cell, byte red, byte green, byte blue) => pixels.CountExactInArea(red, green, blue,
+                (int)(startX + cell * stride + 3), (int)(startX + cell * stride + byteWidth - 3),
+                middleY - 2, middleY + 2);
+
+            Assert.IsGreaterThan(0, FillCount(0, 0, 0x80, 0), "Edited byte uses its background color.");
+            Assert.IsGreaterThan(0, FillCount(1, 0, 0, 0xFF), "Selection background covers an edited byte.");
+            Assert.AreEqual(0, FillCount(1, 0, 0x80, 0), "Edited background must not cover selection.");
+            Assert.IsGreaterThan(0, pixels.CountExact(0xFF, 0, 0), "Edited border remains visible.");
+            Assert.IsGreaterThan(0, pixels.CountExact(0xFF, 0xFF, 0), "Selected border remains visible.");
+            Assert.IsGreaterThan(0, pixels.CountExact(0xFF, 0, 0xFF), "Find marker remains visible.");
+        }
+    }
+
     private static PixelBuffer Render(HexByteRowControl control)
     {
         control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));

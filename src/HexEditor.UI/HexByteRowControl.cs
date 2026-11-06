@@ -112,20 +112,39 @@ public sealed class HexByteRowControl : Control
         var above = owner?.GetAdjacentRow(row, -1);
         var below = owner?.GetAdjacentRow(row, 1);
         var bytesPerRow = owner?.BytesPerRow ?? RowCapacity;
+        var editedBackground = TryFindResource("HexEditedByteBackgroundBrush") as Brush;
+        var selectedBackground = TryFindResource("HexSelectionBrush") as Brush;
+        var editedBorder = TryFindResource("HexEditedByteBrush") as Brush;
+        var selectedBorder = TryFindResource("HexSelectedByteBorderBrush") as Brush;
         for (var index = 0; index < row.Cells.Count; index++)
         {
-            var cellAddress = row.Cells[index].Address;
-            var brush = row.Cells[index].Highlight switch
+            var cell = row.Cells[index];
+            var comparisonBrush = cell.Highlight switch
             {
                 ByteHighlightState.Different => TryFindResource("HexDifferentBrush") as Brush,
                 ByteHighlightState.OnlyInA => TryFindResource("HexOnlyInABrush") as Brush,
                 ByteHighlightState.OnlyInB => TryFindResource("HexOnlyInBBrush") as Brush,
                 _ => null
             };
-            if (brush is not null)
-                drawingContext.DrawRectangle(brush, null, layout.GetHighlightBounds(index, IsAscii));
-            if (row.Cells[index].IsEdited && TryFindResource("HexEditedByteBrush") is Brush editedBrush)
-                DrawOutline(drawingContext, layout, index, row.Cells.Count, editedBrush,
+            if (comparisonBrush is not null)
+                drawingContext.DrawRectangle(comparisonBrush, null, layout.GetHighlightBounds(index, IsAscii));
+            if (cell.IsEdited && cell.Hex.Length > 0 && cell.Address is not null && editedBackground is not null)
+                DrawFill(drawingContext, layout, index, row.Cells.Count, editedBackground,
+                    ByteOutlineEdges.ForEdited(row, above, below, index, bytesPerRow));
+            if (cell.Hex.Length > 0 && cell.Address is uint address &&
+                SelectionStart is uint selectionStart && SelectionEnd is uint selectionEnd &&
+                address >= selectionStart && address <= selectionEnd && selectedBackground is not null)
+                DrawFill(drawingContext, layout, index, row.Cells.Count, selectedBackground,
+                    ByteOutlineEdges.ForSelection(row, above, below, index, bytesPerRow,
+                        selectionStart, selectionEnd));
+        }
+
+        for (var index = 0; index < row.Cells.Count; index++)
+        {
+            var cellAddress = row.Cells[index].Address;
+            if (row.Cells[index].IsEdited && row.Cells[index].Hex.Length > 0 &&
+                row.Cells[index].Address is not null && editedBorder is not null)
+                DrawOutline(drawingContext, layout, index, row.Cells.Count, editedBorder,
                     ByteOutlineEdges.ForEdited(row, above, below, index, bytesPerRow));
             if (row.Cells[index].IsFindMatch && TryFindResource("HexFindMatchBrush") is Brush findBrush)
             {
@@ -140,20 +159,30 @@ public sealed class HexByteRowControl : Control
                 }
             }
 
-            // Draw the user's selection after comparison, edit, and Find indicators so
-            // their fills cannot cover the selected-byte outline.
+            // Keep the selected-byte outline above comparison, edited, and Find indicators.
             if (row.Cells[index].Hex.Length > 0 && cellAddress is uint address &&
                 SelectionStart is uint selectionStart && SelectionEnd is uint selectionEnd &&
                 address >= selectionStart && address <= selectionEnd &&
-                TryFindResource("HexFocusBrush") is Brush selectionBrush)
+                selectedBorder is not null)
             {
-                DrawOutline(drawingContext, layout, index, row.Cells.Count, selectionBrush,
+                DrawOutline(drawingContext, layout, index, row.Cells.Count, selectedBorder,
                     ByteOutlineEdges.ForSelection(row, above, below, index, bytesPerRow,
                         selectionStart, selectionEnd));
             }
         }
 
         drawingContext.DrawDrawing(GetRowDrawing(row, layout));
+    }
+
+    private void DrawFill(DrawingContext drawingContext, ByteGridLayout layout, int index,
+        int cellCount, Brush brush, ByteOutlineEdges edges)
+    {
+        var bounds = layout.GetHighlightBounds(index, IsAscii);
+        var right = bounds.Right + (index + 1 < cellCount && !edges.Right && !IsAscii
+            ? layout.HorizontalSpacing : 0);
+        var bottom = edges.Bottom ? bounds.Bottom : bounds.Bottom + layout.VerticalSpacing;
+        drawingContext.DrawRectangle(brush, null,
+            new Rect(bounds.Left, bounds.Top, right - bounds.Left, bottom - bounds.Top));
     }
 
     private void DrawOutline(DrawingContext drawingContext, ByteGridLayout layout, int index,

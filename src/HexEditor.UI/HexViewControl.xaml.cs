@@ -167,9 +167,8 @@ public partial class HexViewControl : UserControl
     }
 
     private void ApplyRowBackground(DataGridRow row) =>
-        row.Background = row.GetIndex() == _selectedRowIndex
-            ? TryFindResource("HexSelectionBrush") as Brush
-            : TryFindResource("HexSurfaceBrush") as Brush;
+        row.SetResourceReference(Control.BackgroundProperty,
+            row.GetIndex() == _selectedRowIndex ? "HexSelectionBrush" : "HexSurfaceBrush");
 
     private void AddressRow_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

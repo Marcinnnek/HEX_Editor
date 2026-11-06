@@ -12,7 +12,7 @@ internal sealed class ComparisonColorPickerWindow : Window
 
     public ComparisonColorPickerWindow(string initialColor)
     {
-        Title = "Choose comparison color";
+        Title = "Choose highlight color";
         Width = 340;
         SizeToContent = SizeToContent.Height;
         ResizeMode = ResizeMode.NoResize;

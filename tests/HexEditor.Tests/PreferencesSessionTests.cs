@@ -220,8 +220,11 @@ public sealed class PreferencesSessionTests
 
             Assert.AreEqual("#885E3138", choices.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
             choices.SetColor(AppearanceMode.Light, ComparisonColorKind.Different, "#FF112233");
+            choices.SetColor(AppearanceMode.Light, ComparisonColorKind.SelectedByteBorder, "#FF102030");
+            choices.SetColor(AppearanceMode.Light, ComparisonColorKind.SelectedByteBackground, "#FF405060");
             choices.ResetPalette(AppearanceMode.Dark);
             choices.SetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByte, "#FF00FF00");
+            choices.SetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByteBackground, "#80445566");
             Assert.AreEqual("#FF112233", choices.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
             Assert.AreEqual("#885E3138", choices.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
             Assert.AreEqual("#55D03838", settings.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
@@ -231,6 +234,37 @@ public sealed class PreferencesSessionTests
             Assert.AreEqual("#FF112233", restarted.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
             Assert.AreEqual("#885E3138", restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
             Assert.AreEqual("#FF00FF00", restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByte));
+            Assert.AreEqual("#FF102030", restarted.GetColor(AppearanceMode.Light, ComparisonColorKind.SelectedByteBorder));
+            Assert.AreEqual("#FF405060", restarted.GetColor(AppearanceMode.Light, ComparisonColorKind.SelectedByteBackground));
+            Assert.AreEqual("#80445566", restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByteBackground));
+            Assert.AreEqual(ComparisonColorPalette.DarkDefaults.SelectedByteBackground,
+                restarted.GetColor(AppearanceMode.Dark, ComparisonColorKind.SelectedByteBackground));
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
+
+    [TestMethod]
+    public void Older_color_files_keep_existing_values_and_receive_new_theme_defaults()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "hex-editor-legacy-colors-" + Guid.NewGuid());
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var path = Path.Combine(folder, "comparison-colors.json");
+            File.WriteAllText(path, """
+                {"Light":{"Different":"#FF112233","OnlyInA":"#55000000","OnlyInB":"#55000000","EditedByte":"#AA18864B"},
+                 "Dark":{"Different":"#FF445566","OnlyInA":"#88000000","OnlyInB":"#88000000","EditedByte":"#AA53D69A"}}
+                """);
+
+            var settings = new ComparisonColorSettings(path);
+            Assert.AreEqual("#FF112233", settings.GetColor(AppearanceMode.Light, ComparisonColorKind.Different));
+            Assert.AreEqual("#FF445566", settings.GetColor(AppearanceMode.Dark, ComparisonColorKind.Different));
+            Assert.AreEqual(ComparisonColorPalette.LightDefaults.SelectedByteBorder,
+                settings.GetColor(AppearanceMode.Light, ComparisonColorKind.SelectedByteBorder));
+            Assert.AreEqual(ComparisonColorPalette.DarkDefaults.SelectedByteBackground,
+                settings.GetColor(AppearanceMode.Dark, ComparisonColorKind.SelectedByteBackground));
+            Assert.AreEqual(ComparisonColorPalette.DarkDefaults.EditedByteBackground,
+                settings.GetColor(AppearanceMode.Dark, ComparisonColorKind.EditedByteBackground));
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }
@@ -310,9 +344,13 @@ public sealed class PreferencesSessionTests
                 Assert.AreEqual("Follow Windows", radios.Single(radio => radio.IsChecked == true).Content);
                 CollectionAssert.AreEquivalent(new[] { 2d, 1d },
                     Children<Slider>(window).Select(slider => slider.Value).ToArray());
-                CollectionAssert.AreEquivalent(new[] { "Cancel", "Save", "Choose…", "Choose…", "Choose…", "Choose…", "Reset palette" },
+                CollectionAssert.AreEquivalent(new[] { "Cancel", "Save", "Choose…", "Choose…", "Choose…", "Choose…",
+                        "Choose…", "Choose…", "Choose…", "Reset palette" },
                     Children<Wpf.Ui.Controls.Button>(window)
                         .Select(button => button.Content?.ToString()).ToArray());
+                foreach (var label in new[] { "Selected byte border", "Selected byte background",
+                             "Edited byte border", "Edited byte background" })
+                    Assert.IsTrue(Children<TextBlock>(window).Any(block => block.Text == label));
                 var paletteSelector = Children<ComboBox>(window).Single(combo => combo.Name == "ComparisonPaletteSelector");
                 paletteSelector.SelectedIndex = 1;
                 Assert.AreEqual(AppearanceMode.Automatic, choices.Appearance,

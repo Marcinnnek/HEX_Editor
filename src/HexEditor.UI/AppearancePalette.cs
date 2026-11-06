@@ -25,16 +25,18 @@ internal static class AppearancePalette
         Set(resources, "HexMutedTextBrush", dark ? "#BBC3CE" : "#4C5561");
         Set(resources, "HexDisabledTextBrush", dark ? "#929BA6" : "#68717D");
         Set(resources, "HexBorderBrush", dark ? "#6B7582" : "#AAB3BE");
-        Set(resources, "HexSelectionBrush", dark ? "#315F8A" : "#C4DDF5");
         Set(resources, "HexFocusBrush", dark ? "#79BCFF" : "#246CA4");
         Set(resources, "HexErrorBrush", dark ? "#FF9292" : "#A52828");
         Set(resources, "HexFindMatchBrush", dark ? "#FFFFB347" : "#FFB56600");
         Set(resources, "HexAsciiBackgroundBrush", dark ? "#244C6E93" : "#146B87A6");
         var colors = ComparisonColorSettings.Current.GetPalette(dark ? AppearanceMode.Dark : AppearanceMode.Light);
+        Set(resources, "HexSelectionBrush", colors.Get(ComparisonColorKind.SelectedByteBackground));
+        Set(resources, "HexSelectedByteBorderBrush", colors.Get(ComparisonColorKind.SelectedByteBorder));
         Set(resources, "HexDifferentBrush", colors.Different);
         Set(resources, "HexOnlyInABrush", colors.OnlyInA);
         Set(resources, "HexOnlyInBBrush", colors.OnlyInB);
         Set(resources, "HexEditedByteBrush", colors.EditedByte);
+        Set(resources, "HexEditedByteBackgroundBrush", colors.Get(ComparisonColorKind.EditedByteBackground));
         Changed?.Invoke();
     }
 
