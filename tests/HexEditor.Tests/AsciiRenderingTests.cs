@@ -60,6 +60,38 @@ public sealed class AsciiRenderingTests
         }
     }
 
+    [STATestMethod]
+    public void AdjacentEditedBytesDoNotDrawAnInternalOutlineInHexOrAscii()
+    {
+        var row = new HexViewRow("00001000", "20 21", " !", false, null)
+        {
+            Cells =
+            [
+                new HexByteCell("20", " ", 0x1000, ByteHighlightState.None, IsEdited: true),
+                new HexByteCell("21", "!", 0x1001, ByteHighlightState.None, IsEdited: true)
+            ]
+        };
+        foreach (var isAscii in new[] { false, true })
+        {
+            var control = new HexByteRowControl
+            {
+                Row = row, IsAscii = isAscii, FontFamily = new FontFamily("Consolas"), FontSize = 16
+            };
+            control.Resources["HexEditedByteBrush"] = new SolidColorBrush(Colors.Red);
+            var pixels = Render(control);
+            var spacing = isAscii ? 0 : GridSpacingSettings.Current.HorizontalByteSpacing;
+            var byteWidth = (control.DesiredSize.Width - (isAscii ? 12 : spacing)) / 2;
+            var innerLeft = (int)Math.Floor((isAscii ? 6 : 0) + byteWidth) - 1;
+            var innerRight = (int)Math.Ceiling((isAscii ? 6 : 0) + byteWidth + spacing) + 1;
+            var middleY = (int)((control.DesiredSize.Height - GridSpacingSettings.Current.VerticalRowSpacing) / 2);
+
+            Assert.IsGreaterThan(0, pixels.CountExact(0xFF, 0x00, 0x00), "The exterior edited outline must remain visible.");
+            Assert.AreEqual(0, pixels.CountExactInArea(0xFF, 0x00, 0x00,
+                innerLeft, innerRight, middleY - 2, middleY + 2),
+                "Adjacent edited bytes must not have an internal outline.");
+        }
+    }
+
     private static PixelBuffer Render(HexByteRowControl control)
     {
         control.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -79,5 +111,18 @@ public sealed class AsciiRenderingTests
         public byte AlphaAt(int x, int y) => Pixels[(y * Width + x) * 4 + 3];
         public int CountExact(byte red, byte green, byte blue) => Enumerable.Range(0, Pixels.Length / 4)
             .Count(index => Pixels[index * 4 + 2] == red && Pixels[index * 4 + 1] == green && Pixels[index * 4] == blue);
+
+        public int CountExactInArea(byte red, byte green, byte blue, int left, int right, int top, int bottom)
+        {
+            var count = 0;
+            for (var y = top; y <= bottom; y++)
+                for (var x = left; x <= right; x++)
+                {
+                    var index = (y * Width + x) * 4;
+                    if (Pixels[index + 2] == red && Pixels[index + 1] == green && Pixels[index] == blue)
+                        count++;
+                }
+            return count;
+        }
     }
 }

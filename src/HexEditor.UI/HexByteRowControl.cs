@@ -107,7 +107,8 @@ public sealed class HexByteRowControl : Control
         if (IsAscii && TryFindResource("HexAsciiBackgroundBrush") is Brush asciiBackground)
             drawingContext.DrawRectangle(asciiBackground, null, dataBounds);
         if (row is null || row.IsGapMarker) return;
-        var owner = SelectionStart is not null && SelectionEnd is not null ? FindOwner() : null;
+        var hasSelection = SelectionStart is not null && SelectionEnd is not null;
+        var owner = hasSelection || row.Cells.Any(static cell => cell.IsEdited) ? FindOwner() : null;
         var above = owner?.GetAdjacentRow(row, -1);
         var below = owner?.GetAdjacentRow(row, 1);
         var bytesPerRow = owner?.BytesPerRow ?? RowCapacity;
@@ -124,7 +125,8 @@ public sealed class HexByteRowControl : Control
             if (brush is not null)
                 drawingContext.DrawRectangle(brush, null, layout.GetHighlightBounds(index, IsAscii));
             if (row.Cells[index].IsEdited && TryFindResource("HexEditedByteBrush") is Brush editedBrush)
-                drawingContext.DrawRectangle(null, new Pen(editedBrush, 2), layout.GetHighlightBounds(index, IsAscii));
+                DrawOutline(drawingContext, layout, index, row.Cells.Count, editedBrush,
+                    ByteOutlineEdges.ForEdited(row, above, below, index, bytesPerRow));
             if (row.Cells[index].IsFindMatch && TryFindResource("HexFindMatchBrush") is Brush findBrush)
             {
                 // Keep the Find marker visually distinct from the edited-byte outline,
@@ -145,24 +147,30 @@ public sealed class HexByteRowControl : Control
                 address >= selectionStart && address <= selectionEnd &&
                 TryFindResource("HexFocusBrush") is Brush selectionBrush)
             {
-                var edges = SelectionOutlineEdges.ForCell(row, above, below, index, bytesPerRow,
-                    selectionStart, selectionEnd);
-                var bounds = layout.GetHighlightBounds(index, IsAscii);
-                var selectedLeft = index > 0 && !edges.Left;
-                var selectedRight = index + 1 < row.Cells.Count && !edges.Right;
-                var halfSpacing = IsAscii ? 0 : layout.HorizontalSpacing / 2d;
-                var left = bounds.Left - (selectedLeft ? halfSpacing : 0);
-                var right = bounds.Right + (selectedRight ? halfSpacing : 0);
-                var pen = new Pen(selectionBrush, 2);
-                if (edges.Top) drawingContext.DrawLine(pen, new Point(left, bounds.Top), new Point(right, bounds.Top));
-                if (edges.Bottom) drawingContext.DrawLine(pen, new Point(left, bounds.Bottom), new Point(right, bounds.Bottom));
-                var sideBottom = edges.Bottom ? bounds.Bottom : bounds.Bottom + layout.VerticalSpacing;
-                if (edges.Left) drawingContext.DrawLine(pen, new Point(bounds.Left, bounds.Top), new Point(bounds.Left, sideBottom));
-                if (edges.Right) drawingContext.DrawLine(pen, new Point(bounds.Right, bounds.Top), new Point(bounds.Right, sideBottom));
+                DrawOutline(drawingContext, layout, index, row.Cells.Count, selectionBrush,
+                    ByteOutlineEdges.ForSelection(row, above, below, index, bytesPerRow,
+                        selectionStart, selectionEnd));
             }
         }
 
         drawingContext.DrawDrawing(GetRowDrawing(row, layout));
+    }
+
+    private void DrawOutline(DrawingContext drawingContext, ByteGridLayout layout, int index,
+        int cellCount, Brush brush, ByteOutlineEdges edges)
+    {
+        var bounds = layout.GetHighlightBounds(index, IsAscii);
+        var joinedLeft = index > 0 && !edges.Left;
+        var joinedRight = index + 1 < cellCount && !edges.Right;
+        var halfSpacing = IsAscii ? 0 : layout.HorizontalSpacing / 2d;
+        var left = bounds.Left - (joinedLeft ? halfSpacing : 0);
+        var right = bounds.Right + (joinedRight ? halfSpacing : 0);
+        var pen = new Pen(brush, 2);
+        if (edges.Top) drawingContext.DrawLine(pen, new Point(left, bounds.Top), new Point(right, bounds.Top));
+        if (edges.Bottom) drawingContext.DrawLine(pen, new Point(left, bounds.Bottom), new Point(right, bounds.Bottom));
+        var sideBottom = edges.Bottom ? bounds.Bottom : bounds.Bottom + layout.VerticalSpacing;
+        if (edges.Left) drawingContext.DrawLine(pen, new Point(bounds.Left, bounds.Top), new Point(bounds.Left, sideBottom));
+        if (edges.Right) drawingContext.DrawLine(pen, new Point(bounds.Right, bounds.Top), new Point(bounds.Right, sideBottom));
     }
 
     protected override void OnPropertyChanged(DependencyPropertyChangedEventArgs e)

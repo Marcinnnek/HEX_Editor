@@ -17,7 +17,7 @@ Make selected bytes readable as one region in HEX and ASCII, and remove the defa
 
 ## Verification
 
-`SelectionOutlineEdgesTests` cover horizontal and vertical adjacency and gaps. The Editor context menu was opened and rendered in Light and Dark to check its final appearance.
+`ByteOutlineEdgesTests` cover horizontal and vertical adjacency and gaps. The Editor context menu was opened and rendered in Light and Dark to check its final appearance.
 
 ## Comments
 

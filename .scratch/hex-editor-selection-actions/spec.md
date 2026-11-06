@@ -9,3 +9,5 @@ On Delete with an occupied-byte selection, choose Remove bytes, Set bytes to `00
 Ctrl+V and Paste clipboard bytes parse system clipboard HEX text into a contiguous byte sequence beginning at the selection start. A single confirmation shows byte count, target address, overlap count, and Overwrite/Keep existing/Cancel choices. The operation affects exactly the clipboard byte count, leaves any longer selected tail untouched, rejects 32-bit overflow atomically, and is one Undo step. Retain the separate sparse internal Copy range/Paste workflow.
 
 Draw selection as an exterior outline in HEX and ASCII, without lines between adjacent selected bytes horizontally or vertically. Address gaps split visible outlines. Right-click preserves the selection and exposes applicable actions. Repair context menu rendering in Light and Dark themes.
+
+Adjacent edited bytes likewise share one exterior outline in HEX and ASCII, including across row boundaries. Unedited bytes and address gaps separate edited outlines. Difference backgrounds, Find markers, and selection outlines remain visible.
