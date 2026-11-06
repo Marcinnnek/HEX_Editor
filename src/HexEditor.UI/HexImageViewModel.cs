@@ -97,7 +97,8 @@ public sealed class HexImageViewModel : INotifyPropertyChanged
         new(image.Ranges.Select(range => ((ulong)range.StartAddress, (ulong)range.EndAddress)),
             bytesPerRow, position => position.IsGap
             ? HexViewRow.Gap((uint)position.GapStartAddress, (uint)position.GapEndAddress)
-            : CreateRow(image, bytesPerRow, showAscii, (uint)position.RowAddress), sourceIdentity: image);
+            : CreateRow(image, bytesPerRow, showAscii, (uint)position.RowAddress),
+            sourceIdentity: (object?)_document ?? image);
 
     private HexViewRow CreateRow(MemoryImage image, int bytesPerRow, bool showAscii, uint rowAddress)
     {

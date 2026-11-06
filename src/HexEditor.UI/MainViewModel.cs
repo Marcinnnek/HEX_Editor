@@ -386,7 +386,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private void OnEditingImageChanged(MemoryImage previousImage, MemoryImage updatedImage)
     {
         Checksum.TrackImageChange(previousImage, updatedImage);
-        RefreshImage();
+        RefreshImage(clearSelection: false);
         RefreshModifiedTitle();
         StatusMessage = "Image modified. Save to write changes to disk.";
         RefreshEditorStatus();
