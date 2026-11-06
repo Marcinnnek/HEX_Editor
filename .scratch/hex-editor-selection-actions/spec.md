@@ -8,6 +8,8 @@ On Delete with an occupied-byte selection, choose Remove bytes, Set bytes to `00
 
 The Editor context menu has one fill entry, labeled `Fill with Pattern...`, which opens the same Fill dialog as the Edit menu command.
 
+The Fill dialog styles its repeating-pattern input like other form text fields, including inner padding, vertical text centering, and spacing below the field. Its `Get fill all region` action uses the themed button appearance. The Keep existing and Overwrite existing choices show a visible filled dot when selected, and Keep existing is selected by default.
+
 Ctrl+V and Paste clipboard bytes parse system clipboard HEX text into a contiguous byte sequence beginning at the selection start. A single confirmation shows byte count, target address, overlap count, and Overwrite/Keep existing/Cancel choices. The operation affects exactly the clipboard byte count, leaves any longer selected tail untouched, rejects 32-bit overflow atomically, and is one Undo step. Retain the separate sparse internal Copy range/Paste workflow.
 
 Draw selection as an exterior outline in HEX and ASCII, without lines between adjacent selected bytes horizontally or vertically. Address gaps split visible outlines. Right-click preserves the selection and exposes applicable actions. Repair context menu rendering in Light and Dark themes.

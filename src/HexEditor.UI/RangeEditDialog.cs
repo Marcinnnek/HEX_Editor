@@ -16,7 +16,12 @@ internal sealed class RangeEditDialog : Window
     private readonly TextBox _pattern = new() { MinWidth = 220 };
     private readonly TextBlock _error = new() { TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _count = new() { Name = "InclusiveAddressCount" };
-    private readonly Button _allRegion = new() { Name = "GetFillAllRegion", Content = "Get fill all region", MinWidth = 140 };
+    private readonly Wpf.Ui.Controls.Button _allRegion = new()
+    {
+        Name = "GetFillAllRegion", Content = "Get fill all region", MinWidth = 140,
+        HorizontalAlignment = HorizontalAlignment.Left, Padding = new Thickness(12, 6, 12, 6),
+        Margin = new Thickness(0, 4, 0, 8)
+    };
     private readonly RadioButton _keep = new() { Name = "KeepExistingData", Content = "Keep existing data", IsChecked = true, GroupName = "FillPolicy" };
     private readonly RadioButton _overwrite = new() { Name = "OverwriteExistingData", Content = "Overwrite existing data", GroupName = "FillPolicy" };
     private readonly (uint Start, uint End)? _fillAllRegion;
@@ -28,6 +33,8 @@ internal sealed class RangeEditDialog : Window
         _error.SetResourceReference(TextBlock.ForegroundProperty, "HexErrorBrush");
         HexAddressInput.Configure(_start);
         HexAddressInput.Configure(_end);
+        FormTextBoxAppearance.Apply(_pattern);
+        if (kind == RangeEditDialogKind.Fill) _pattern.Margin = new Thickness(0, 0, 0, 8);
         Title = kind switch { RangeEditDialogKind.SelectRange => "Select Range", RangeEditDialogKind.Insert => "Edit / Insert", _ => "Fill Range" };
         Width = kind == RangeEditDialogKind.Insert ? 390 : 470;
         SizeToContent = SizeToContent.Height;
@@ -47,6 +54,11 @@ internal sealed class RangeEditDialog : Window
             AddField(panel, kind == RangeEditDialogKind.Insert ? "Bytes (hex):" : "Repeating byte pattern (hex):", _pattern);
         if (kind == RangeEditDialogKind.Fill)
         {
+            StyleButton(_allRegion);
+            _keep.Template = ThemedRadioButtonTemplate.Create();
+            _overwrite.Template = ThemedRadioButtonTemplate.Create();
+            _keep.Margin = new Thickness(0, 4, 0, 4);
+            _overwrite.Margin = new Thickness(0, 4, 0, 4);
             _allRegion.IsEnabled = fillAllRegion is not null;
             _allRegion.Click += (_, _) => SetFillAllRegion();
             panel.Children.Add(_allRegion);
@@ -59,9 +71,11 @@ internal sealed class RangeEditDialog : Window
         }
         panel.Children.Add(_error);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
-        var ok = new Button { Content = "OK", IsDefault = true, MinWidth = 76, Margin = new Thickness(0, 0, 8, 0) };
+        var ok = new Wpf.Ui.Controls.Button { Content = "OK", IsDefault = true, MinWidth = 76, Margin = new Thickness(0, 0, 8, 0) };
+        StyleButton(ok);
         ok.Click += (_, _) => Accept();
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 76 };
+        var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true, MinWidth = 76 };
+        StyleButton(cancel);
         buttons.Children.Add(ok); buttons.Children.Add(cancel); panel.Children.Add(buttons);
         Content = panel;
         Loaded += (_, _) => { _start.Focus(); _start.SelectAll(); };
@@ -73,6 +87,13 @@ internal sealed class RangeEditDialog : Window
     {
         panel.Children.Add(new TextBlock { Text = label, Margin = new Thickness(0, 8, 0, 3) });
         panel.Children.Add(input);
+    }
+
+    private static void StyleButton(Wpf.Ui.Controls.Button button)
+    {
+        button.SetResourceReference(Control.BackgroundProperty, "HexRaisedBrush");
+        button.SetResourceReference(Control.ForegroundProperty, "HexTextBrush");
+        button.SetResourceReference(Control.BorderBrushProperty, "HexBorderBrush");
     }
 
     private void Accept()
