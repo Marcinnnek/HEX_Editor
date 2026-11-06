@@ -17,11 +17,11 @@
                 CornerRadius="4" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
             <TextBlock Text="{Binding ViewModel.ComparisonStatus}" FontWeight="SemiBold" TextWrapping="Wrap" />
         </Border>
-        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" VerticalAlignment="Center">
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,2" VerticalAlignment="Center">
             <ComboBox x:Name="ViewModeBox" Width="150" Height="{Binding ElementName=RangeStartBox, Path=ActualHeight}"
-                      FontSize="15" VerticalContentAlignment="Center"
+                      FontSize="15" VerticalContentAlignment="Center" Margin="0,0,12,8"
                       ItemsSource="{Binding ViewModes}" SelectedItem="{Binding ViewModel.ViewMode}" />
-            <StackPanel x:Name="RangeControls" Orientation="Horizontal" Margin="0,0,12,0" ToolTipService.ShowOnDisabled="True">
+            <StackPanel x:Name="RangeControls" Orientation="Horizontal" Margin="0,0,12,8" ToolTipService.ShowOnDisabled="True">
                 <StackPanel.Style>
                     <Style TargetType="StackPanel">
                         <Setter Property="IsEnabled" Value="False" />
@@ -34,20 +34,22 @@
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>
-                <TextBlock Text="Start" FontSize="15" VerticalAlignment="Center" Margin="10,0,4,0" />
+                <TextBlock Text="Start" FontSize="15" VerticalAlignment="Center" Margin="0,0,4,0" />
                 <ui:TextBox x:Name="RangeStartBox" Text="00000000" local:HexAddressInput.Apply="True" />
                 <TextBlock Text="End" FontSize="15" VerticalAlignment="Center" Margin="8,0,4,0" />
                 <ui:TextBox x:Name="RangeEndBox" Text="FFFFFFFF" local:HexAddressInput.Apply="True" />
                 <ui:Button x:Name="ApplyRangeButton" Content="Apply range" Height="{Binding ElementName=RangeEndBox, Path=ActualHeight}"
                            FontSize="15" VerticalContentAlignment="Center" Margin="5,0" Padding="8,3" Click="ApplyRange_Click" />
             </StackPanel>
-            <ui:TextBox x:Name="AddressBox" local:HexAddressInput.Apply="True" />
-            <ui:Button x:Name="GoButton" Content="Go" Height="{Binding ElementName=AddressBox, Path=ActualHeight}"
-                       FontSize="15" VerticalContentAlignment="Center" Margin="4,0" Padding="8,3" Click="Go_Click" />
-            <ui:Button x:Name="PreviousDifferenceButton" Content="Previous difference" Height="{Binding ElementName=AddressBox, Path=ActualHeight}"
-                       FontSize="15" VerticalContentAlignment="Center" Margin="10,0,3,0" Padding="8,3" Click="PreviousDifference_Click" />
-            <ui:Button x:Name="NextDifferenceButton" Content="Next difference" Height="{Binding ElementName=AddressBox, Path=ActualHeight}"
-                       FontSize="15" VerticalContentAlignment="Center" Padding="8,3" Click="NextDifference_Click" />
+            <StackPanel x:Name="NavigationControls" Orientation="Horizontal" Margin="0,0,12,8">
+                <ui:TextBox x:Name="AddressBox" local:HexAddressInput.Apply="True" />
+                <ui:Button x:Name="GoButton" Content="Go" Height="{Binding ElementName=AddressBox, Path=ActualHeight}"
+                           FontSize="15" VerticalContentAlignment="Center" Margin="8,0,0,0" Padding="8,3" Click="Go_Click" />
+                <ui:Button x:Name="PreviousDifferenceButton" Content="Previous difference" Height="{Binding ElementName=AddressBox, Path=ActualHeight}"
+                           FontSize="15" VerticalContentAlignment="Center" Margin="8,0,0,0" Padding="8,3" Click="PreviousDifference_Click" />
+                <ui:Button x:Name="NextDifferenceButton" Content="Next difference" Height="{Binding ElementName=AddressBox, Path=ActualHeight}"
+                           FontSize="15" VerticalContentAlignment="Center" Margin="8,0,0,0" Padding="8,3" Click="NextDifference_Click" />
+            </StackPanel>
         </WrapPanel>
         <Grid>
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>

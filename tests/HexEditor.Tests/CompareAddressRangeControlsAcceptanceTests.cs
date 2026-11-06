@@ -14,6 +14,63 @@ namespace HexEditor.Tests;
 public sealed class CompareAddressRangeControlsAcceptanceTests
 {
     [TestMethod]
+    public void MinimumWidthKeepsCompareToolbarGroupsTogetherAndSpaced()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            Window? window = null;
+            try
+            {
+                var image = MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]);
+                var view = new CompareView(new CompareWorkspaceTabViewModel(image, image, "base.hex", "reference.hex"));
+                // Allow for the main window's margin and tab chrome within its 620 px minimum width.
+                window = new Window { Content = view, Width = 580, Height = 600, ShowInTaskbar = false };
+                window.Show();
+                window.UpdateLayout();
+
+                Rect Bounds(string name)
+                {
+                    var control = (FrameworkElement)view.FindName(name);
+                    return control.TransformToAncestor(view).TransformBounds(new Rect(control.RenderSize));
+                }
+
+                var mode = Bounds("ViewModeBox");
+                var range = Bounds("RangeControls");
+                var navigation = Bounds("NavigationControls");
+                var start = Bounds("RangeStartBox");
+                var end = Bounds("RangeEndBox");
+                var apply = Bounds("ApplyRangeButton");
+                var address = Bounds("AddressBox");
+                var go = Bounds("GoButton");
+                var previous = Bounds("PreviousDifferenceButton");
+                var next = Bounds("NextDifferenceButton");
+
+                Assert.AreEqual(start.Top, end.Top, 1);
+                Assert.AreEqual(start.Top, apply.Top, 1);
+                Assert.AreEqual(address.Top, go.Top, 1);
+                Assert.AreEqual(address.Top, previous.Top, 1);
+                Assert.AreEqual(address.Top, next.Top, 1);
+                Assert.AreEqual(mode.Left, range.Left, 1);
+                Assert.AreEqual(mode.Left, navigation.Left, 1);
+                Assert.IsTrue(start.Top >= mode.Bottom + 6, "The range group needs a gap below the view selector.");
+                Assert.IsTrue(address.Top >= start.Bottom + 6, "The navigation group needs a gap below the range group.");
+                Assert.IsTrue(go.Left >= address.Right + 6);
+                Assert.IsTrue(previous.Left >= go.Right + 6);
+                Assert.IsTrue(next.Left >= previous.Right + 6);
+                Assert.IsTrue(apply.Right <= view.ActualWidth - 8);
+                Assert.IsTrue(next.Right <= view.ActualWidth - 8);
+            }
+            catch (Exception exception) { failure = exception; }
+            finally { window?.Close(); }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [TestMethod]
     public void RangeControlsAreAvailableOnlyInAddressRangeMode()
     {
         Exception? failure = null;

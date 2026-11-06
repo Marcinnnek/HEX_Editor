@@ -38,7 +38,7 @@
                 <ui:MenuItem Header="Fill range" Click="Fill_Click" />
                 <ui:MenuItem Header="Copy range" Click="Copy_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
                 <ui:MenuItem Header="Cut range" Click="Cut_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
-                <ui:MenuItem Header="Paste at start" Click="Paste_Click" IsEnabled="{Binding ViewModel.ActiveCanPaste}" />
+                <ui:MenuItem Header="Paste" Click="Paste_Click" IsEnabled="{Binding ViewModel.ActiveCanPaste}" />
                 <ui:MenuItem Header="Delete range" Click="Delete_Click" IsEnabled="{Binding ViewModel.ActiveHasSelection}" />
             </ui:MenuItem>
             <ui:MenuItem Header="_View">
