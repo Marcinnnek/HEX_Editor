@@ -308,14 +308,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void Save()
     {
         ActiveDocument.Save();
-        CompleteSave(ActiveDocument);
+        RefreshAfterDocumentSave(ActiveDocument);
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken, IProgress<MemoryImageFileProgress>? progress)
     {
         var document = ActiveDocument;
         await document.SaveAsync(cancellationToken, progress);
-        if (ReferenceEquals(ActiveDocument, document)) CompleteSave(document);
+        RefreshAfterDocumentSave(document);
     }
 
     public async Task SaveAsAsync(string path, MemoryImageExportFormat format, bool overwriteExisting,
@@ -323,30 +323,34 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         var document = ActiveDocument;
         await document.SaveAsAsync(path, format, overwriteExisting, cancellationToken, progress);
-        if (ReferenceEquals(ActiveDocument, document)) CompleteSave(document);
+        RefreshAfterDocumentSave(document);
     }
 
     public void SaveAs(string path, MemoryImageExportFormat format, bool overwriteExisting)
     {
         ActiveDocument.SaveAs(path, format, overwriteExisting);
-        CompleteSave(ActiveDocument);
+        RefreshAfterDocumentSave(ActiveDocument);
     }
 
-    private void CompleteSave(EditorDocument document)
+    internal void RefreshAfterDocumentSave(EditorDocument document)
     {
-        if (ReferenceEquals(document, Workspace.Document)) RefreshImage(clearSelection: false);
-        if (ReferenceEquals(document, Workspace.Document)) RefreshTitle();
+        ArgumentNullException.ThrowIfNull(document);
+        if (ReferenceEquals(document, Workspace.Document))
+        {
+            RefreshImage(clearSelection: false);
+            RefreshEditorStatus();
+            Raise(nameof(SourcePath), nameof(EditorBlockListHeader), nameof(SourceFormat),
+                nameof(SourceFormatMetadata), nameof(IsModified));
+        }
+        if (ReferenceEquals(document, ActiveDocument))
+        {
+            RefreshTitle();
+            Raise(nameof(ActiveCanSave), nameof(ActiveHasImage), nameof(ActiveCanCloseImage));
+        }
         StatusMessage = $"Saved {document.CurrentImage.OccupiedByteCount:N0} bytes as {document.SourceFormat}.";
-        if (ReferenceEquals(document, Workspace.Document)) RefreshEditorStatus();
-        Raise(nameof(SourcePath), nameof(EditorBlockListHeader), nameof(SourceFormat), nameof(SourceFormatMetadata), nameof(IsModified),
-            nameof(ActiveCanSave), nameof(ActiveHasImage), nameof(ActiveCanCloseImage));
     }
 
     public bool TryNavigateToAddress(uint address, out int rowIndex) => ImageView.TryNavigateToAddress(address, out rowIndex);
-    public void RefreshEditedByteMarkers()
-    {
-        if (ReferenceEquals(ActiveDocument, Workspace.Document)) RefreshImage(clearSelection: false);
-    }
     public bool TryNavigateToSegment(int segmentIndex, out int rowIndex) => ImageView.TryNavigateToSegment(segmentIndex, out rowIndex);
 
     public void ExportSegments(IEnumerable<int> segmentIndexes, MemoryImageExportFormat format, int maxDataBytesPerRecord, Stream output) =>

@@ -44,6 +44,63 @@ public sealed class FileOpenAndSaveAcceptanceTests
         if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }
 
+    [TestMethod]
+    public void WindowSaveAndSaveAsClearEditorDirtyIndicators()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"hex-editor-dirty-state-{Guid.NewGuid():N}.hex");
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            MainWindow? window = null;
+            try
+            {
+                window = new MainWindow();
+                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(window.Dispatcher));
+                window.ViewModel.LoadImage(MemoryImage.FromSegments([new MemorySegment(0x1000, [0x10])]),
+                    null, null);
+                window.Show();
+
+                var document = window.ViewModel.Workspace.Document;
+                document.Editing.EditByte(0x1000, 0x11, OverlapDecision.OverwriteIncoming);
+                Assert.AreEqual("Modified", window.ViewModel.EditorStatus.ModifiedStateText);
+                Assert.IsTrue(WaitFor(window.SaveDocumentAsAsync(document, path,
+                    MemoryImageExportFormat.IntelHex, overwriteExisting: false), window.Dispatcher));
+                AssertSaved();
+
+                document.Editing.EditByte(0x1000, 0x12, OverlapDecision.OverwriteIncoming);
+                Assert.AreEqual("Modified", window.ViewModel.EditorStatus.ModifiedStateText);
+                Assert.AreEqual($"{Path.GetFileName(path)} * - HexEditor", window.Title);
+                Assert.IsTrue(WaitFor(window.SaveDocumentAsync(document), window.Dispatcher));
+                AssertSaved();
+
+                void AssertSaved()
+                {
+                    Assert.IsFalse(document.IsModified);
+                    Assert.AreEqual("Saved", window.ViewModel.EditorStatus.ModifiedStateText);
+                    Assert.AreEqual($"{Path.GetFileName(path)} - HexEditor", window.Title);
+                    Assert.IsFalse(window.ViewModel.ImageView.Rows.Single(row => !row.IsGapMarker)
+                        .Cells.Single(cell => cell.Address == 0x1000).IsEdited);
+                }
+            }
+            catch (Exception exception) { failure = exception; }
+            finally
+            {
+                if (window is not null)
+                {
+                    var document = window.ViewModel.Workspace.Document;
+                    while (document.IsModified && document.Editing.CanUndo) document.Editing.Undo();
+                    window.Close();
+                }
+                SynchronizationContext.SetSynchronizationContext(null);
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (File.Exists(path)) File.Delete(path);
+        if (failure is not null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
     [DataRow(MemoryImageExportFormat.IntelHex, "hex")]
     [DataRow(MemoryImageExportFormat.SRecord, "s19")]
     [TestMethod]
