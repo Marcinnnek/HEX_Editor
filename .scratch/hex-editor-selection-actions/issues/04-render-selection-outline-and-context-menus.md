@@ -17,4 +17,8 @@ Make selected bytes readable as one region in HEX and ASCII, and remove the defa
 
 ## Verification
 
-`SelectionOutlineEdgesTests` cover horizontal and vertical adjacency and gaps. A visual Light/Dark review remains useful for final appearance.
+`SelectionOutlineEdgesTests` cover horizontal and vertical adjacency and gaps. The Editor context menu was opened and rendered in Light and Dark to check its final appearance.
+
+## Comments
+
+- 2026-11-06: A screenshot showed stray light fragments in the context menu icon gutter. Added an explicit `ContextMenu` template for Editor and Compare, removing the default gutter. Rendered the opened Editor menu in Light and Dark; both show aligned items and a clean separator.

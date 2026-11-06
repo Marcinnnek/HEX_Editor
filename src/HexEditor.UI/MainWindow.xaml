@@ -126,7 +126,7 @@
                                           ShowAscii="{Binding ViewModel.ImageView.ShowAscii}"
                                           AddressRangeSelected="HexView_AddressRangeSelected">
                         <local:HexViewControl.ContextMenu>
-                            <ContextMenu>
+                            <ContextMenu Style="{StaticResource HexContextMenuStyle}">
                                 <MenuItem Header="Select Range..." Click="SelectRange_Click" Style="{StaticResource HexContextMenuItemStyle}" />
                                 <Separator Style="{StaticResource HexContextMenuSeparatorStyle}" />
                                 <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" Style="{StaticResource HexContextMenuItemStyle}" />

@@ -52,7 +52,7 @@ public partial class CompareView : UserControl
 
     private void ConfigureBaseContextMenu()
     {
-        var menu = new ContextMenu();
+        var menu = new ContextMenu { Style = (Style)FindResource("HexContextMenuStyle") };
         var fill = new MenuItem { Header = "Fill with Pattern..." };
         var paste = new MenuItem { Header = "Paste clipboard bytes" };
         var delete = new MenuItem { Header = "Delete selected bytes" };
