@@ -130,7 +130,6 @@
                                 <MenuItem Header="Select Range..." Click="SelectRange_Click" Style="{StaticResource HexContextMenuItemStyle}" />
                                 <Separator Style="{StaticResource HexContextMenuSeparatorStyle}" />
                                 <MenuItem Header="Edit / Insert..." Click="EditInsert_Click" Style="{StaticResource HexContextMenuItemStyle}" />
-                                <MenuItem Header="Fill Range..." Click="Fill_Click" Style="{StaticResource HexContextMenuItemStyle}" />
                                 <MenuItem Header="Fill with Pattern..." Click="Fill_Click" Style="{StaticResource HexContextMenuItemStyle}" />
                                 <MenuItem Header="Paste clipboard bytes" Click="PasteClipboardBytes_Click" Style="{StaticResource HexContextMenuItemStyle}" />
                                 <MenuItem Header="Delete selected bytes" Click="DeleteSelectedBytes_Click" Style="{StaticResource HexContextMenuItemStyle}" />
